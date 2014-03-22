@@ -795,6 +795,18 @@ template<> bool8 RegexMatcher<true>::characterClassCanMatch(RegexCharacterClass 
     return true;
 }
 
+template<> void (RegexMatcher<false>::*RegexMatcher<false>::chooseBuiltinCharacterClassFunction(bool (*characterMatchFunction)(Uchar ch), void (RegexMatcher<false>::*matchFunction)(RegexSymbol *thisSymbol)))(RegexSymbol *thisSymbol)
+{
+    if (characterMatchFunction(basicChar))
+        return &RegexMatcher<false>::matchSymbol_Character;
+    else
+        return &RegexMatcher<false>::matchSymbol_NeverMatch;
+}
+template<> void (RegexMatcher<true>::*RegexMatcher<true>::chooseBuiltinCharacterClassFunction(bool (*characterMatchFunction)(Uchar ch), void (RegexMatcher<true>::*matchFunction)(RegexSymbol *thisSymbol)))(RegexSymbol *thisSymbol)
+{
+    return matchFunction;
+}
+
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
 {
@@ -855,28 +867,22 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_WordBoundary;
                 break;
             case RegexSymbol_DigitNot:
-                // todo: check character uniformity
-                matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_DigitNot;
+                matchFunction(*thisSymbol++) = chooseBuiltinCharacterClassFunction(matchDigitNot,         &RegexMatcher<USE_STRINGS>::matchSymbol_DigitNot);
                 break;
             case RegexSymbol_Digit:
-                // todo: check character uniformity
-                matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_Digit;
+                matchFunction(*thisSymbol++) = chooseBuiltinCharacterClassFunction(matchDigit,            &RegexMatcher<USE_STRINGS>::matchSymbol_Digit);
                 break;
             case RegexSymbol_SpaceNot:
-                // todo: check character uniformity
-                matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_SpaceNot;
+                matchFunction(*thisSymbol++) = chooseBuiltinCharacterClassFunction(matchSpaceNot,         &RegexMatcher<USE_STRINGS>::matchSymbol_SpaceNot);
                 break;
             case RegexSymbol_Space:
-                // todo: check character uniformity
-                matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_Space;
+                matchFunction(*thisSymbol++) = chooseBuiltinCharacterClassFunction(matchSpace,            &RegexMatcher<USE_STRINGS>::matchSymbol_Space);
                 break;
             case RegexSymbol_WordCharacterNot:
-                // todo: check character uniformity
-                matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_WordCharacterNot;
+                matchFunction(*thisSymbol++) = chooseBuiltinCharacterClassFunction(matchWordCharacterNot, &RegexMatcher<USE_STRINGS>::matchSymbol_WordCharacterNot);
                 break;
             case RegexSymbol_WordCharacter:
-                // todo: check character uniformity
-                matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_WordCharacter;
+                matchFunction(*thisSymbol++) = chooseBuiltinCharacterClassFunction(matchWordCharacter,    &RegexMatcher<USE_STRINGS>::matchSymbol_WordCharacter);
                 break;
             case RegexSymbol_Group:
                 matchFunction(*thisSymbol) = &RegexMatcher<USE_STRINGS>::matchSymbol_Group;
