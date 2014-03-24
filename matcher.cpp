@@ -597,7 +597,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
             Uint64 neededMatch = position + currentMatch * multiple;
             if (input >= neededMatch)
             {
-                if (USE_STRINGS && thisSymbol->lazy && !doesRepetendMatchOnce(repetend, multiple, currentMatch-1))
+                if (USE_STRINGS && thisSymbol->lazy && currentMatch>1 && !doesRepetendMatchOnce(repetend, multiple, currentMatch-1))
                 {
                     nonMatch();
                     return;
