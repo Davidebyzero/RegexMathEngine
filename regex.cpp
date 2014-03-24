@@ -356,6 +356,13 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (!buf)
+    {
+        fprintf(stderr, "Error: No pattern specified\n");
+        printShortUsage(argv[0]);
+        return -1;
+    }
+
     Regex regex(buf);
 
     if (mathMode)
