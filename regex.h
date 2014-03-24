@@ -98,6 +98,7 @@ class RegexSymbol
             Uint maxCount;
         };
         char *string;
+        RegexSymbol *originalSymbol;
     };
     union
     {

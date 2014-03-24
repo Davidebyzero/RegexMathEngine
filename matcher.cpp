@@ -884,6 +884,14 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
             case RegexSymbol_WordCharacter:
                 matchFunction(*thisSymbol++) = chooseBuiltinCharacterClassFunction(matchWordCharacter,    &RegexMatcher<USE_STRINGS>::matchSymbol_WordCharacter);
                 break;
+            case RegexSymbol_IsPowerOf2:
+                if (USE_STRINGS)
+                {
+                    RegexSymbol *originalSymbol = (*thisSymbol)->originalSymbol;
+                    delete *thisSymbol;
+                    *thisSymbol = originalSymbol;
+                }
+                break;
             case RegexSymbol_Group:
                 matchFunction(*thisSymbol) = &RegexMatcher<USE_STRINGS>::matchSymbol_Group;
                 RegexGroup *group = (RegexGroup*)(*thisSymbol);
@@ -928,18 +936,16 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                                             innermostSymbol = innermostAlternative[0]->symbols;
                                             if (innermostSymbol[0] && innermostSymbol[0]->type==RegexSymbol_Character && innermostSymbol[0]->minCount==2 && innermostSymbol[0]->maxCount==2 && characterCanMatch(innermostSymbol[0]) && !innermostSymbol[1])
                                             {
+                                                RegexSymbol   *originalSymbol    = (*thisSymbol);
                                                 const char    *originalCode      = (*thisSymbol)->originalCode;
                                                 RegexPattern **parentAlternative = (*thisSymbol)->parentAlternative;
-
-                                                // todo: delete the old negative lookahead and its children
 
                                                 *thisSymbol = new RegexSymbol(RegexSymbol_IsPowerOf2);
                                                 (*thisSymbol)->lazy              = matchZero;
                                                 (*thisSymbol)->parentAlternative = parentAlternative;
                                                 (*thisSymbol)->self              = thisSymbol;
                                                 (*thisSymbol)->originalCode      = originalCode;
-                                                (*thisSymbol)->minCount          = 1;
-                                                (*thisSymbol)->maxCount          = 1;
+                                                (*thisSymbol)->originalSymbol    = originalSymbol;
                                                 matchFunction(*thisSymbol) = &RegexMatcher<USE_STRINGS>::matchSymbol_IsPowerOf2;
                                                 thisSymbol++;
                                                 break;
