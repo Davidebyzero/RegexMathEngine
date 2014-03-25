@@ -50,7 +50,9 @@ void RegexMatcher<USE_STRINGS>::nonMatch()
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::pushStack()
 {
-    MatchingStack_TryMatch<USE_STRINGS> *pushStack = stack.push<MatchingStack_TryMatch<USE_STRINGS>>();
+    // the following two lines work around what I'm pretty sure is a GCC bug
+    typedef MatchingStack_TryMatch<USE_STRINGS> TryMatch;
+    MatchingStack_TryMatch<USE_STRINGS> *pushStack = stack.template push<TryMatch>();
     pushStack->position     = position;
     pushStack->currentMatch = currentMatch;
     pushStack->symbol       = *symbol;
@@ -68,7 +70,9 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
     alternative = group->alternatives;
     symbol      = group->alternatives[0]->symbols;
 
-    stack.push<MatchingStack_EnterGroup<USE_STRINGS>>();
+    // the following two lines work around what I'm pretty sure is a GCC bug
+    typedef MatchingStack_EnterGroup<USE_STRINGS> EnterGroup;
+    stack.template push<EnterGroup>();
 }
 
 template <bool USE_STRINGS>
@@ -624,7 +628,9 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Group(RegexSymbol *thisSymbol)
     }
     if (group->lazy && group->minCount == 0)
     {
-        MatchingStack_SkipGroup<USE_STRINGS> *pushStack = stack.push<MatchingStack_SkipGroup<USE_STRINGS>>();
+        // the following two lines work around what I'm pretty sure is a GCC bug
+        typedef MatchingStack_SkipGroup<USE_STRINGS> SkipGroup;
+        MatchingStack_SkipGroup<USE_STRINGS> *pushStack = stack.template push<SkipGroup>();
         pushStack->position = position;
         pushStack->group    = group;
         symbol++;
@@ -1029,7 +1035,9 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 
                     if (numCapturedDelta)
                     {
-                        MatchingStack_LookaheadCapture<USE_STRINGS> *pushStack = stack.push<MatchingStack_LookaheadCapture<USE_STRINGS>>();
+                        // the following two lines work around what I'm pretty sure is a GCC bug
+                        typedef MatchingStack_LookaheadCapture<USE_STRINGS> LookaheadCapture;
+                        MatchingStack_LookaheadCapture<USE_STRINGS> *pushStack = stack.template push<LookaheadCapture>();
                         pushStack->numCaptured       = numCapturedDelta;
                         pushStack->parentAlternative = group->parentAlternative;
                     }
@@ -1061,15 +1069,21 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 
                 if (group->lazy && groupStackTop->loopCount >= group->minCount)
                 {
-                    MatchingStack_TryLazyAlternatives<USE_STRINGS> *pushStack = stack.push<MatchingStack_TryLazyAlternatives<USE_STRINGS>>();
+                    // the following two lines work around what I'm pretty sure is a GCC bug
+                    typedef MatchingStack_TryLazyAlternatives<USE_STRINGS> TryLazyAlternatives;
+                    MatchingStack_TryLazyAlternatives<USE_STRINGS> *pushStack = stack.template push<TryLazyAlternatives>();
                     pushStack->position    = groupStackTop->position;
                     pushStack->alternative = (Uint)(alternative - groupStackTop->group->alternatives);
-                    leaveGroup(stack.push<MatchingStack_LeaveGroupLazily<USE_STRINGS>>(), position);
+                    // the following two lines work around what I'm pretty sure is a GCC bug
+                    typedef MatchingStack_LeaveGroupLazily<USE_STRINGS> LeaveGroupLazily;
+                    leaveGroup(stack.template push<LeaveGroupLazily>(), position);
                 }
                 else
                 if (groupStackTop->loopCount == group->maxCount || position == groupStackTop->position)
                 {
-                    leaveGroup(stack.push<MatchingStack_LeaveGroup<USE_STRINGS>>(), groupStackTop->position);
+                    // the following two lines work around what I'm pretty sure is a GCC bug
+                    typedef MatchingStack_LeaveGroup<USE_STRINGS> LeaveGroup;
+                    leaveGroup(stack.template push<LeaveGroup>(), groupStackTop->position);
                 }
                 else
                 if (!group->lazy && inrangex(groupStackTop->loopCount, group->minCount, group->maxCount))
@@ -1078,8 +1092,10 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     Uint64 oldPosition = groupStackTop->position;
                     Uint alternativeNum = (Uint)(alternative - groupStackTop->group->alternatives);
                     size_t privateSpace = sizeof(Uint64) + (selfCapture ? sizeof(Uint64) : 0); // first term has sizeof(Uint64) instead of sizeof(Uint) for alignment
+                    // the following two lines work around what I'm pretty sure is a GCC bug
+                    typedef MatchingStack_LoopGroupGreedily<USE_STRINGS> LoopGroupGreedily;
                     void *buffer = loopGroup(
-                        stack.push<MatchingStack_LoopGroupGreedily<USE_STRINGS>>(MatchingStack_LoopGroupGreedily<USE_STRINGS>::get_size(groupStackTop->numCaptured, privateSpace)),
+                        stack.template push<LoopGroupGreedily>(MatchingStack_LoopGroupGreedily<USE_STRINGS>::get_size(groupStackTop->numCaptured, privateSpace)),
                         privateSpace,
                         position);
                     *(Uint*)buffer = alternativeNum;
@@ -1087,7 +1103,11 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                         ((Uint64*)buffer)[1] = oldPosition;
                 }
                 else
-                    loopGroup(stack.push<MatchingStack_LoopGroup<USE_STRINGS>>(MatchingStack_LoopGroup<USE_STRINGS>::get_size(groupStackTop->numCaptured, 0)), 0, position);
+                {
+                    // the following two lines work around what I'm pretty sure is a GCC bug
+                    typedef MatchingStack_LoopGroup<USE_STRINGS> LoopGroup;
+                    loopGroup(stack.template push<LoopGroup>(MatchingStack_LoopGroup<USE_STRINGS>::get_size(groupStackTop->numCaptured, 0)), 0, position);
+                }
                 continue;
             }
             if (debugTrace)
