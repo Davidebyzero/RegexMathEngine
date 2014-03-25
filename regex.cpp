@@ -364,6 +364,11 @@ int main(int argc, char *argv[])
     }
 
     Regex regex(buf);
+    //__debugbreak();
+
+    /*Uint64 returnMatch_;
+    if (regex.MatchNumber(256, 'x', returnMatch_))
+        printf("%llu\n", returnMatch_);*/
 
     if (mathMode)
     {
@@ -372,14 +377,10 @@ int main(int argc, char *argv[])
         for(;;)
         {
             Uint64 returnMatch;
-    #ifdef SHOW_MATCHES_ONLY
             if (regex.MatchNumber(a, mathMode, returnMatch))
                 printf("%llu -> %llu\n", a, returnMatch);
             else
                 printf("%llu -> no match\n", a);
-    #else
-            printf("%llu, %d, %llu\n", a, regex.MatchNumber(a, mathMode, returnMatch), returnMatch);
-    #endif
             Uint64 c = a + b;
             a = b;
             b = c;
