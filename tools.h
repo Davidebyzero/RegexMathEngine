@@ -29,6 +29,8 @@ typedef Uint8 bool8;
 #define inrange(n,a,b) ((Uint)((n)-(a))<=(Uint)((b)-(a)))
 #define inrangex(n,a,b) ((Uint)((n)-(a))<(Uint)((b)-(a)))
 
+#define MAX_EXTEND(n) ((Uint64)((n)+1)-1)
+
 template <size_t size>
 char (*__strlength_helper(char const (&_String)[size]))[size];
 #define strlength(_String) (sizeof(*__strlength_helper(_String))-1)

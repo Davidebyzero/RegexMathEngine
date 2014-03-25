@@ -370,7 +370,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
             {
                 Uint64 spaceLeft = input - position;
                 currentMatch = spaceLeft / multiple;
-                if (!inrange(currentMatch, thisSymbol->minCount, thisSymbol->maxCount))
+                if (!inrange(currentMatch, thisSymbol->minCount, MAX_EXTEND(thisSymbol->maxCount)))
                 {
                     nonMatch();
                     return;
@@ -391,7 +391,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
             if (nextSymbol && nextSymbol->type==RegexSymbol_Group ||
                 !nextSymbol && !alternative[+1] && groupStackTop > groupStackBase
                             && (thisGroup->type==RegexGroup_Capturing || thisGroup->type==RegexGroup_NonCapturing)
-                            && groupStackTop->loopCount==thisGroup->maxCount && (nextSymbol = thisGroup->self[+1])
+                            && groupStackTop->loopCount==MAX_EXTEND(thisGroup->maxCount) && (nextSymbol = thisGroup->self[+1])
                             && nextSymbol->type==RegexSymbol_Group && (afterEndOfGroup=true))
             {
                 RegexGroup *group = (RegexGroup*)nextSymbol;
@@ -429,8 +429,8 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                             nonMatch();
                                             return;
                                         }
-                                        if (currentMatch > thisSymbol->maxCount)
-                                            currentMatch = thisSymbol->maxCount;
+                                        if (currentMatch > MAX_EXTEND(thisSymbol->maxCount))
+                                            currentMatch = MAX_EXTEND(thisSymbol->maxCount);
                                         if (lookaheadSymbol[+1]) // anchored?
                                         {
                                             if (!doesRepetendMatch(repetend, multiple, currentMatch))
@@ -488,8 +488,8 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                 nonMatch();
                                 return;
                             }
-                            if (currentMatch > thisSymbol->maxCount)
-                                currentMatch = thisSymbol->maxCount;
+                            if (currentMatch > MAX_EXTEND(thisSymbol->maxCount))
+                                currentMatch = MAX_EXTEND(thisSymbol->maxCount);
                             if (*lookaheadSymbol) // anchored?
                             {
                                 if (!doesRepetendMatch(repetend, multiple, currentMatch))
@@ -581,7 +581,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                     nonMatch();
                     return;
                 }
-                if (currentMatch != (thisSymbol->lazy ? thisSymbol->maxCount : thisSymbol->minCount))
+                if (currentMatch != (thisSymbol->lazy ? MAX_EXTEND(thisSymbol->maxCount) : thisSymbol->minCount))
                     pushStack();
                 position     = neededMatch;
                 currentMatch = ULLONG_MAX;
@@ -597,7 +597,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
     try_next_match:
         if (thisSymbol->lazy)
         {
-            if (currentMatch == thisSymbol->maxCount)
+            if (currentMatch == MAX_EXTEND(thisSymbol->maxCount))
             {
                 nonMatch();
                 return;
@@ -1079,14 +1079,14 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     leaveGroup(stack.template push<LeaveGroupLazily>(), position);
                 }
                 else
-                if (groupStackTop->loopCount == group->maxCount || position == groupStackTop->position)
+                if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || position == groupStackTop->position)
                 {
                     // the following two lines work around what I'm pretty sure is a GCC bug
                     typedef MatchingStack_LeaveGroup<USE_STRINGS> LeaveGroup;
                     leaveGroup(stack.template push<LeaveGroup>(), groupStackTop->position);
                 }
                 else
-                if (!group->lazy && inrangex(groupStackTop->loopCount, group->minCount, group->maxCount))
+                if (!group->lazy && inrangex(groupStackTop->loopCount, group->minCount, MAX_EXTEND(group->maxCount)))
                 {
                     bool selfCapture = group->type == RegexGroup_Capturing;
                     Uint64 oldPosition = groupStackTop->position;
