@@ -29,5 +29,6 @@ UINT_TYPE readNumericConstant(const char *&buf)
     return n;
 }
 
+template Uint   readNumericConstant<Uint  >(const char *&buf);
 template Uint32 readNumericConstant<Uint32>(const char *&buf);
 template Uint64 readNumericConstant<Uint64>(const char *&buf);

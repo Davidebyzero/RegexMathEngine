@@ -14,15 +14,15 @@
 
 typedef   signed char            int8;
 typedef unsigned char           Uint8;
-typedef   signed short           int16;
-typedef unsigned short          Uint16;
-typedef   signed int             int32;
-typedef unsigned int            Uint32;
+typedef   signed short int       int16;
+typedef unsigned short int      Uint16;
+typedef   signed long int        int32;
+typedef unsigned long int       Uint32;
 typedef   signed long long int 	 int64;
 typedef unsigned long long int  Uint64;
 
-typedef Uint8  Uchar;
-typedef Uint32 Uint;
+typedef unsigned char Uchar;
+typedef unsigned int  Uint;
 
 typedef Uint8 bool8;
 
