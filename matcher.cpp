@@ -107,6 +107,7 @@ void *RegexMatcher<USE_STRINGS>::loopGroup(MatchingStack_LoopGroup<USE_STRINGS> 
     pushLoop->position    = pushPosition;
     pushLoop->numCaptured = numCaptured;
 
+    const char *&dummy = (const char *&)pushLoop->buffer;
     Uint64 *values = (Uint64*)(pushLoop->buffer + privateSpace);
     const char **offsets;
     Uint *indexes;
@@ -120,7 +121,7 @@ void *RegexMatcher<USE_STRINGS>::loopGroup(MatchingStack_LoopGroup<USE_STRINGS> 
     for (Uint i=0; i<numCaptured; i++)
     {
         indexes[i] = captureStackTop[(int)i - (int)numCaptured];
-        readCapture(indexes[i], values[i], offsets[i]);
+        readCapture(indexes[i], values[i], USE_STRINGS ? offsets[i] : dummy);
         captures[indexes[i]] = NON_PARTICIPATING_CAPTURE_GROUP;
     }
     captureStackTop -= numCaptured;
