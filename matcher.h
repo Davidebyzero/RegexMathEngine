@@ -294,8 +294,9 @@ void MatchingStack<USE_STRINGS>::flush()
     while (chunkBase != firstChunk)
     {
         ChunkInfo *node = (ChunkInfo*)(chunkBase + CHUNK_SIZE - sizeof(ChunkInfo));
-        free(chunkBase);
+        Uint8 *oldChunk = chunkBase;
         chunkBase = node->baseOfPreviousChunk;
+        free(oldChunk);
     }
     nextToBePopped = (MatchingStackNode<USE_STRINGS>*)(chunkBase + CHUNK_SIZE);
 }

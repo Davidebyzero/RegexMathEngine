@@ -1013,7 +1013,6 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 if (groupStackTop == groupStackBase)
                 {
                     match = +1;
-                    stack.flush();
                     break;
                 }
 
@@ -1170,6 +1169,8 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
             (this->*matchFunction(thisSymbol))(thisSymbol);
         }
         while (!match);
+
+        stack.flush();
 
         if (match > 0)
             break;
