@@ -570,7 +570,7 @@ protected:
 
     static size_t get_size(Uint numCaptured, size_t privateSpace)
     {
-        return (size_t)&((MatchingStack_LoopGroup*)0)->buffer + privateSpace + (sizeof(Uint64) + sizeof(const char*) + sizeof(Uint))*numCaptured;
+        return (size_t)&((MatchingStack_LoopGroup*)0)->buffer + privateSpace + (sizeof(Uint64) + (USE_STRINGS ? sizeof(const char*) : 0) + sizeof(Uint))*numCaptured;
     }
 
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
