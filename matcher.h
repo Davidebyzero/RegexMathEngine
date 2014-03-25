@@ -29,6 +29,7 @@ class MatchingStack
     enum { CHUNK_SIZE = 256*1024 };
     Uint8 *firstChunk;
     Uint8 *chunkBase;
+    Uint8 *pendingChunkDeletion;
     MatchingStackNode<USE_STRINGS> *nextToBePopped;
 
     struct ChunkInfo
@@ -39,8 +40,9 @@ class MatchingStack
 
 public:
     MatchingStack()
+        : pendingChunkDeletion(NULL)
 #ifdef _DEBUG
-        : stack(*this), stackDepth(0)
+        , stack(*this), stackDepth(0)
 #endif
     {
         firstChunk = (Uint8*)malloc(CHUNK_SIZE);
@@ -58,7 +60,15 @@ public:
     }
     template <class NODE_TYPE> NODE_TYPE *push(size_t size);
     template <class NODE_TYPE> NODE_TYPE *push() { return push<NODE_TYPE>(sizeof(NODE_TYPE)); }
-    void pop(RegexMatcher<USE_STRINGS> &matcher);
+    void pop(RegexMatcher<USE_STRINGS> &matcher, bool delayChunkDeletion = false);
+    void deletePendingChunk()
+    {
+        if (pendingChunkDeletion)
+        {
+            free(pendingChunkDeletion);
+            pendingChunkDeletion = NULL;
+        }
+    }
     MatchingStackNode<USE_STRINGS> &operator*()
     {
         return *nextToBePopped;
@@ -284,6 +294,7 @@ void MatchingStack<USE_STRINGS>::flush()
     while (chunkBase != firstChunk)
     {
         ChunkInfo *node = (ChunkInfo*)(chunkBase + CHUNK_SIZE - sizeof(ChunkInfo));
+        free(chunkBase);
         chunkBase = node->baseOfPreviousChunk;
     }
     nextToBePopped = (MatchingStackNode<USE_STRINGS>*)(chunkBase + CHUNK_SIZE);
@@ -309,7 +320,7 @@ template <class NODE_TYPE> NODE_TYPE *MatchingStack<USE_STRINGS>::push(size_t si
 }
 
 template <bool USE_STRINGS>
-void MatchingStack<USE_STRINGS>::pop(RegexMatcher<USE_STRINGS> &matcher)
+void MatchingStack<USE_STRINGS>::pop(RegexMatcher<USE_STRINGS> &matcher, bool delayChunkDeletion/* = false*/)
 {
 #ifdef _DEBUG
     stackDepth++;
@@ -318,8 +329,13 @@ void MatchingStack<USE_STRINGS>::pop(RegexMatcher<USE_STRINGS> &matcher)
     if (next == chunkBase + CHUNK_SIZE - sizeof(ChunkInfo) && chunkBase != firstChunk)
     {
         ChunkInfo *node = (ChunkInfo*)next;
+        Uint8 *oldChunk = chunkBase;
         chunkBase = node->baseOfPreviousChunk;
         nextToBePopped = node->previousNode;
+        if (delayChunkDeletion)
+            pendingChunkDeletion = oldChunk;
+        else
+            free(oldChunk);
         return;
     }
     nextToBePopped = (MatchingStackNode<USE_STRINGS>*)next;

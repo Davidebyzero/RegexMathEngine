@@ -38,9 +38,9 @@ void RegexMatcher<USE_STRINGS>::nonMatch()
         }
 
         MatchingStackNode<USE_STRINGS> &formerTop = *stack;
-        stack.pop(*this);
-
+        stack.pop(*this, true);
         bool stopHere = formerTop.popTo(*this);
+        stack.deletePendingChunk();
         
         if (stopHere)
             break;
