@@ -11,8 +11,69 @@
 
 #define NON_PARTICIPATING_CAPTURE_GROUP ULLONG_MAX
 
+#pragma warning(push)
+#pragma warning(disable : 4355)
+
 template <bool> class MatchingStackNode;
+template <bool> class RegexMatcher;
 class GroupStackNode;
+
+template <bool USE_STRINGS>
+class MatchingStack
+{
+#ifdef _DEBUG
+    MatchingStack<USE_STRINGS> &stack;
+    Uint64 stackDepth;
+#endif
+    // todo: fix the problem that a constant chunk size limits the maximum number of capture groups (to something very very large, but still)
+    enum { CHUNK_SIZE = 256*1024 };
+    Uint8 *firstChunk;
+    Uint8 *chunkBase;
+    MatchingStackNode<USE_STRINGS> *nextToBePopped;
+
+    struct ChunkInfo
+    {
+        Uint8 *baseOfPreviousChunk;
+        MatchingStackNode<USE_STRINGS> *previousNode;
+    };
+
+public:
+    MatchingStack()
+#ifdef _DEBUG
+        : stack(*this), stackDepth(0)
+#endif
+    {
+        firstChunk = (Uint8*)malloc(CHUNK_SIZE);
+        chunkBase = firstChunk;
+        nextToBePopped = (MatchingStackNode<USE_STRINGS>*)(chunkBase + CHUNK_SIZE);
+    }
+    ~MatchingStack()
+    {
+        free(chunkBase); // assume that flush() has already been called
+    }
+    void flush();
+    bool empty()
+    {
+        return nextToBePopped == (MatchingStackNode<USE_STRINGS>*)(chunkBase + CHUNK_SIZE);
+    }
+    template <class NODE_TYPE> NODE_TYPE *push(size_t size);
+    template <class NODE_TYPE> NODE_TYPE *push() { return push<NODE_TYPE>(sizeof(NODE_TYPE)); }
+    void pop(RegexMatcher<USE_STRINGS> &matcher);
+    MatchingStackNode<USE_STRINGS> &operator*()
+    {
+        return *nextToBePopped;
+    }
+    MatchingStackNode<USE_STRINGS> *operator->()
+    {
+        return nextToBePopped;
+    }
+#ifdef _DEBUG
+    Uint64 getStackDepth()
+    {
+        return stackDepth;
+    }
+#endif
+};
 
 template <bool>
 struct RegexMatcherBase
@@ -35,6 +96,7 @@ struct RegexMatcherBase<true>
 template <bool USE_STRINGS>
 class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
 {
+    friend class MatchingStack<USE_STRINGS>;
     friend class MatchingStackNode<USE_STRINGS>;
     friend class MatchingStack_LookaheadCapture<USE_STRINGS>;
     friend class MatchingStack_SkipGroup<USE_STRINGS>;
@@ -53,9 +115,9 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     Uint64 input;
     Uint64 *captures;
 
+    MatchingStack<USE_STRINGS> stack;
     Uint *captureStackBase;
     Uint *captureStackTop;
-    MatchingStackNode<USE_STRINGS> *stack;
     GroupStackNode *groupStackBase;
     GroupStackNode *groupStackTop;
 
@@ -65,9 +127,6 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     RegexSymbol  **symbol;
 
     Uint64 numSteps;
-#ifdef _DEBUG
-    Uint64 stackDepth;
-#endif
 
     char match; // zero = looking for match, negative = match failed, positive = match found
     bool anchored; // indicates whether we can optimize the search by only trying a match at the start
@@ -77,7 +136,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void pushStack();
     void enterGroup(RegexGroup *group);
     void leaveGroup(MatchingStack_LeaveGroup<USE_STRINGS> *pushStack, Uint64 pushPosition);
-    void *loopGroup(MatchingStack_LoopGroup<USE_STRINGS> *allocateFunction(Uint numCaptured, size_t privateSpace), size_t privateSpace, Uint64 pushPosition);
+    void *loopGroup(MatchingStack_LoopGroup<USE_STRINGS> *pushLoop, size_t privateSpace, Uint64 pushPosition);
 
     inline void initInput(Uint64 _input, Uint numCaptureGroups);
     inline void  readCapture(Uint index, Uint64 &multiple, const char *&pBackref);
@@ -205,16 +264,66 @@ class GroupStackNode
     Uint numCaptured; // how many capture groups inside this group (including nested groups) have been pushed onto the capture stack
 };
 
+template <bool> class MatchingStack_ConnectingChunk;
+
 template <bool USE_STRINGS>
 class MatchingStackNode
 {
     friend class RegexMatcher<USE_STRINGS>;
-    MatchingStackNode *below;
+    friend class MatchingStack<USE_STRINGS>;
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)=0;
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)=0; // returns true if the popping can finish with this one
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)=0;
     virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)=0; // returns the numCaptured delta
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)=0;
 };
+
+template <bool USE_STRINGS>
+void MatchingStack<USE_STRINGS>::flush()
+{
+    while (chunkBase != firstChunk)
+    {
+        ChunkInfo *node = (ChunkInfo*)(chunkBase + CHUNK_SIZE - sizeof(ChunkInfo));
+        chunkBase = node->baseOfPreviousChunk;
+    }
+    nextToBePopped = (MatchingStackNode<USE_STRINGS>*)(chunkBase + CHUNK_SIZE);
+}
+
+template <bool USE_STRINGS>
+template <class NODE_TYPE> NODE_TYPE *MatchingStack<USE_STRINGS>::push(size_t size)
+{
+#ifdef _DEBUG
+    stackDepth++;
+#endif
+    Uint8 *newNode = (Uint8*)nextToBePopped - size;
+    if (newNode < chunkBase)
+    {
+        Uint8 *newChunk = (Uint8*)malloc(CHUNK_SIZE);
+        ChunkInfo *node = (ChunkInfo*)(newChunk + CHUNK_SIZE - sizeof(ChunkInfo));
+        node->baseOfPreviousChunk = chunkBase;
+        node->previousNode = nextToBePopped;
+        chunkBase = newChunk;
+        newNode = (Uint8*)node - size;
+    }
+    return new(nextToBePopped = (MatchingStackNode<USE_STRINGS>*)newNode) NODE_TYPE();
+}
+
+template <bool USE_STRINGS>
+void MatchingStack<USE_STRINGS>::pop(RegexMatcher<USE_STRINGS> &matcher)
+{
+#ifdef _DEBUG
+    stackDepth++;
+#endif
+    Uint8 *next = (Uint8*)nextToBePopped + nextToBePopped->getSize(matcher);
+    if (next == chunkBase + CHUNK_SIZE - sizeof(ChunkInfo) && chunkBase != firstChunk)
+    {
+        ChunkInfo *node = (ChunkInfo*)next;
+        chunkBase = node->baseOfPreviousChunk;
+        nextToBePopped = node->previousNode;
+        return;
+    }
+    nextToBePopped = (MatchingStackNode<USE_STRINGS>*)next;
+}
 
 template <bool USE_STRINGS>
 class MatchingStack_LookaheadCapture : public MatchingStackNode<USE_STRINGS>
@@ -223,6 +332,10 @@ class MatchingStack_LookaheadCapture : public MatchingStackNode<USE_STRINGS>
     Uint numCaptured;
     RegexPattern **parentAlternative;
 
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return sizeof(*this);
+    }
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
         for (Uint i=0; i<numCaptured; i++)
@@ -253,6 +366,10 @@ class MatchingStack_SkipGroup : public MatchingStackNode<USE_STRINGS>
     Uint64 position;
     RegexGroup *group;
 
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return sizeof(*this);
+    }
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
         matcher.position = position;
@@ -276,6 +393,10 @@ class MatchingStack_SkipGroup : public MatchingStackNode<USE_STRINGS>
 template <bool USE_STRINGS>
 class MatchingStack_EnterGroup : public MatchingStackNode<USE_STRINGS>
 {
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return sizeof(*this);
+    }
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
         RegexGroup *group = matcher.groupStackTop->group;
@@ -343,6 +464,10 @@ class MatchingStack_LeaveGroup : public MatchingStackNode<USE_STRINGS>
 protected:
     RegexGroup *group;
 
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return sizeof(*this);
+    }
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
         matcher.groupStackTop++;
@@ -358,11 +483,13 @@ protected:
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
     {
         matcher.groupStackTop++;
+        matcher.groupStackTop->group = group;
         popCaptureGroup(matcher);
     }
     virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)
     {
         matcher.groupStackTop++;
+        matcher.groupStackTop->group = group;
         return group->type == RegexGroup_Capturing ? 1 : 0;
     }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
@@ -392,6 +519,10 @@ class MatchingStack_TryLazyAlternatives : public MatchingStackNode<USE_STRINGS>
     Uint64 position;
     Uint alternative;
 
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return sizeof(*this);
+    }
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
         Uint numCaptured = matcher.groupStackTop->numCaptured;
@@ -437,22 +568,15 @@ protected:
     Uint numCaptured;
     Uint8 buffer[1]; // variable number of elements
 
-    static void *allocate_helper(Uint numCaptured, size_t privateSpace)
+    static size_t get_size(Uint numCaptured, size_t privateSpace)
     {
-        return malloc((size_t)&((MatchingStack_LoopGroup*)0)->buffer + privateSpace + (sizeof(Uint64) + sizeof(const char*) + sizeof(Uint))*numCaptured);
+        return (size_t)&((MatchingStack_LoopGroup*)0)->buffer + privateSpace + (sizeof(Uint64) + sizeof(const char*) + sizeof(Uint))*numCaptured;
     }
 
-    // "privateSpace" parameter included just to make the function signature compatible; need to replace this with something cleaner
-    static MatchingStack_LoopGroup *allocate(Uint numCaptured, size_t privateSpace)
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
     {
-        MatchingStack_LoopGroup *newLoopGroup = (MatchingStack_LoopGroup*)allocate_helper(numCaptured, 0);
-        return new(newLoopGroup) MatchingStack_LoopGroup();
+        return get_size(numCaptured, 0);
     }
-    static void deallocate(MatchingStack_LoopGroup *p)
-    {
-        free(p);
-    }
-
     void popTo(RegexMatcher<USE_STRINGS> &matcher, size_t privateSpace)
     {
         Uint64 *values = (Uint64*)(buffer + privateSpace);
@@ -522,12 +646,12 @@ class MatchingStack_LoopGroupGreedily : public MatchingStack_LoopGroup<USE_STRIN
     friend class RegexMatcher<USE_STRINGS>;
     // this class must have no member variables
 
-    static MatchingStack_LoopGroup<USE_STRINGS> *allocate(Uint numCaptured, size_t privateSpace)
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
     {
-        MatchingStack_LoopGroupGreedily *newLoopGroup = (MatchingStack_LoopGroupGreedily*)MatchingStack_LoopGroup<USE_STRINGS>::allocate_helper(numCaptured, privateSpace);
-        return new(newLoopGroup) MatchingStack_LoopGroupGreedily();
+        RegexGroup *group = matcher.groupStackTop->group;
+        bool selfCapture = group->type == RegexGroup_Capturing;
+        return get_size(numCaptured, sizeof(Uint64) + (selfCapture ? sizeof(Uint64) : 0));
     }
-
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
         bool selfCapture = matcher.groupStackTop->group->type == RegexGroup_Capturing;
@@ -536,7 +660,7 @@ class MatchingStack_LoopGroupGreedily : public MatchingStack_LoopGroup<USE_STRIN
         if (selfCapture)
             matcher.groupStackTop->position = ((Uint64*)this->buffer)[1];
         matcher.position = this->position;
-        matcher.leaveGroup(new MatchingStack_LeaveGroup<USE_STRINGS>, matcher.groupStackTop->position);
+        matcher.leaveGroup(matcher.stack.push<MatchingStack_LeaveGroup<USE_STRINGS>>(), matcher.groupStackTop->position);
         return true;
     }
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
@@ -555,6 +679,10 @@ class MatchingStack_TryMatch : public MatchingStackNode<USE_STRINGS>
     Uint64 currentMatch; // ULLONG_MAX means no match has been tried yet
     RegexSymbol *symbol;
 
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return sizeof(*this);
+    }
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
         matcher.position     = position;
@@ -576,9 +704,6 @@ class MatchingStack_TryMatch : public MatchingStackNode<USE_STRINGS>
     }
 };
 
-#pragma warning(push)
-#pragma warning(disable : 4355)
-
 template<> inline RegexMatcher<false>::RegexMatcher() :
     groupStackBase(NULL),
     captureStackBase(NULL)
@@ -599,8 +724,6 @@ template<> inline RegexMatcher<true>::RegexMatcher() :
     captureOffsets = NULL;
 }
 
-#pragma warning(pop)
-
 template<> inline RegexMatcher<false>::~RegexMatcher()
 {
     delete [] groupStackBase;
@@ -614,3 +737,5 @@ template<> inline RegexMatcher<true>::~RegexMatcher()
     delete [] captures;
     delete [] captureOffsets;
 }
+
+#pragma warning(pop)

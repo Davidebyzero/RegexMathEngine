@@ -12,14 +12,6 @@
 #include "regex.h"
 #include "matcher.h"
 
-#ifdef _DEBUG
-#define POPSTACK  stackDepth--;
-#define PUSHSTACK stackDepth++;
-#else
-#define POPSTACK  do{}while (0)
-#define PUSHSTACK do{}while (0)
-#endif
-
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::nonMatch()
 {
@@ -27,7 +19,7 @@ void RegexMatcher<USE_STRINGS>::nonMatch()
 
     for (;;)
     {
-        if (*alternative && (!stack || stack->okayToTryAlternatives(*this)))
+        if (*alternative && (stack.empty() || stack->okayToTryAlternatives(*this)))
         {
             alternative++;
             if (*alternative)
@@ -39,20 +31,17 @@ void RegexMatcher<USE_STRINGS>::nonMatch()
             }
         }
 
-        if (!stack)
+        if (stack.empty())
         {
             match = -1;
             return;
         }
 
-        MatchingStackNode<USE_STRINGS> *formerTop = stack;
-        stack = stack->below;
-        POPSTACK;
+        MatchingStackNode<USE_STRINGS> &formerTop = *stack;
+        stack.pop(*this);
 
-        bool stopHere = formerTop->popTo(*this);
+        bool stopHere = formerTop.popTo(*this);
         
-        delete formerTop;
-
         if (stopHere)
             break;
     }
@@ -61,11 +50,7 @@ void RegexMatcher<USE_STRINGS>::nonMatch()
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::pushStack()
 {
-    MatchingStack_TryMatch<USE_STRINGS> *pushStack = new MatchingStack_TryMatch<USE_STRINGS>;
-    pushStack->below = stack;
-    stack = pushStack;
-    PUSHSTACK;
-
+    MatchingStack_TryMatch<USE_STRINGS> *pushStack = stack.push<MatchingStack_TryMatch<USE_STRINGS>>();
     pushStack->position     = position;
     pushStack->currentMatch = currentMatch;
     pushStack->symbol       = *symbol;
@@ -83,19 +68,12 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
     alternative = group->alternatives;
     symbol      = group->alternatives[0]->symbols;
 
-    MatchingStack_EnterGroup<USE_STRINGS> *pushStack = new MatchingStack_EnterGroup<USE_STRINGS>;
-    pushStack->below = stack;
-    stack = pushStack;
-    PUSHSTACK;
+    stack.push<MatchingStack_EnterGroup<USE_STRINGS>>();
 }
 
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::leaveGroup(MatchingStack_LeaveGroup<USE_STRINGS> *pushStack, Uint64 pushPosition)
 {
-    pushStack->below = stack;
-    stack = pushStack;
-    PUSHSTACK;
-
     pushStack->position    = pushPosition;
     pushStack->loopCount   = groupStackTop->loopCount;
     pushStack->group       = groupStackTop->group;
@@ -119,19 +97,15 @@ void RegexMatcher<USE_STRINGS>::leaveGroup(MatchingStack_LeaveGroup<USE_STRINGS>
 }
 
 template <bool USE_STRINGS>
-void *RegexMatcher<USE_STRINGS>::loopGroup(MatchingStack_LoopGroup<USE_STRINGS> *allocateFunction(Uint numCaptured, size_t privateSpace), size_t privateSpace, Uint64 pushPosition)
+void *RegexMatcher<USE_STRINGS>::loopGroup(MatchingStack_LoopGroup<USE_STRINGS> *pushLoop, size_t privateSpace, Uint64 pushPosition)
 {
     groupStackTop->loopCount++;
 
     Uint numCaptured = groupStackTop->numCaptured;
     groupStackTop->numCaptured = 0;
 
-    MatchingStack_LoopGroup<USE_STRINGS> *pushLoop = allocateFunction(numCaptured, privateSpace);
-    pushLoop->below       = stack;
     pushLoop->position    = pushPosition;
     pushLoop->numCaptured = numCaptured;
-    stack = pushLoop;
-    PUSHSTACK;
 
     Uint64 *values = (Uint64*)(pushLoop->buffer + privateSpace);
     const char **offsets;
@@ -649,10 +623,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Group(RegexSymbol *thisSymbol)
     }
     if (group->lazy && group->minCount == 0)
     {
-        MatchingStack_SkipGroup<USE_STRINGS> *pushStack = new MatchingStack_SkipGroup<USE_STRINGS>;
-        pushStack->below = stack;
-        stack = pushStack;
-        PUSHSTACK;
+        MatchingStack_SkipGroup<USE_STRINGS> *pushStack = stack.push<MatchingStack_SkipGroup<USE_STRINGS>>();
         pushStack->position = position;
         pushStack->group    = group;
         symbol++;
@@ -1008,10 +979,6 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
     for (; curPosition<=input; curPosition++)
     {
         numSteps = 0;
-#ifdef _DEBUG
-        stackDepth = 0;
-#endif
-        stack = NULL;
         alternative   = regex.alternatives;
         symbol        = regex.alternatives[0]->symbols;
         position      = curPosition;
@@ -1039,12 +1006,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 if (groupStackTop == groupStackBase)
                 {
                     match = +1;
-                    while (stack)
-                    {
-                        MatchingStackNode<USE_STRINGS> *formerTop = stack;
-                        stack = stack->below;
-                        delete formerTop;
-                    }
+                    stack.flush();
                     break;
                 }
 
@@ -1060,20 +1022,13 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     do
                     {
                         numCapturedDelta += stack->popForLookahead(*this);
-                    
-                        MatchingStackNode<USE_STRINGS> *stackDown = stack->below;
-                        delete stack;
-                        stack = stackDown;
-                        POPSTACK;
+                        stack.pop(*this);
                     }
                     while (groupStackTop >= groupStackOldTop);
 
                     if (numCapturedDelta)
                     {
-                        MatchingStack_LookaheadCapture<USE_STRINGS> *pushStack = new MatchingStack_LookaheadCapture<USE_STRINGS>;
-                        pushStack->below = stack;
-                        stack = pushStack;
-                        PUSHSTACK;
+                        MatchingStack_LookaheadCapture<USE_STRINGS> *pushStack = stack.push<MatchingStack_LookaheadCapture<USE_STRINGS>>();
                         pushStack->numCaptured       = numCapturedDelta;
                         pushStack->parentAlternative = group->parentAlternative;
                     }
@@ -1094,11 +1049,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     do
                     {
                         stack->popForNegativeLookahead(*this);
-                    
-                        MatchingStackNode<USE_STRINGS> *stackDown = stack->below;
-                        delete stack;
-                        stack = stackDown;
-                        POPSTACK;
+                        stack.pop(*this);
                     }
                     while (groupStackTop >= groupStackOldTop);
 
@@ -1109,34 +1060,33 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 
                 if (group->lazy && groupStackTop->loopCount >= group->minCount)
                 {
-                    MatchingStack_TryLazyAlternatives<USE_STRINGS> *pushStack = new MatchingStack_TryLazyAlternatives<USE_STRINGS>;
-                    pushStack->below = stack;
-                    stack = pushStack;
-                    PUSHSTACK;
+                    MatchingStack_TryLazyAlternatives<USE_STRINGS> *pushStack = stack.push<MatchingStack_TryLazyAlternatives<USE_STRINGS>>();
                     pushStack->position    = groupStackTop->position;
                     pushStack->alternative = (Uint)(alternative - groupStackTop->group->alternatives);
-
-                    leaveGroup(new MatchingStack_LeaveGroupLazily<USE_STRINGS>, position);
+                    leaveGroup(stack.push<MatchingStack_LeaveGroupLazily<USE_STRINGS>>(), position);
                 }
                 else
                 if (groupStackTop->loopCount == group->maxCount || position == groupStackTop->position)
-                    leaveGroup(new MatchingStack_LeaveGroup<USE_STRINGS>, groupStackTop->position);
+                {
+                    leaveGroup(stack.push<MatchingStack_LeaveGroup<USE_STRINGS>>(), groupStackTop->position);
+                }
                 else
                 if (!group->lazy && inrangex(groupStackTop->loopCount, group->minCount, group->maxCount))
                 {
                     bool selfCapture = group->type == RegexGroup_Capturing;
                     Uint64 oldPosition = groupStackTop->position;
                     Uint alternativeNum = (Uint)(alternative - groupStackTop->group->alternatives);
+                    size_t privateSpace = sizeof(Uint64) + (selfCapture ? sizeof(Uint64) : 0); // first term has sizeof(Uint64) instead of sizeof(Uint) for alignment
                     void *buffer = loopGroup(
-                        MatchingStack_LoopGroupGreedily<USE_STRINGS>::allocate,
-                        sizeof(Uint64) + (selfCapture ? sizeof(Uint64) : 0), // first term has sizeof(Uint64) instead of sizeof(Uint) for alignment
+                        stack.push<MatchingStack_LoopGroupGreedily<USE_STRINGS>>(MatchingStack_LoopGroupGreedily<USE_STRINGS>::get_size(groupStackTop->numCaptured, privateSpace)),
+                        privateSpace,
                         position);
                     *(Uint*)buffer = alternativeNum;
                     if (selfCapture)
                         ((Uint64*)buffer)[1] = oldPosition;
                 }
                 else
-                    loopGroup(MatchingStack_LoopGroup<USE_STRINGS>::allocate, 0, position);
+                    loopGroup(stack.push<MatchingStack_LoopGroup<USE_STRINGS>>(MatchingStack_LoopGroup<USE_STRINGS>::get_size(groupStackTop->numCaptured, 0)), 0, position);
                 continue;
             }
             if (debugTrace)
@@ -1161,7 +1111,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 delete [] copy;
 
 #ifdef _DEBUG
-                fprintf(stderr, "Step %llu: {%llu} <%llu> ", numSteps, position, stackDepth);
+                fprintf(stderr, "Step %llu: {%llu} <%llu> ", numSteps, position, stack.getStackDepth());
 #else
                 fprintf(stderr, "Step %llu: {%llu} ", numSteps, position);
 #endif
