@@ -146,6 +146,8 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void pushStack();
     void enterGroup(RegexGroup *group);
     void leaveGroup(MatchingStack_LeaveGroup<USE_STRINGS> *pushStack, Uint64 pushPosition);
+    void leaveLazyGroup();
+    void leaveMaxedOutGroup();
     void *loopGroup(MatchingStack_LoopGroup<USE_STRINGS> *pushLoop, size_t privateSpace, Uint64 pushPosition);
 
     inline void initInput(Uint64 _input, Uint numCaptureGroups);

@@ -101,6 +101,27 @@ void RegexMatcher<USE_STRINGS>::leaveGroup(MatchingStack_LeaveGroup<USE_STRINGS>
 }
 
 template <bool USE_STRINGS>
+void RegexMatcher<USE_STRINGS>::leaveLazyGroup()
+{
+    // the following two lines work around what I'm pretty sure is a GCC bug
+    typedef MatchingStack_TryLazyAlternatives<USE_STRINGS> TryLazyAlternatives;
+    MatchingStack_TryLazyAlternatives<USE_STRINGS> *pushStack = stack.template push<TryLazyAlternatives>();
+    pushStack->position    = groupStackTop->position;
+    pushStack->alternative = (Uint)(alternative - groupStackTop->group->alternatives);
+    // the following two lines work around what I'm pretty sure is a GCC bug
+    typedef MatchingStack_LeaveGroupLazily<USE_STRINGS> LeaveGroupLazily;
+    leaveGroup(stack.template push<LeaveGroupLazily>(), position);
+}
+
+template <bool USE_STRINGS>
+void RegexMatcher<USE_STRINGS>::leaveMaxedOutGroup()
+{
+    // the following two lines work around what I'm pretty sure is a GCC bug
+    typedef MatchingStack_LeaveGroup<USE_STRINGS> LeaveGroup;
+    leaveGroup(stack.template push<LeaveGroup>(), groupStackTop->position);
+}
+
+template <bool USE_STRINGS>
 void *RegexMatcher<USE_STRINGS>::loopGroup(MatchingStack_LoopGroup<USE_STRINGS> *pushLoop, size_t privateSpace, Uint64 pushPosition)
 {
     groupStackTop->loopCount++;
@@ -385,7 +406,6 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
             RegexSymbol *nextSymbol = symbol[+1];
             RegexGroup *thisGroup = groupStackTop->group;
             bool afterEndOfGroup = false;
-            Uint64 multiplication = 0;
             if (nextSymbol && nextSymbol->type==RegexSymbol_Group ||
                 !nextSymbol && !alternative[+1] && groupStackTop > groupStackBase
                             && (thisGroup->type==RegexGroup_Capturing || thisGroup->type==RegexGroup_NonCapturing)
@@ -396,8 +416,10 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                 if (group->type==RegexGroup_Lookahead && !group->alternatives[1] && group->minCount)
                 {
                     RegexSymbol **lookaheadSymbol = group->alternatives[0]->symbols;
+                    // todo: check for empty lookahead (otherwise, this can crash, I think)
                     Uint64 totalLength = 0;
                     bool cannotMatch = false;
+                    Uint64 multiplication = 0;
                     for (;;)
                     {
                         RegexSymbol *currentSymbol = *lookaheadSymbol;
@@ -494,16 +516,69 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                 return;
                             }
                             Uint64 spaceLeft = target - position;
+                            RegexGroup *multiplicationGroup = NULL;
+                            RegexSymbol **multiplicationAnchor;
+                            Uint64 totalLengthSmallerFactor;
+#ifdef _DEBUG
+                            multiplicationAnchor = NULL;
+                            totalLengthSmallerFactor = 0;
+#endif
                             if (multiplication)
                             {
                                 RegexSymbol *afterLookahead = group->self[+1];
                                 bool lazinessDoesntMatter = afterLookahead && afterLookahead->type==RegexSymbol_Backref &&
                                                             afterLookahead->minCount == 0 && afterLookahead->maxCount == UINT_MAX && !afterLookahead->lazy &&
                                                             ((RegexBackref*)afterLookahead)->index == ((RegexBackref*)currentSymbol)->index;
+                                if (!USE_STRINGS)
+                                {
+                                    if (lazinessDoesntMatter)
+                                        afterLookahead = group->self[+2];
+                                    if (afterLookahead && afterLookahead->type==RegexSymbol_Group && afterLookahead->minCount==1 && afterLookahead->maxCount==1)
+                                    {
+                                        RegexGroup *outsideGroup = afterEndOfGroup ? groupStackTop[-1].group : thisGroup;
+                                        if (outsideGroup->type==RegexGroup_Lookahead && !outsideGroup->alternatives[1])
+                                        {
+                                            RegexGroup *afterGroup = (RegexGroup*)afterLookahead;
+                                            RegexSymbol **afterSymbol = afterGroup->alternatives[0]->symbols;
+                                            totalLengthSmallerFactor = 0;
+                                            for (; *afterSymbol; afterSymbol++)
+                                            {
+                                                if ((*afterSymbol)->type == RegexSymbol_Backref)
+                                                {
+                                                    Uint64 afterCapture = captures[((RegexBackref*)(*afterSymbol))->index];
+                                                    if ((*afterSymbol)->minCount == (*afterSymbol)->maxCount)
+                                                    {
+                                                        if (afterCapture != NON_PARTICIPATING_CAPTURE_GROUP)
+                                                            totalLengthSmallerFactor += afterCapture * (*afterSymbol)->minCount;
+                                                        else
+                                                        {
+                                                            if ((*afterSymbol)->minCount && !emulate_ECMA_NPCGs)
+                                                                break;
+                                                        }
+                                                    }
+                                                    else
+                                                    if ((*afterSymbol)->minCount==1 && (*afterSymbol)->maxCount==UINT_MAX && afterSymbol[+1]->type==RegexSymbol_AnchorEnd &&
+                                                        totalLengthSmallerFactor <= multiplication && afterCapture+1 == multiplication)
+                                                    {
+                                                        lazinessDoesntMatter = true;
+                                                        multiplicationGroup = afterGroup;
+                                                        multiplicationAnchor = &afterSymbol[+1];
+                                                        break;
+                                                    }
+                                                    else
+                                                        break;
+                                                }
+                                                else
+                                                if ((*afterSymbol)->type == RegexSymbol_Character && (*afterSymbol)->minCount == (*afterSymbol)->maxCount)
+                                                    totalLengthSmallerFactor += (*afterSymbol)->minCount;
+                                            }
+                                        }
+                                    }
+                                }
                                 if (lazinessDoesntMatter || thisSymbol->lazy)
                                     spaceLeft %= multiplication;
-                                if (lazinessDoesntMatter)
-                                    multiplication = 0;
+                                if (!lazinessDoesntMatter)
+                                    lookaheadSymbol = NULL;
                             }
                             currentMatch = spaceLeft / multiple;
                             if (currentMatch < thisSymbol->minCount)
@@ -513,7 +588,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                             }
                             if (currentMatch > MAX_EXTEND(thisSymbol->maxCount))
                                 currentMatch = MAX_EXTEND(thisSymbol->maxCount);
-                            if (*lookaheadSymbol && !multiplication) // anchored?
+                            if (lookaheadSymbol && *lookaheadSymbol) // anchored?
                             {
                                 if (!doesRepetendMatch(repetend, multiple, currentMatch))
                                 {
@@ -531,6 +606,24 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                             position += currentMatch * multiple;
                             currentMatch = ULLONG_MAX;
                             symbol++;
+                            if (multiplicationGroup)
+                            {
+                                if (afterEndOfGroup)
+                                    thisGroup->lazy ? leaveLazyGroup() : leaveMaxedOutGroup();
+
+                                spaceLeft = input - position;
+                                Uint64 product = (totalLengthSmallerFactor ? totalLengthSmallerFactor : multiplication-1) * multiplication;
+                                if (spaceLeft < product)
+                                {
+                                    nonMatch();
+                                    return;
+                                }
+
+                                position = input - product;
+                                enterGroup(multiplicationGroup);
+                                symbol = multiplicationAnchor;
+                                position = input;
+                            }
                             return;
                         }
                     }
@@ -1090,23 +1183,10 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 }
 
                 if (group->lazy && groupStackTop->loopCount >= group->minCount)
-                {
-                    // the following two lines work around what I'm pretty sure is a GCC bug
-                    typedef MatchingStack_TryLazyAlternatives<USE_STRINGS> TryLazyAlternatives;
-                    MatchingStack_TryLazyAlternatives<USE_STRINGS> *pushStack = stack.template push<TryLazyAlternatives>();
-                    pushStack->position    = groupStackTop->position;
-                    pushStack->alternative = (Uint)(alternative - groupStackTop->group->alternatives);
-                    // the following two lines work around what I'm pretty sure is a GCC bug
-                    typedef MatchingStack_LeaveGroupLazily<USE_STRINGS> LeaveGroupLazily;
-                    leaveGroup(stack.template push<LeaveGroupLazily>(), position);
-                }
+                    leaveLazyGroup();
                 else
                 if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || position == groupStackTop->position)
-                {
-                    // the following two lines work around what I'm pretty sure is a GCC bug
-                    typedef MatchingStack_LeaveGroup<USE_STRINGS> LeaveGroup;
-                    leaveGroup(stack.template push<LeaveGroup>(), groupStackTop->position);
-                }
+                    leaveMaxedOutGroup();
                 else
                 if (!group->lazy && inrangex(groupStackTop->loopCount, group->minCount, MAX_EXTEND(group->maxCount)))
                 {
