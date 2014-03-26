@@ -40,6 +40,11 @@ UINT_TYPE readNumericConstant(const char *&buf);
 
 class ParsingError {};
 
+template <typename TYPE>
+inline void tellCompilerVariableIsntUninitialized(TYPE &n)
+{
+}
+
 #ifdef _MSC_VER
 #define GETC _getc_nolock  // using this results in a huge speed-up under MS Visual C++
 #else

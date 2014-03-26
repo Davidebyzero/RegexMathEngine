@@ -519,10 +519,8 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                             RegexGroup *multiplicationGroup = NULL;
                             RegexSymbol **multiplicationAnchor;
                             Uint64 totalLengthSmallerFactor;
-#ifdef _DEBUG
-                            multiplicationAnchor = NULL;
-                            totalLengthSmallerFactor = 0;
-#endif
+                            tellCompilerVariableIsntUninitialized(multiplicationAnchor);
+                            tellCompilerVariableIsntUninitialized(totalLengthSmallerFactor);
                             if (multiplication)
                             {
                                 RegexSymbol *afterLookahead = group->self[+1];
