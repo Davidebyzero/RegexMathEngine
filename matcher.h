@@ -161,9 +161,9 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     inline bool doesRepetendMatch(bool (*matchFunction)(Uchar ch), Uint64 multiple, Uint64 count);
     inline bool doesRepetendMatch(RegexCharacterClass *charClass, Uint64 multiple, Uint64 count);
 
-    inline Uint64 countRepetendMatches(const char *pBackref, Uint64 multiple);
-    inline Uint64 countRepetendMatches(bool (*matchFunction)(Uchar ch), Uint64 multiple);
-    inline Uint64 countRepetendMatches(RegexCharacterClass *charClass, Uint64 multiple);
+    inline void countRepetendMatches(const char *pBackref, Uint64 multiple);
+    inline void countRepetendMatches(bool (*matchFunction)(Uchar ch), Uint64 multiple);
+    inline void countRepetendMatches(RegexCharacterClass *charClass, Uint64 multiple);
 
     inline bool doesStringMatch(RegexSymbol *stringSymbol);
     inline bool matchWordBoundary();

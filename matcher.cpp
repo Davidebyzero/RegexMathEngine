@@ -225,44 +225,41 @@ template<> bool RegexMatcher<true>::doesRepetendMatchOnce(RegexCharacterClass *c
     return !!charClass->isInClass(stringToMatchAgainst[position + count]); // todo: give these functions bool8 return values so that the overhead of the conversion from bool8 to bool can be eliminated
 }
 
-template<> Uint64 RegexMatcher<false>::countRepetendMatches(const char *pBackref, Uint64 multiple)
+template<> void RegexMatcher<false>::countRepetendMatches(const char *pBackref, Uint64 multiple)
 {
-    return 0;
 }
-template<> Uint64 RegexMatcher<false>::countRepetendMatches(bool (*matchFunction)(Uchar ch), Uint64 multiple)
+template<> void RegexMatcher<false>::countRepetendMatches(bool (*matchFunction)(Uchar ch), Uint64 multiple)
 {
-    return 0;
 }
-template<> Uint64 RegexMatcher<false>::countRepetendMatches(RegexCharacterClass *charClass, Uint64 multiple)
+template<> void RegexMatcher<false>::countRepetendMatches(RegexCharacterClass *charClass, Uint64 multiple)
 {
-    return 0;
 }
-template<> Uint64 RegexMatcher<true>::countRepetendMatches(const char *pBackref, Uint64 multiple)
+template<> void RegexMatcher<true>::countRepetendMatches(const char *pBackref, Uint64 multiple)
 {
     const char *s = stringToMatchAgainst + position;
     Uint64 count;
     for (count = 0; count < currentMatch; count++, s+=multiple)
         if (memcmp(s, pBackref, (size_t)multiple)!=0)
             break;
-    return count;
+    currentMatch = count;
 }
-template<> Uint64 RegexMatcher<true>::countRepetendMatches(bool (*matchFunction)(Uchar ch), Uint64 multiple)
+template<> void RegexMatcher<true>::countRepetendMatches(bool (*matchFunction)(Uchar ch), Uint64 multiple)
 {
     const char *s = stringToMatchAgainst + position;
     Uint64 count;
     for (count = 0; count < currentMatch; count++, s+=1)
         if (!matchFunction(*s))
             break;
-    return count;
+    currentMatch = count;
 }
-template<> Uint64 RegexMatcher<true>::countRepetendMatches(RegexCharacterClass *charClass, Uint64 multiple)
+template<> void RegexMatcher<true>::countRepetendMatches(RegexCharacterClass *charClass, Uint64 multiple)
 {
     const char *s = stringToMatchAgainst + position;
     Uint64 count;
     for (count = 0; count < currentMatch; count++, s+=1)
         if (!charClass->isInClass(*s))
             break;
-    return count;
+    currentMatch = count;
 }
 
 template<> inline bool RegexMatcher<false>::doesStringMatch(RegexSymbol *stringSymbol)
@@ -445,7 +442,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                         else
                                         {
                                             if (USE_STRINGS)
-                                                currentMatch = countRepetendMatches(repetend, multiple);
+                                                countRepetendMatches(repetend, multiple);
                                             pushStack();
                                         }
                                         position += currentMatch * multiple;
@@ -518,7 +515,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                             else
                             {
                                 if (USE_STRINGS)
-                                    currentMatch = countRepetendMatches(repetend, multiple);
+                                    countRepetendMatches(repetend, multiple);
                                 pushStack();
                             }
                             //position = target - spaceLeft % multiple;
@@ -553,7 +550,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                 }
                 if (USE_STRINGS && repetend)
                 {
-                    currentMatch = countRepetendMatches(repetend, multiple);
+                    countRepetendMatches(repetend, multiple);
                     if (currentMatch < thisSymbol->minCount)
                     {
                         nonMatch();
@@ -575,7 +572,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                 currentMatch = thisSymbol->maxCount;
                 if (USE_STRINGS && repetend)
                 {
-                    currentMatch = countRepetendMatches(repetend, multiple);
+                    countRepetendMatches(repetend, multiple);
                     if (currentMatch < thisSymbol->minCount)
                     {
                         nonMatch();
