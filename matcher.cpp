@@ -388,6 +388,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
             RegexSymbol *nextSymbol = symbol[+1];
             RegexGroup *thisGroup = groupStackTop->group;
             bool afterEndOfGroup = false;
+            Uint64 multiplication = 0;
             if (nextSymbol && nextSymbol->type==RegexSymbol_Group ||
                 !nextSymbol && !alternative[+1] && groupStackTop > groupStackBase
                             && (thisGroup->type==RegexGroup_Capturing || thisGroup->type==RegexGroup_NonCapturing)
@@ -403,10 +404,12 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                     for (;;)
                     {
                         RegexSymbol *currentSymbol = *lookaheadSymbol;
-                        if (currentSymbol->type == RegexSymbol_Backref && currentSymbol->minCount == currentSymbol->maxCount)
+                        if (currentSymbol->type == RegexSymbol_Backref)
                         {
                             if (afterEndOfGroup && thisGroup->type==RegexGroup_Capturing && ((RegexGroupCapturing*)thisGroup)->backrefIndex == ((RegexBackref*)currentSymbol)->index)
                             {
+                                if (currentSymbol->minCount != currentSymbol->maxCount)
+                                    break;
                                 if (lookaheadSymbol == group->alternatives[0]->symbols && optimizationLevel >= 2)
                                 {
                                     if (!lookaheadSymbol[+1] && !thisSymbol->lazy || lookaheadSymbol[+1]->type == RegexSymbol_AnchorEnd)
@@ -455,7 +458,18 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                             }
                             Uint64 thisCapture = captures[((RegexBackref*)currentSymbol)->index];
                             if (thisCapture != NON_PARTICIPATING_CAPTURE_GROUP)
+                            {
                                 totalLength += thisCapture * currentSymbol->minCount;
+                                if (currentSymbol->minCount != currentSymbol->maxCount)
+                                {
+                                    if (currentSymbol->maxCount == UINT_MAX && lookaheadSymbol[+1]->type==RegexSymbol_AnchorEnd && optimizationLevel >= 2)
+                                    {
+                                        multiplication = thisCapture;
+                                        goto do_optimization;
+                                    }
+                                    break;
+                                }
+                            }
                             else
                             {
                                 if (currentSymbol->minCount && !emulate_ECMA_NPCGs)
@@ -470,6 +484,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                         lookaheadSymbol++;
                         if (!*lookaheadSymbol && !thisSymbol->lazy || (*lookaheadSymbol)->type==RegexSymbol_AnchorEnd)
                         {
+                        do_optimization:
                             if (totalLength > input || cannotMatch)
                             {
                                 nonMatch();
@@ -482,6 +497,8 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                 return;
                             }
                             Uint64 spaceLeft = target - position;
+                            if (multiplication && thisSymbol->lazy)
+                                spaceLeft %= multiplication;
                             currentMatch = spaceLeft / multiple;
                             if (currentMatch < thisSymbol->minCount)
                             {
@@ -490,7 +507,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                             }
                             if (currentMatch > MAX_EXTEND(thisSymbol->maxCount))
                                 currentMatch = MAX_EXTEND(thisSymbol->maxCount);
-                            if (*lookaheadSymbol) // anchored?
+                            if (*lookaheadSymbol && !multiplication) // anchored?
                             {
                                 if (!doesRepetendMatch(repetend, multiple, currentMatch))
                                 {
