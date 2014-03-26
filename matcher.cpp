@@ -529,7 +529,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                 bool lazinessDoesntMatter = afterLookahead && afterLookahead->type==RegexSymbol_Backref &&
                                                             afterLookahead->minCount == 0 && afterLookahead->maxCount == UINT_MAX && !afterLookahead->lazy &&
                                                             ((RegexBackref*)afterLookahead)->index == ((RegexBackref*)currentSymbol)->index;
-                                if (!USE_STRINGS)
+                                if (!USE_STRINGS && (lazinessDoesntMatter || !thisSymbol->lazy && thisSymbol->maxCount == UINT_MAX))
                                 {
                                     if (lazinessDoesntMatter)
                                         afterLookahead = group->self[+2];
@@ -580,7 +580,8 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                 if (!lazinessDoesntMatter)
                                     lookaheadSymbol = NULL;
                             }
-                            currentMatch = spaceLeft / multiple;
+                            currentMatch     = spaceLeft / multiple;
+                            Uint64 remainder = spaceLeft % multiple;
                             if (currentMatch < thisSymbol->minCount)
                             {
                                 nonMatch();
@@ -606,7 +607,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                             position += currentMatch * multiple;
                             currentMatch = ULLONG_MAX;
                             symbol++;
-                            if (multiplicationGroup)
+                            if (multiplicationGroup && remainder == 0)
                             {
                                 if (afterEndOfGroup)
                                     thisGroup->lazy ? leaveLazyGroup() : leaveMaxedOutGroup();
