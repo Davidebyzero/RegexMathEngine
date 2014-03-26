@@ -494,8 +494,17 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                 return;
                             }
                             Uint64 spaceLeft = target - position;
-                            if (multiplication && thisSymbol->lazy)
-                                spaceLeft %= multiplication;
+                            if (multiplication)
+                            {
+                                RegexSymbol *afterLookahead = group->self[+1];
+                                bool lazinessDoesntMatter = afterLookahead && afterLookahead->type==RegexSymbol_Backref &&
+                                                            afterLookahead->minCount == 0 && afterLookahead->maxCount == UINT_MAX && !afterLookahead->lazy &&
+                                                            ((RegexBackref*)afterLookahead)->index == ((RegexBackref*)currentSymbol)->index;
+                                if (lazinessDoesntMatter || thisSymbol->lazy)
+                                    spaceLeft %= multiplication;
+                                if (lazinessDoesntMatter)
+                                    multiplication = 0;
+                            }
                             currentMatch = spaceLeft / multiple;
                             if (currentMatch < thisSymbol->minCount)
                             {
