@@ -50,9 +50,7 @@ void RegexMatcher<USE_STRINGS>::nonMatch()
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::pushStack()
 {
-    // the following two lines work around what I'm pretty sure is a GCC bug
-    typedef MatchingStack_TryMatch<USE_STRINGS> TryMatch;
-    MatchingStack_TryMatch<USE_STRINGS> *pushStack = stack.template push<TryMatch>();
+    MatchingStack_TryMatch<USE_STRINGS> *pushStack = stack.template push< MatchingStack_TryMatch<USE_STRINGS> >();
     pushStack->position     = position;
     pushStack->currentMatch = currentMatch;
     pushStack->symbol       = *symbol;
@@ -70,9 +68,7 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
     alternative = group->alternatives;
     symbol      = group->alternatives[0]->symbols;
 
-    // the following two lines work around what I'm pretty sure is a GCC bug
-    typedef MatchingStack_EnterGroup<USE_STRINGS> EnterGroup;
-    stack.template push<EnterGroup>();
+    stack.template push< MatchingStack_EnterGroup<USE_STRINGS> >();
 }
 
 template <bool USE_STRINGS>
@@ -103,22 +99,16 @@ void RegexMatcher<USE_STRINGS>::leaveGroup(MatchingStack_LeaveGroup<USE_STRINGS>
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::leaveLazyGroup()
 {
-    // the following two lines work around what I'm pretty sure is a GCC bug
-    typedef MatchingStack_TryLazyAlternatives<USE_STRINGS> TryLazyAlternatives;
-    MatchingStack_TryLazyAlternatives<USE_STRINGS> *pushStack = stack.template push<TryLazyAlternatives>();
+    MatchingStack_TryLazyAlternatives<USE_STRINGS> *pushStack = stack.template push< MatchingStack_TryLazyAlternatives<USE_STRINGS> >();
     pushStack->position    = groupStackTop->position;
     pushStack->alternative = (Uint)(alternative - groupStackTop->group->alternatives);
-    // the following two lines work around what I'm pretty sure is a GCC bug
-    typedef MatchingStack_LeaveGroupLazily<USE_STRINGS> LeaveGroupLazily;
-    leaveGroup(stack.template push<LeaveGroupLazily>(), position);
+    leaveGroup(stack.template push< MatchingStack_LeaveGroupLazily<USE_STRINGS> >(), position);
 }
 
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::leaveMaxedOutGroup()
 {
-    // the following two lines work around what I'm pretty sure is a GCC bug
-    typedef MatchingStack_LeaveGroup<USE_STRINGS> LeaveGroup;
-    leaveGroup(stack.template push<LeaveGroup>(), groupStackTop->position);
+    leaveGroup(stack.template push< MatchingStack_LeaveGroup<USE_STRINGS> >(), groupStackTop->position);
 }
 
 template <bool USE_STRINGS>
@@ -743,9 +733,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Group(RegexSymbol *thisSymbol)
     }
     if (group->lazy && group->minCount == 0)
     {
-        // the following two lines work around what I'm pretty sure is a GCC bug
-        typedef MatchingStack_SkipGroup<USE_STRINGS> SkipGroup;
-        MatchingStack_SkipGroup<USE_STRINGS> *pushStack = stack.template push<SkipGroup>();
+        MatchingStack_SkipGroup<USE_STRINGS> *pushStack = stack.template push< MatchingStack_SkipGroup<USE_STRINGS> >();
         pushStack->position = position;
         pushStack->group    = group;
         symbol++;
@@ -1149,9 +1137,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 
                     if (numCapturedDelta)
                     {
-                        // the following two lines work around what I'm pretty sure is a GCC bug
-                        typedef MatchingStack_LookaheadCapture<USE_STRINGS> LookaheadCapture;
-                        MatchingStack_LookaheadCapture<USE_STRINGS> *pushStack = stack.template push<LookaheadCapture>();
+                        MatchingStack_LookaheadCapture<USE_STRINGS> *pushStack = stack.template push< MatchingStack_LookaheadCapture<USE_STRINGS> >();
                         pushStack->numCaptured       = numCapturedDelta;
                         pushStack->parentAlternative = group->parentAlternative;
                     }
@@ -1193,10 +1179,8 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     Uint64 oldPosition = groupStackTop->position;
                     Uint alternativeNum = (Uint)(alternative - groupStackTop->group->alternatives);
                     size_t privateSpace = sizeof(Uint64) + (selfCapture ? sizeof(Uint64) : 0); // first term has sizeof(Uint64) instead of sizeof(Uint) for alignment
-                    // the following two lines work around what I'm pretty sure is a GCC bug
-                    typedef MatchingStack_LoopGroupGreedily<USE_STRINGS> LoopGroupGreedily;
                     void *buffer = loopGroup(
-                        stack.template push<LoopGroupGreedily>(MatchingStack_LoopGroupGreedily<USE_STRINGS>::get_size(groupStackTop->numCaptured, privateSpace)),
+                        stack.template push< MatchingStack_LoopGroupGreedily<USE_STRINGS> >(MatchingStack_LoopGroupGreedily<USE_STRINGS>::get_size(groupStackTop->numCaptured, privateSpace)),
                         privateSpace,
                         position);
                     *(Uint*)buffer = alternativeNum;
@@ -1205,9 +1189,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 }
                 else
                 {
-                    // the following two lines work around what I'm pretty sure is a GCC bug
-                    typedef MatchingStack_LoopGroup<USE_STRINGS> LoopGroup;
-                    loopGroup(stack.template push<LoopGroup>(MatchingStack_LoopGroup<USE_STRINGS>::get_size(groupStackTop->numCaptured, 0)), 0, position);
+                    loopGroup(stack.template push< MatchingStack_LoopGroup<USE_STRINGS> >(MatchingStack_LoopGroup<USE_STRINGS>::get_size(groupStackTop->numCaptured, 0)), 0, position);
                 }
                 continue;
             }

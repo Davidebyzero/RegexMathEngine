@@ -679,9 +679,7 @@ class MatchingStack_LoopGroupGreedily : public MatchingStack_LoopGroup<USE_STRIN
         if (selfCapture)
             matcher.groupStackTop->position = ((Uint64*)this->buffer)[1];
         matcher.position = this->position;
-        // the following two lines work around what I'm pretty sure is a GCC bug
-        typedef MatchingStack_LeaveGroup<USE_STRINGS> LeaveGroup;
-        matcher.leaveGroup(matcher.stack.template push<LeaveGroup>(), matcher.groupStackTop->position);
+        matcher.leaveGroup(matcher.stack.template push< MatchingStack_LeaveGroup<USE_STRINGS> >(), matcher.groupStackTop->position);
         return true;
     }
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
