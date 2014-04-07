@@ -729,6 +729,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Group(RegexSymbol *thisSymbol)
     {
         if (group->type == RegexGroup_Capturing)
             captures[((RegexGroupCapturing*)group)->backrefIndex] = NON_PARTICIPATING_CAPTURE_GROUP;
+        symbol++;
         return;
     }
     if (group->lazy && group->minCount == 0)
