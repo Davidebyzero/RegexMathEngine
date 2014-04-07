@@ -391,7 +391,11 @@ int main(int argc, char *argv[])
             {
                 Uint64 returnMatch;
                 if (regex.MatchNumber(i, mathMode, returnMatch))
+                {
                     printf("%*llu -> %*llu\n", testNum_digits, i, testNum_digits, returnMatch);
+                    if (lineBuffered)
+                        fflush(stdout);
+                }
                 if (i==testNum1)
                     break;
             }
