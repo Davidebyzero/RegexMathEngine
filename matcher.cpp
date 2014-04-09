@@ -589,7 +589,8 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                             {
                                 if (USE_STRINGS)
                                     countRepetendMatches(repetend, multiple);
-                                pushStack();
+                                if (currentMatch > thisSymbol->minCount)
+                                    pushStack();
                             }
                             //position = target - spaceLeft % multiple;
                             position += currentMatch * multiple;
