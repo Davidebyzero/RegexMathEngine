@@ -1151,6 +1151,24 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     continue;
                 }
                 else
+                if (group->type == RegexGroup_LookaheadMolecular)
+                {
+                    MatchingStack_LeaveMolecularLookahead<USE_STRINGS> *pushStack = stack.template push< MatchingStack_LeaveMolecularLookahead<USE_STRINGS> >();
+
+                    pushStack->position    = groupStackTop->position;
+                    pushStack->group       = group;
+                    pushStack->numCaptured = groupStackTop->numCaptured;
+                    pushStack->alternative = (Uint)(alternative - groupStackTop->group->alternatives);
+
+                    position    = groupStackTop->position;
+                    alternative = group->parentAlternative;
+                    symbol      = group->self + 1;
+                    groupStackTop[-1].numCaptured += groupStackTop->numCaptured;
+                    groupStackTop--;
+                    currentMatch = ULLONG_MAX;
+                    continue;
+                }
+                else
                 if (group->type == RegexGroup_NegativeLookahead)
                 {
                     position = groupStackTop->position;
@@ -1231,10 +1249,11 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     switch (i->group->type)
                     {
                     default:
-                    case RegexGroup_NonCapturing:      openSymbol=" (?:"; break;
-                    case RegexGroup_Capturing:         openSymbol=" (";   break;
-                    case RegexGroup_Lookahead:         openSymbol=" (?="; break;
-                    case RegexGroup_NegativeLookahead: openSymbol=" (?!"; break;
+                    case RegexGroup_NonCapturing:       openSymbol=" (?:"; break;
+                    case RegexGroup_Capturing:          openSymbol=" (";   break;
+                    case RegexGroup_Lookahead:          openSymbol=" (?="; break;
+                    case RegexGroup_LookaheadMolecular: openSymbol=" (?*"; break;
+                    case RegexGroup_NegativeLookahead:  openSymbol=" (?!"; break;
                     }
                     if (i > groupStackBase)
                     {

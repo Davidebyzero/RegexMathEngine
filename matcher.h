@@ -113,6 +113,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     friend class MatchingStack_EnterGroup<USE_STRINGS>;
     friend class MatchingStack_LeaveGroup<USE_STRINGS>;
     friend class MatchingStack_LeaveGroupLazily<USE_STRINGS>;
+    friend class MatchingStack_LeaveMolecularLookahead<USE_STRINGS>;
     friend class MatchingStack_TryLazyAlternatives<USE_STRINGS>;
     friend class MatchingStack_LoopGroup<USE_STRINGS>;
     friend class MatchingStack_LoopGroupGreedily<USE_STRINGS>;
@@ -250,6 +251,8 @@ class GroupStackNode
     friend class MatchingStack_LeaveGroup<true>;
     friend class MatchingStack_LeaveGroupLazily<false>;
     friend class MatchingStack_LeaveGroupLazily<true>;
+    friend class MatchingStack_LeaveMolecularLookahead<false>;
+    friend class MatchingStack_LeaveMolecularLookahead<true>;
     friend class MatchingStack_TryLazyAlternatives<false>;
     friend class MatchingStack_TryLazyAlternatives<true>;
     friend class MatchingStack_LoopGroup<false>;
@@ -453,6 +456,46 @@ class MatchingStack_EnterGroup : public MatchingStackNode<USE_STRINGS>
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
         return true;
+    }
+};
+
+template <bool USE_STRINGS>
+class MatchingStack_LeaveMolecularLookahead : public MatchingStackNode<USE_STRINGS>
+{
+    friend class RegexMatcher<USE_STRINGS>;
+    Uint64 position;
+    Uint numCaptured;
+    Uint alternative;
+    RegexGroup *group;
+
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return sizeof(*this);
+    }
+    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        matcher.groupStackTop++;
+        matcher.groupStackTop->position    = position;
+        matcher.groupStackTop->group       = group;
+        matcher.groupStackTop->numCaptured = numCaptured;
+        matcher.groupStackTop[-1].numCaptured -= numCaptured;
+        matcher.alternative = group->alternatives + alternative;
+        return false;
+    }
+    virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        matcher.groupStackTop++;
+        matcher.groupStackTop->group = group;
+    }
+    virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        matcher.groupStackTop++;
+        matcher.groupStackTop->group = group;
+        return 0;
+    }
+    virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return false;
     }
 };
 

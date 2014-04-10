@@ -378,6 +378,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                     {
                     case ':': buf+=2; group = new RegexGroup(RegexGroup_NonCapturing);       break;
                     case '=': buf+=2; group = new RegexGroup(RegexGroup_Lookahead);          break;
+                    case '*': buf+=2; group = new RegexGroup(RegexGroup_LookaheadMolecular); break;
                     case '!': buf+=2; group = new RegexGroup(RegexGroup_NegativeLookahead);  break;
                     case '#':
                         buf+=2;

@@ -49,6 +49,7 @@ enum RegexGroupType
     RegexGroup_NonCapturing,
     RegexGroup_Capturing,
     RegexGroup_Lookahead,
+    RegexGroup_LookaheadMolecular,
     RegexGroup_NegativeLookahead,
 };
 
@@ -62,6 +63,7 @@ template<bool> class MatchingStack_LeaveGroup;
 template<bool> class MatchingStack_LoopGroup;
 template<bool> class MatchingStack_LoopGroupGreedily;
 template<bool> class MatchingStack_LeaveGroupLazily;
+template<bool> class MatchingStack_LeaveMolecularLookahead;
 template<bool> class MatchingStack_TryLazyAlternatives;
 template<bool> class MatchingStack_TryMatch;
 
@@ -144,6 +146,8 @@ class RegexGroup : public RegexSymbol
     friend class MatchingStack_LeaveGroup<true>;
     friend class MatchingStack_LeaveGroupLazily<false>;
     friend class MatchingStack_LeaveGroupLazily<true>;
+    friend class MatchingStack_LeaveMolecularLookahead<false>;
+    friend class MatchingStack_LeaveMolecularLookahead<true>;
     friend class MatchingStack_TryLazyAlternatives<false>;
     friend class MatchingStack_TryLazyAlternatives<true>;
     friend class MatchingStack_LoopGroupGreedily<false>;
@@ -156,7 +160,7 @@ public:
     RegexGroup(RegexGroupType type) : RegexSymbol(RegexSymbol_Group), type(type) {}
     bool isLookahead()
     {
-        return type == RegexGroup_Lookahead || type == RegexGroup_NegativeLookahead;
+        return type == RegexGroup_Lookahead || type == RegexGroup_LookaheadMolecular || type == RegexGroup_NegativeLookahead;
     }
 };
 
