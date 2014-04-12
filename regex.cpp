@@ -93,6 +93,9 @@ Options:\n\
                       NUM0 to NUM1, inclusive. If NUM1 is not specified, only\n\
                       one number, NUM0, shall be tested.\n\
   --trace             Enable printout of debug trace\n\
+  --verbose           Print both matches and non-matches along with the input\n\
+                      number. Currently works only in numerical mode when\n\
+                      taking input from standard input.\n\
 ", argv0);
 }
 
@@ -130,6 +133,7 @@ int main(int argc, char *argv[])
     // crudely implemented getopt-command-line interface; probably replace it with getopt later
     char *buf = NULL;
     char mathMode = '\0'; // if nonzero, enables math mode and specifies what character to use
+    bool verbose = false;
     bool lineBuffered = false;
     bool showMatch = false;
     bool optionsDone = false;
@@ -157,6 +161,11 @@ int main(int argc, char *argv[])
                     }
                     if (int result = loadPatternFile(buf, argv[i] + 2 + strlength("file=")))
                         return result;
+                }
+                else
+                if (strcmp(&argv[i][2], "verbose")==0)
+                {
+                    verbose = true;
                 }
                 else
                 if (strcmp(&argv[i][2], "line-buffered")==0)
@@ -409,7 +418,16 @@ int main(int argc, char *argv[])
                 {
                     Uint64 input = readNumericConstant<Uint64>(line);
                     Uint64 returnMatch;
-                    if (regex.MatchNumber(input, mathMode, returnMatch))
+                    bool matched = regex.MatchNumber(input, mathMode, returnMatch);
+                    if (verbose)
+                    {
+                        if (matched)
+                            printf("%llu -> %llu\n", input, returnMatch);
+                        else
+                            printf("%llu -> no match\n", input);
+                    }
+                    else
+                    if (matched)
                         printf("%llu\n", returnMatch);
                 }
                 else
