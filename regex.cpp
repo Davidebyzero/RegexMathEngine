@@ -414,6 +414,8 @@ int main(int argc, char *argv[])
             for (;;)
             {
                 const char *line = lineGetter.fgets(stdin);
+                if (!line)
+                    break;
                 if (inrange(*line, '0', '9'))
                 {
                     Uint64 input = readNumericConstant<Uint64>(line);
