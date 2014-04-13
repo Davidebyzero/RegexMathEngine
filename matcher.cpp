@@ -407,8 +407,25 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                     if (nextSymbol->type==RegexSymbol_Backref && thisGroup->type==RegexGroup_Capturing && ((RegexGroupCapturing*)thisGroup)->backrefIndex == ((RegexBackref*)nextSymbol)->index &&
                         optimizationLevel >= 2 && !thisSymbol->lazy && nextSymbol->minCount==nextSymbol->maxCount)
                     {
+                        Uint64 divisor = 1 + nextSymbol->minCount;
+                        RegexSymbol *nextSymbolAfter = thisGroup->self[+2];
+                        if (nextSymbolAfter && nextSymbolAfter->type == RegexSymbol_Group)
+                        {
+                            RegexGroup *group = (RegexGroup*)nextSymbolAfter;
+                            if (group->type != RegexGroup_NegativeLookahead && !group->alternatives[1] && group->minCount==1 && group->maxCount==1)
+                            {
+                                RegexSymbol **lookaheadSymbol = group->alternatives[0]->symbols;
+                                if (*lookaheadSymbol && (*lookaheadSymbol)->type==RegexSymbol_Backref && ((RegexGroupCapturing*)thisGroup)->backrefIndex == ((RegexBackref*)*lookaheadSymbol)->index &&
+                                    (*lookaheadSymbol)->minCount==(*lookaheadSymbol)->maxCount)
+                                {
+                                    divisor += (*lookaheadSymbol)->minCount;
+                                    nextSymbolAfter = lookaheadSymbol[+1];
+                                }
+                            }
+                        }
+
                         Uint64 spaceLeft = input - position;
-                        currentMatch = spaceLeft / (multiple * (1 + nextSymbol->minCount));
+                        currentMatch = spaceLeft / (multiple * divisor);
                         if (currentMatch < thisSymbol->minCount)
                         {
                             nonMatch();
@@ -416,7 +433,6 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                         }
                         if (currentMatch > MAX_EXTEND(thisSymbol->maxCount))
                             currentMatch = MAX_EXTEND(thisSymbol->maxCount);
-                        RegexSymbol *nextSymbolAfter = thisGroup->self[+2];
                         if (nextSymbolAfter && nextSymbolAfter->type == RegexSymbol_AnchorEnd)
                         {
                             if (!doesRepetendMatch(repetend, multiple, currentMatch))
