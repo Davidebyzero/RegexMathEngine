@@ -29,6 +29,9 @@ typedef Uint8 bool8;
 #define inrange(n,a,b) ((Uint)((n)-(a))<=(Uint)((b)-(a)))
 #define inrangex(n,a,b) ((Uint)((n)-(a))<(Uint)((b)-(a)))
 
+#define inrange64(n,a,b) ((Uint64)((n)-(a))<=(Uint64)((b)-(a)))
+#define inrangex64(n,a,b) ((Uint64)((n)-(a))<(Uint64)((b)-(a)))
+
 #define MAX_EXTEND(n) ((Uint64)((n)+1)-1)
 
 template <size_t size>

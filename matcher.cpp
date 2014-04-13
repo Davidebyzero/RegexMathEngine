@@ -378,7 +378,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
             {
                 Uint64 spaceLeft = input - position;
                 currentMatch = spaceLeft / multiple;
-                if (!inrange(currentMatch, thisSymbol->minCount, MAX_EXTEND(thisSymbol->maxCount)))
+                if (!inrange64(currentMatch, thisSymbol->minCount, MAX_EXTEND(thisSymbol->maxCount)))
                 {
                     nonMatch();
                     return;
@@ -1231,7 +1231,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || position == groupStackTop->position)
                     leaveMaxedOutGroup();
                 else
-                if (!group->lazy && inrangex(groupStackTop->loopCount, group->minCount, MAX_EXTEND(group->maxCount)))
+                if (!group->lazy && inrangex64(groupStackTop->loopCount, group->minCount, MAX_EXTEND(group->maxCount)))
                 {
                     bool selfCapture = group->type == RegexGroup_Capturing;
                     Uint64 oldPosition = groupStackTop->position;
