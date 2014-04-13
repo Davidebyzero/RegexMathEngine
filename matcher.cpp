@@ -400,221 +400,259 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                 !nextSymbol && !alternative[+1] && groupStackTop > groupStackBase
                             && (thisGroup->type==RegexGroup_Capturing || thisGroup->type==RegexGroup_NonCapturing)
                             && groupStackTop->loopCount==MAX_EXTEND(thisGroup->maxCount) && (nextSymbol = thisGroup->self[+1])
-                            && nextSymbol->type==RegexSymbol_Group && (afterEndOfGroup=true))
+                            && (afterEndOfGroup=true))
             {
-                RegexGroup *group = (RegexGroup*)nextSymbol;
-                if (group->type==RegexGroup_Lookahead && !group->alternatives[1] && group->minCount)
+                if (afterEndOfGroup && nextSymbol->type!=RegexSymbol_Group)
                 {
-                    RegexSymbol **lookaheadSymbol = group->alternatives[0]->symbols;
-                    // todo: check for empty lookahead (otherwise, this can crash, I think)
-                    Uint64 totalLength = 0;
-                    bool cannotMatch = false;
-                    Uint64 multiplication = 0;
-                    for (;;)
+                    if (nextSymbol->type==RegexSymbol_Backref && thisGroup->type==RegexGroup_Capturing && ((RegexGroupCapturing*)thisGroup)->backrefIndex == ((RegexBackref*)nextSymbol)->index &&
+                        optimizationLevel >= 2 && !thisSymbol->lazy && nextSymbol->minCount==nextSymbol->maxCount)
                     {
-                        RegexSymbol *currentSymbol = *lookaheadSymbol;
-                        if (currentSymbol->type == RegexSymbol_Backref)
+                        Uint64 spaceLeft = input - position;
+                        currentMatch = spaceLeft / (multiple * (1 + nextSymbol->minCount));
+                        if (currentMatch < thisSymbol->minCount)
                         {
-                            if (afterEndOfGroup && thisGroup->type==RegexGroup_Capturing && ((RegexGroupCapturing*)thisGroup)->backrefIndex == ((RegexBackref*)currentSymbol)->index)
+                            nonMatch();
+                            return;
+                        }
+                        if (currentMatch > MAX_EXTEND(thisSymbol->maxCount))
+                            currentMatch = MAX_EXTEND(thisSymbol->maxCount);
+                        RegexSymbol *nextSymbolAfter = thisGroup->self[+2];
+                        if (nextSymbolAfter && nextSymbolAfter->type == RegexSymbol_AnchorEnd)
+                        {
+                            if (!doesRepetendMatch(repetend, multiple, currentMatch))
                             {
-                                if (currentSymbol->minCount != currentSymbol->maxCount)
-                                    break;
-                                if (lookaheadSymbol == group->alternatives[0]->symbols && optimizationLevel >= 2)
+                                nonMatch();
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            if (USE_STRINGS)
+                                countRepetendMatches(repetend, multiple);
+                            pushStack();
+                        }
+                        position += currentMatch * multiple;
+                        currentMatch = ULLONG_MAX;
+                        symbol++;
+                        return;
+                    }
+                }
+                else
+                {
+                    RegexGroup *group = (RegexGroup*)nextSymbol;
+                    if (group->type==RegexGroup_Lookahead && !group->alternatives[1] && group->minCount)
+                    {
+                        RegexSymbol **lookaheadSymbol = group->alternatives[0]->symbols;
+                        // todo: check for empty lookahead (otherwise, this can crash, I think)
+                        Uint64 totalLength = 0;
+                        bool cannotMatch = false;
+                        Uint64 multiplication = 0;
+                        for (;;)
+                        {
+                            RegexSymbol *currentSymbol = *lookaheadSymbol;
+                            if (currentSymbol->type == RegexSymbol_Backref)
+                            {
+                                if (afterEndOfGroup && thisGroup->type==RegexGroup_Capturing && ((RegexGroupCapturing*)thisGroup)->backrefIndex == ((RegexBackref*)currentSymbol)->index)
                                 {
-                                    if (!lookaheadSymbol[+1] && !thisSymbol->lazy || lookaheadSymbol[+1]->type == RegexSymbol_AnchorEnd)
+                                    if (currentSymbol->minCount != currentSymbol->maxCount)
+                                        break;
+                                    if (lookaheadSymbol == group->alternatives[0]->symbols && optimizationLevel >= 2)
                                     {
-                                        if (totalLength > input || cannotMatch)
+                                        if (!lookaheadSymbol[+1] && !thisSymbol->lazy || lookaheadSymbol[+1]->type == RegexSymbol_AnchorEnd)
                                         {
-                                            nonMatch();
-                                            return;
-                                        }
-                                        Uint64 target = input - totalLength;
-                                        if (position > target)
-                                        {
-                                            nonMatch();
-                                            return;
-                                        }
-                                        Uint64 spaceLeft = target - position;
-                                        currentMatch = spaceLeft / (multiple * (1 + currentSymbol->minCount));
-                                        if (currentMatch < thisSymbol->minCount)
-                                        {
-                                            nonMatch();
-                                            return;
-                                        }
-                                        if (currentMatch > MAX_EXTEND(thisSymbol->maxCount))
-                                            currentMatch = MAX_EXTEND(thisSymbol->maxCount);
-                                        if (lookaheadSymbol[+1]) // anchored?
-                                        {
-                                            if (!doesRepetendMatch(repetend, multiple, currentMatch))
+                                            if (totalLength > input || cannotMatch)
                                             {
                                                 nonMatch();
                                                 return;
                                             }
+                                            Uint64 target = input - totalLength;
+                                            if (position > target)
+                                            {
+                                                nonMatch();
+                                                return;
+                                            }
+                                            Uint64 spaceLeft = target - position;
+                                            currentMatch = spaceLeft / (multiple * (1 + currentSymbol->minCount));
+                                            if (currentMatch < thisSymbol->minCount)
+                                            {
+                                                nonMatch();
+                                                return;
+                                            }
+                                            if (currentMatch > MAX_EXTEND(thisSymbol->maxCount))
+                                                currentMatch = MAX_EXTEND(thisSymbol->maxCount);
+                                            if (lookaheadSymbol[+1]) // anchored?
+                                            {
+                                                if (!doesRepetendMatch(repetend, multiple, currentMatch))
+                                                {
+                                                    nonMatch();
+                                                    return;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                if (USE_STRINGS)
+                                                    countRepetendMatches(repetend, multiple);
+                                                pushStack();
+                                            }
+                                            position += currentMatch * multiple;
+                                            currentMatch = ULLONG_MAX;
+                                            symbol++;
+                                            return;
                                         }
-                                        else
-                                        {
-                                            if (USE_STRINGS)
-                                                countRepetendMatches(repetend, multiple);
-                                            pushStack();
-                                        }
-                                        position += currentMatch * multiple;
-                                        currentMatch = ULLONG_MAX;
-                                        symbol++;
-                                        return;
-                                    }
-                                }
-                                break;
-                            }
-                            Uint64 thisCapture = captures[((RegexBackref*)currentSymbol)->index];
-                            if (thisCapture != NON_PARTICIPATING_CAPTURE_GROUP)
-                            {
-                                totalLength += thisCapture * currentSymbol->minCount;
-                                if (currentSymbol->minCount != currentSymbol->maxCount)
-                                {
-                                    if (currentSymbol->maxCount == UINT_MAX && lookaheadSymbol[+1]->type==RegexSymbol_AnchorEnd && optimizationLevel >= 2)
-                                    {
-                                        multiplication = thisCapture;
-                                        goto do_optimization;
                                     }
                                     break;
                                 }
+                                Uint64 thisCapture = captures[((RegexBackref*)currentSymbol)->index];
+                                if (thisCapture != NON_PARTICIPATING_CAPTURE_GROUP)
+                                {
+                                    totalLength += thisCapture * currentSymbol->minCount;
+                                    if (currentSymbol->minCount != currentSymbol->maxCount)
+                                    {
+                                        if (currentSymbol->maxCount == UINT_MAX && lookaheadSymbol[+1]->type==RegexSymbol_AnchorEnd && optimizationLevel >= 2)
+                                        {
+                                            multiplication = thisCapture;
+                                            goto do_optimization;
+                                        }
+                                        break;
+                                    }
+                                }
+                                else
+                                {
+                                    if (currentSymbol->minCount && !emulate_ECMA_NPCGs)
+                                        cannotMatch = true;
+                                }
                             }
                             else
+                            if (currentSymbol->type == RegexSymbol_Character && currentSymbol->minCount == currentSymbol->maxCount)
+                                totalLength += currentSymbol->minCount;
+                            else
+                                break;
+                            lookaheadSymbol++;
+                            if (!*lookaheadSymbol && !thisSymbol->lazy || (*lookaheadSymbol)->type==RegexSymbol_AnchorEnd)
                             {
-                                if (currentSymbol->minCount && !emulate_ECMA_NPCGs)
-                                    cannotMatch = true;
-                            }
-                        }
-                        else
-                        if (currentSymbol->type == RegexSymbol_Character && currentSymbol->minCount == currentSymbol->maxCount)
-                            totalLength += currentSymbol->minCount;
-                        else
-                            break;
-                        lookaheadSymbol++;
-                        if (!*lookaheadSymbol && !thisSymbol->lazy || (*lookaheadSymbol)->type==RegexSymbol_AnchorEnd)
-                        {
-                        do_optimization:
-                            if (totalLength > input || cannotMatch)
-                            {
-                                nonMatch();
-                                return;
-                            }
-                            Uint64 target = input - totalLength;
-                            if (position > target)
-                            {
-                                nonMatch();
-                                return;
-                            }
-                            Uint64 spaceLeft = target - position;
-                            RegexGroup *multiplicationGroup = NULL;
-                            RegexSymbol **multiplicationAnchor;
-                            Uint64 totalLengthSmallerFactor;
-                            tellCompilerVariableIsntUninitialized(multiplicationAnchor);
-                            tellCompilerVariableIsntUninitialized(totalLengthSmallerFactor);
-                            if (multiplication)
-                            {
-                                RegexSymbol *afterLookahead = group->self[+1];
-                                bool lazinessDoesntMatter = afterLookahead && afterLookahead->type==RegexSymbol_Backref &&
-                                                            afterLookahead->minCount == 0 && afterLookahead->maxCount == UINT_MAX && !afterLookahead->lazy &&
-                                                            ((RegexBackref*)afterLookahead)->index == ((RegexBackref*)currentSymbol)->index;
-                                if (!USE_STRINGS && (lazinessDoesntMatter || !thisSymbol->lazy && thisSymbol->maxCount == UINT_MAX))
+                            do_optimization:
+                                if (totalLength > input || cannotMatch)
                                 {
-                                    if (lazinessDoesntMatter)
-                                        afterLookahead = group->self[+2];
-                                    if (afterLookahead && afterLookahead->type==RegexSymbol_Group && afterLookahead->minCount==1 && afterLookahead->maxCount==1)
+                                    nonMatch();
+                                    return;
+                                }
+                                Uint64 target = input - totalLength;
+                                if (position > target)
+                                {
+                                    nonMatch();
+                                    return;
+                                }
+                                Uint64 spaceLeft = target - position;
+                                RegexGroup *multiplicationGroup = NULL;
+                                RegexSymbol **multiplicationAnchor;
+                                Uint64 totalLengthSmallerFactor;
+                                tellCompilerVariableIsntUninitialized(multiplicationAnchor);
+                                tellCompilerVariableIsntUninitialized(totalLengthSmallerFactor);
+                                if (multiplication)
+                                {
+                                    RegexSymbol *afterLookahead = group->self[+1];
+                                    bool lazinessDoesntMatter = afterLookahead && afterLookahead->type==RegexSymbol_Backref &&
+                                                                afterLookahead->minCount == 0 && afterLookahead->maxCount == UINT_MAX && !afterLookahead->lazy &&
+                                                                ((RegexBackref*)afterLookahead)->index == ((RegexBackref*)currentSymbol)->index;
+                                    if (!USE_STRINGS && (lazinessDoesntMatter || !thisSymbol->lazy && thisSymbol->maxCount == UINT_MAX))
                                     {
-                                        RegexGroup *outsideGroup = afterEndOfGroup ? groupStackTop[-1].group : thisGroup;
-                                        if (outsideGroup->type==RegexGroup_Lookahead && !outsideGroup->alternatives[1])
+                                        if (lazinessDoesntMatter)
+                                            afterLookahead = group->self[+2];
+                                        if (afterLookahead && afterLookahead->type==RegexSymbol_Group && afterLookahead->minCount==1 && afterLookahead->maxCount==1)
                                         {
-                                            RegexGroup *afterGroup = (RegexGroup*)afterLookahead;
-                                            RegexSymbol **afterSymbol = afterGroup->alternatives[0]->symbols;
-                                            totalLengthSmallerFactor = 0;
-                                            for (; *afterSymbol; afterSymbol++)
+                                            RegexGroup *outsideGroup = afterEndOfGroup ? groupStackTop[-1].group : thisGroup;
+                                            if (outsideGroup->type==RegexGroup_Lookahead && !outsideGroup->alternatives[1])
                                             {
-                                                if ((*afterSymbol)->type == RegexSymbol_Backref)
+                                                RegexGroup *afterGroup = (RegexGroup*)afterLookahead;
+                                                RegexSymbol **afterSymbol = afterGroup->alternatives[0]->symbols;
+                                                totalLengthSmallerFactor = 0;
+                                                for (; *afterSymbol; afterSymbol++)
                                                 {
-                                                    Uint64 afterCapture = captures[((RegexBackref*)(*afterSymbol))->index];
-                                                    if ((*afterSymbol)->minCount == (*afterSymbol)->maxCount)
+                                                    if ((*afterSymbol)->type == RegexSymbol_Backref)
                                                     {
-                                                        if (afterCapture != NON_PARTICIPATING_CAPTURE_GROUP)
-                                                            totalLengthSmallerFactor += afterCapture * (*afterSymbol)->minCount;
-                                                        else
+                                                        Uint64 afterCapture = captures[((RegexBackref*)(*afterSymbol))->index];
+                                                        if ((*afterSymbol)->minCount == (*afterSymbol)->maxCount)
                                                         {
-                                                            if ((*afterSymbol)->minCount && !emulate_ECMA_NPCGs)
-                                                                break;
+                                                            if (afterCapture != NON_PARTICIPATING_CAPTURE_GROUP)
+                                                                totalLengthSmallerFactor += afterCapture * (*afterSymbol)->minCount;
+                                                            else
+                                                            {
+                                                                if ((*afterSymbol)->minCount && !emulate_ECMA_NPCGs)
+                                                                    break;
+                                                            }
                                                         }
+                                                        else
+                                                        if ((*afterSymbol)->minCount==1 && (*afterSymbol)->maxCount==UINT_MAX && afterSymbol[+1]->type==RegexSymbol_AnchorEnd &&
+                                                            totalLengthSmallerFactor <= multiplication && afterCapture+1 == multiplication)
+                                                        {
+                                                            lazinessDoesntMatter = true;
+                                                            multiplicationGroup = afterGroup;
+                                                            multiplicationAnchor = &afterSymbol[+1];
+                                                            break;
+                                                        }
+                                                        else
+                                                            break;
                                                     }
                                                     else
-                                                    if ((*afterSymbol)->minCount==1 && (*afterSymbol)->maxCount==UINT_MAX && afterSymbol[+1]->type==RegexSymbol_AnchorEnd &&
-                                                        totalLengthSmallerFactor <= multiplication && afterCapture+1 == multiplication)
-                                                    {
-                                                        lazinessDoesntMatter = true;
-                                                        multiplicationGroup = afterGroup;
-                                                        multiplicationAnchor = &afterSymbol[+1];
-                                                        break;
-                                                    }
-                                                    else
-                                                        break;
+                                                    if ((*afterSymbol)->type == RegexSymbol_Character && (*afterSymbol)->minCount == (*afterSymbol)->maxCount)
+                                                        totalLengthSmallerFactor += (*afterSymbol)->minCount;
                                                 }
-                                                else
-                                                if ((*afterSymbol)->type == RegexSymbol_Character && (*afterSymbol)->minCount == (*afterSymbol)->maxCount)
-                                                    totalLengthSmallerFactor += (*afterSymbol)->minCount;
                                             }
                                         }
                                     }
+                                    if (lazinessDoesntMatter || thisSymbol->lazy)
+                                        spaceLeft %= multiplication;
+                                    if (!lazinessDoesntMatter)
+                                        lookaheadSymbol = NULL;
                                 }
-                                if (lazinessDoesntMatter || thisSymbol->lazy)
-                                    spaceLeft %= multiplication;
-                                if (!lazinessDoesntMatter)
-                                    lookaheadSymbol = NULL;
-                            }
-                            currentMatch     = spaceLeft / multiple;
-                            Uint64 remainder = spaceLeft % multiple;
-                            if (currentMatch < thisSymbol->minCount)
-                            {
-                                nonMatch();
+                                currentMatch     = spaceLeft / multiple;
+                                Uint64 remainder = spaceLeft % multiple;
+                                if (currentMatch < thisSymbol->minCount)
+                                {
+                                    nonMatch();
+                                    return;
+                                }
+                                if (currentMatch > MAX_EXTEND(thisSymbol->maxCount))
+                                    currentMatch = MAX_EXTEND(thisSymbol->maxCount);
+                                if (lookaheadSymbol && *lookaheadSymbol) // anchored?
+                                {
+                                    if (!doesRepetendMatch(repetend, multiple, currentMatch))
+                                    {
+                                        nonMatch();
+                                        return;
+                                    }
+                                }
+                                else
+                                {
+                                    if (USE_STRINGS)
+                                        countRepetendMatches(repetend, multiple);
+                                    if (currentMatch > thisSymbol->minCount)
+                                        pushStack();
+                                }
+                                //position = target - spaceLeft % multiple;
+                                position += currentMatch * multiple;
+                                currentMatch = ULLONG_MAX;
+                                symbol++;
+                                if (multiplicationGroup && remainder == 0)
+                                {
+                                    if (afterEndOfGroup)
+                                        thisGroup->lazy ? leaveLazyGroup() : leaveMaxedOutGroup();
+
+                                    spaceLeft = input - position;
+                                    Uint64 product = (totalLengthSmallerFactor ? totalLengthSmallerFactor : multiplication-1) * multiplication;
+                                    if (spaceLeft < product)
+                                    {
+                                        nonMatch();
+                                        return;
+                                    }
+
+                                    position = input - product;
+                                    enterGroup(multiplicationGroup);
+                                    symbol = multiplicationAnchor;
+                                    position = input;
+                                }
                                 return;
                             }
-                            if (currentMatch > MAX_EXTEND(thisSymbol->maxCount))
-                                currentMatch = MAX_EXTEND(thisSymbol->maxCount);
-                            if (lookaheadSymbol && *lookaheadSymbol) // anchored?
-                            {
-                                if (!doesRepetendMatch(repetend, multiple, currentMatch))
-                                {
-                                    nonMatch();
-                                    return;
-                                }
-                            }
-                            else
-                            {
-                                if (USE_STRINGS)
-                                    countRepetendMatches(repetend, multiple);
-                                if (currentMatch > thisSymbol->minCount)
-                                    pushStack();
-                            }
-                            //position = target - spaceLeft % multiple;
-                            position += currentMatch * multiple;
-                            currentMatch = ULLONG_MAX;
-                            symbol++;
-                            if (multiplicationGroup && remainder == 0)
-                            {
-                                if (afterEndOfGroup)
-                                    thisGroup->lazy ? leaveLazyGroup() : leaveMaxedOutGroup();
-
-                                spaceLeft = input - position;
-                                Uint64 product = (totalLengthSmallerFactor ? totalLengthSmallerFactor : multiplication-1) * multiplication;
-                                if (spaceLeft < product)
-                                {
-                                    nonMatch();
-                                    return;
-                                }
-
-                                position = input - product;
-                                enterGroup(multiplicationGroup);
-                                symbol = multiplicationAnchor;
-                                position = input;
-                            }
-                            return;
                         }
                     }
                 }
