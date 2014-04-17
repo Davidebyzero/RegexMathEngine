@@ -544,7 +544,13 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                             else
                                 break;
                             lookaheadSymbol++;
-                            if (!*lookaheadSymbol && !thisSymbol->lazy || (*lookaheadSymbol)->type==RegexSymbol_AnchorEnd)
+                            if (!*lookaheadSymbol)
+                            {
+                                if (thisSymbol->lazy)
+                                    break;
+                                goto do_optimization;
+                            }
+                            if ((*lookaheadSymbol)->type==RegexSymbol_AnchorEnd)
                             {
                             do_optimization:
                                 if (totalLength > input || cannotMatch)
@@ -617,7 +623,10 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                         }
                                     }
                                     if (lazinessDoesntMatter || thisSymbol->lazy)
-                                        spaceLeft %= multiplication;
+                                    {
+                                        Uint64 minMatch = thisSymbol->minCount * multiple;
+                                        spaceLeft = (spaceLeft - minMatch) % multiplication + minMatch;
+                                    }
                                     if (!lazinessDoesntMatter)
                                         lookaheadSymbol = NULL;
                                 }
@@ -642,7 +651,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                 {
                                     if (USE_STRINGS)
                                         countRepetendMatches(repetend, multiple);
-                                    if (currentMatch > thisSymbol->minCount)
+                                    if (currentMatch != (thisSymbol->lazy ? MAX_EXTEND(thisSymbol->maxCount) : thisSymbol->minCount))
                                         pushStack();
                                 }
                                 //position = target - spaceLeft % multiple;
