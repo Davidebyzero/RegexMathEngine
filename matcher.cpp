@@ -456,10 +456,9 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                 else
                 {
                     RegexGroup *group = (RegexGroup*)nextSymbol;
-                    if (group->type==RegexGroup_Lookahead && !group->alternatives[1] && group->minCount)
+                    RegexSymbol **lookaheadSymbol;
+                    if (group->type==RegexGroup_Lookahead && !group->alternatives[1] && group->minCount && *(lookaheadSymbol = group->alternatives[0]->symbols))
                     {
-                        RegexSymbol **lookaheadSymbol = group->alternatives[0]->symbols;
-                        // todo: check for empty lookahead (otherwise, this can crash, I think)
                         Uint64 totalLength = 0;
                         bool cannotMatch = false;
                         Uint64 multiplication = 0;
@@ -524,7 +523,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                     totalLength += thisCapture * currentSymbol->minCount;
                                     if (currentSymbol->minCount != currentSymbol->maxCount)
                                     {
-                                        if (currentSymbol->maxCount == UINT_MAX && lookaheadSymbol[+1]->type==RegexSymbol_AnchorEnd && optimizationLevel >= 2)
+                                        if (currentSymbol->maxCount == UINT_MAX && lookaheadSymbol[+1] && lookaheadSymbol[+1]->type==RegexSymbol_AnchorEnd && optimizationLevel >= 2)
                                         {
                                             multiplication = thisCapture;
                                             goto do_optimization;
