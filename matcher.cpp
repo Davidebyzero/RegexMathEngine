@@ -443,7 +443,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                         }
                         else
                         {
-                            if (USE_STRINGS)
+                            if (USE_STRINGS && repetend)
                                 countRepetendMatches(repetend, multiple);
                             pushStack();
                         }
@@ -505,7 +505,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                             }
                                             else
                                             {
-                                                if (USE_STRINGS)
+                                                if (USE_STRINGS && repetend)
                                                     countRepetendMatches(repetend, multiple);
                                                 pushStack();
                                             }
@@ -648,7 +648,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                 }
                                 else
                                 {
-                                    if (USE_STRINGS)
+                                    if (USE_STRINGS && repetend)
                                         countRepetendMatches(repetend, multiple);
                                     if (currentMatch != (thisSymbol->lazy ? MAX_EXTEND(thisSymbol->maxCount) : thisSymbol->minCount))
                                         pushStack();
