@@ -95,6 +95,7 @@ struct RegexMatcherBase<false>
     friend class Regex;
 protected:
     char basicChar;
+    bool basicCharIsWordCharacter;
 };
 template <>
 struct RegexMatcherBase<true>

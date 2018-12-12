@@ -149,9 +149,12 @@ void *RegexMatcher<USE_STRINGS>::loopGroup(MatchingStack_LoopGroup<USE_STRINGS> 
     return (void*)pushLoop->buffer;
 }
 
+bool matchWordCharacter(Uchar ch);
+
 template<> void RegexMatcher<false>::initInput(Uint64 _input, Uint numCaptureGroups)
 {
     input = _input;
+    basicCharIsWordCharacter = matchWordCharacter(basicChar);
 }
 template<> void RegexMatcher<true>::initInput(Uint64 _input, Uint numCaptureGroups)
 {
@@ -285,18 +288,13 @@ template<> inline bool RegexMatcher<true>::doesStringMatch(RegexSymbol *stringSy
 
 template<> bool RegexMatcher<false>::matchWordBoundary()
 {
-    return position==0 || position==input;
+    return basicCharIsWordCharacter && (position==0 || position==input) && input!=0;
 }
 
 template<> bool RegexMatcher<true>::matchWordBoundary()
 {
-    if (position==0 || position==input)
-        return true;
-
-    char lfChar = stringToMatchAgainst[position-1];
-    char rhChar = stringToMatchAgainst[position];
-    bool lfWord = inrange(lfChar,'A','Z') || inrange(lfChar,'a','z') || inrange(lfChar,'0','9') || lfChar=='_';
-    bool rhWord = inrange(rhChar,'A','Z') || inrange(rhChar,'a','z') || inrange(rhChar,'0','9') || rhChar=='_';
+    bool lfWord = position==0     ? false : matchWordCharacter(stringToMatchAgainst[position-1]);
+    bool rhWord = position==input ? false : matchWordCharacter(stringToMatchAgainst[position  ]);
     return lfWord != rhWord;
 }
 
