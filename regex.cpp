@@ -385,94 +385,102 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    Regex regex(buf);
-    //__debugbreak();
-
-    /*Uint64 returnMatch_;
-    if (regex.MatchNumber(256, 'x', returnMatch_))
-        printf("%llu\n", returnMatch_);*/
-
-    if (mathMode)
+    try
     {
-#if defined(TEST_NUMBERS_FIBONACCI)
-        Uint64 a=0, b=1;
-        for(;;)
+        Regex regex(buf);
+        //__debugbreak();
+
+        /*Uint64 returnMatch_;
+        if (regex.MatchNumber(256, 'x', returnMatch_))
+            printf("%llu\n", returnMatch_);*/
+
+        if (mathMode)
         {
-            Uint64 returnMatch;
-            if (regex.MatchNumber(a, mathMode, returnMatch))
-                printf("%llu -> %llu\n", a, returnMatch);
-            else
-                printf("%llu -> no match\n", a);
-            Uint64 c = a + b;
-            a = b;
-            b = c;
-        }
-#else
-        if (testNumInc)
-            for (Uint64 i=testNum0;; i+=testNumInc)
+#if defined(TEST_NUMBERS_FIBONACCI)
+            Uint64 a=0, b=1;
+            for(;;)
             {
                 Uint64 returnMatch;
-                if (regex.MatchNumber(i, mathMode, returnMatch))
+                if (regex.MatchNumber(a, mathMode, returnMatch))
+                    printf("%llu -> %llu\n", a, returnMatch);
+                else
+                    printf("%llu -> no match\n", a);
+                Uint64 c = a + b;
+                a = b;
+                b = c;
+            }
+#else
+            if (testNumInc)
+                for (Uint64 i=testNum0;; i+=testNumInc)
                 {
-                    printf("%*llu -> %*llu\n", testNum_digits, i, testNum_digits, returnMatch);
+                    Uint64 returnMatch;
+                    if (regex.MatchNumber(i, mathMode, returnMatch))
+                    {
+                        printf("%*llu -> %*llu\n", testNum_digits, i, testNum_digits, returnMatch);
+                        if (lineBuffered)
+                            fflush(stdout);
+                    }
+                    if (i==testNum1)
+                        break;
+                }
+            else
+            {
+                LineGetter lineGetter(1<<5);
+                for (;;)
+                {
+                    const char *line = lineGetter.fgets(stdin);
+                    if (!line)
+                        break;
+                    if (inrange(*line, '0', '9'))
+                    {
+                        Uint64 input = readNumericConstant<Uint64>(line);
+                        Uint64 returnMatch;
+                        bool matched = regex.MatchNumber(input, mathMode, returnMatch);
+                        if (verbose)
+                        {
+                            if (matched)
+                                printf("%llu -> %llu\n", input, returnMatch);
+                            else
+                                printf("%llu -> no match\n", input);
+                        }
+                        else
+                        if (matched)
+                            printf("%llu\n", returnMatch);
+                    }
+                    else
+                        puts(line);
+                }
+            }
+#endif
+        }
+        else
+        {
+            LineGetter lineGetter(1<<15);
+            const char newline = '\n';
+            for (;;)
+            {
+                char *line = lineGetter.fgets(stdin);
+                if (!line)
+                    break;
+                const char *returnMatch;
+                size_t returnMatchLength;
+                if (regex.MatchString(line, returnMatch, returnMatchLength))
+                {
+                    if (showMatch)
+                        printf("%.*s\n", returnMatchLength, returnMatch);
+                    else
+                        puts(line);
                     if (lineBuffered)
                         fflush(stdout);
                 }
-                if (i==testNum1)
-                    break;
-            }
-        else
-        {
-            LineGetter lineGetter(1<<5);
-            for (;;)
-            {
-                const char *line = lineGetter.fgets(stdin);
-                if (!line)
-                    break;
-                if (inrange(*line, '0', '9'))
-                {
-                    Uint64 input = readNumericConstant<Uint64>(line);
-                    Uint64 returnMatch;
-                    bool matched = regex.MatchNumber(input, mathMode, returnMatch);
-                    if (verbose)
-                    {
-                        if (matched)
-                            printf("%llu -> %llu\n", input, returnMatch);
-                        else
-                            printf("%llu -> no match\n", input);
-                    }
-                    else
-                    if (matched)
-                        printf("%llu\n", returnMatch);
-                }
-                else
-                    puts(line);
             }
         }
-#endif
-    }
-    else
-    {
-        LineGetter lineGetter(1<<15);
-        const char newline = '\n';
-        for (;;)
-        {
-            char *line = lineGetter.fgets(stdin);
-            if (!line)
-                break;
-            const char *returnMatch;
-            size_t returnMatchLength;
-            if (regex.MatchString(line, returnMatch, returnMatchLength))
-            {
-                if (showMatch)
-                    printf("%.*s\n", returnMatchLength, returnMatch);
-                else
-                    puts(line);
-                if (lineBuffered)
-                    fflush(stdout);
-            }
-        }
-    }
 
-    return 0;
+        return 0;
+    }
+    catch (RegexParsingError)
+    {
+        fprintf(stderr, "Error parsing regex pattern\n");
+        return -1;
+    }
 }
