@@ -478,9 +478,9 @@ int main(int argc, char *argv[])
 
         return 0;
     }
-    catch (RegexParsingError)
+    catch (RegexParsingError err)
     {
-        fprintf(stderr, "Error parsing regex pattern\n");
+        fprintf(stderr, "Error parsing regex pattern at offset %u: %s\n", err.buf - buf, err.msg);
         return -1;
     }
 }

@@ -208,7 +208,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 if (inverted)
                     buf++;
                 if (*buf == ']' && !allow_empty_character_classes)
-                    throw RegexParsingError();
+                    throw RegexParsingError(buf, "Empty character class");
                 Uint8 allowedChars[256/8];
                 memset(allowedChars, 0, sizeof(allowedChars));
                 int inRange = 0; /* -1 = the last char was part of an escape code that cannot be part of a range
@@ -219,7 +219,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 for (;;)
                 {
                     if (!*buf)
-                        throw RegexParsingError();
+                        throw RegexParsingError(buf, "Missing terminating ] for character class");
                     if (*buf == ']')
                     {
                         buf++;
@@ -240,7 +240,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                         case 'D':
                             {
                                 if (inRange == 2)
-                                    throw RegexParsingError();
+                                    throw RegexParsingError(buf, "Invalid range in character class");
                                 Uint16 backup = *(Uint16*)(allowedChars + '0'/8) & (((1 << ('9'-'0'+1)) - 1) << ('0'%8));
                                 memset(allowedChars, 0xFF, sizeof(allowedChars));
                                 *(Uint16*)(allowedChars + '0'/8) |= backup;
@@ -250,7 +250,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                             }
                         case 'd':
                             if (inRange == 2)
-                                throw RegexParsingError();
+                                throw RegexParsingError(buf, "Invalid range in character class");
                             *(Uint16*)(allowedChars + '0'/8) |= ((1 << ('9'-'0'+1)) - 1) << ('0'%8);
                             inRange = -1;
                             buf++;
@@ -258,7 +258,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                         case 'S':
                             {
                                 if (inRange == 2)
-                                    throw RegexParsingError();
+                                    throw RegexParsingError(buf, "Invalid range in character class");
                                 Uint8 backup1 = allowedChars[1] & ((1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)); // '\t','\n','\v','\f','\r'
                                 Uint8 backup2 = allowedChars[(Uchar)' '/8] & (1 << ((Uchar)' '%8));
                                 Uint8 backup3 = allowedChars[(Uchar)' '/8] & (1 << ((Uchar)' '%8)); // non-breaking space; WARNING: may not be portable
@@ -272,7 +272,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                             }
                         case 's':
                             if (inRange == 2)
-                                throw RegexParsingError();
+                                throw RegexParsingError(buf, "Invalid range in character class");
                             allowedChars[1] |= (1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5); // '\t','\n','\v','\f','\r'
                             allowedChars[(Uchar)' '/8] |= 1 << ((Uchar)' '%8);
                             allowedChars[(Uchar)' '/8] |= 1 << ((Uchar)' '%8); // non-breaking space; WARNING: may not be portable
@@ -282,7 +282,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                         case 'W':
                             {
                                 if (inRange == 2)
-                                    throw RegexParsingError();
+                                    throw RegexParsingError(buf, "Invalid range in character class");
                                 Uint16 backup1 = *(Uint16*)(allowedChars + '0'/8) & (((1 << ('9'-'0'+1)) - 1) << ('0'%8));
                                 Uint32 backup2 = *(Uint32*)(allowedChars + 'A'/8) & (((1 << ('Z'-'A'+1)) - 1) << ('A'%8));
                                 Uint32 backup3 = *(Uint32*)(allowedChars + 'a'/8) & (((1 << ('z'-'a'+1)) - 1) << ('a'%8));
@@ -298,7 +298,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                             }
                         case 'w':
                             if (inRange == 2)
-                                throw RegexParsingError();
+                                throw RegexParsingError(buf, "Invalid range in character class");
                             *(Uint16*)(allowedChars + '0'/8) |= ((1 << ('9'-'0'+1)) - 1) << ('0'%8);
                             *(Uint32*)(allowedChars + 'A'/8) |= ((1 << ('Z'-'A'+1)) - 1) << ('A'%8);
                             *(Uint32*)(allowedChars + 'a'/8) |= ((1 << ('z'-'a'+1)) - 1) << ('a'%8);
@@ -321,7 +321,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                             }
                             else
                             if (inRange < 0)
-                                throw RegexParsingError();
+                                throw RegexParsingError(buf, "Invalid range in character class");
                         }
                         else
                             goto process_char_for_charClass;
@@ -333,7 +333,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                         if (inRange == 2)
                         {
                             if (firstCharInRange > ch)
-                                throw RegexParsingError();
+                                throw RegexParsingError(buf, "Range out of order in character class");
                             Uint byte0 = firstCharInRange / 8;
                             Uint  bit0 = firstCharInRange % 8;
                             Uint byte1 = (ch + 1) / 8;
@@ -388,12 +388,12 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                             if (*buf == ')')
                                 break;
                             if (!*buf)
-                                throw RegexParsingError();
+                                throw RegexParsingError(buf, "Missing ) after comment");
                         }
                         buf++;
                         goto not_a_group;
                     default:
-                        throw RegexParsingError();
+                        throw RegexParsingError(buf, "Unrecognized character after (?");
                     }
                     break;
                 default:
@@ -423,11 +423,11 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
             }
         case '\0':
             if (stack->below)
-                throw RegexParsingError();
+                throw RegexParsingError(buf, "Missing closing parentheses");
             goto close_group;
         case ')':
             if (!stack->below)
-                throw RegexParsingError();
+                throw RegexParsingError(buf, "Unmatched closing parenthesis");
             buf++;
         close_group:
             {
@@ -466,7 +466,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 else
                 {
                     if (!*buf)
-                        throw RegexParsingError();
+                        throw RegexParsingError(buf, "\\ at end of pattern");
                     char ch;
                     switch (*buf)
                     {
@@ -511,7 +511,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
             }
         case '+':
             if (!symbol || symbolCountSpecified || symbolLazinessSpecified)
-                throw RegexParsingError();
+                throw RegexParsingError(buf, "Nothing to repeat");
             buf++;
             symbol->maxCount = UINT_MAX;
             fixLookaheadQuantifier();
@@ -519,7 +519,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
             break;
         case '*':
             if (!symbol || symbolCountSpecified || symbolLazinessSpecified)
-                throw RegexParsingError();
+                throw RegexParsingError(buf, "Nothing to repeat");
             buf++;
             symbol->minCount = 0;
             symbol->maxCount = UINT_MAX;
@@ -528,7 +528,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
             break;
         case '?':
             if (!symbol || symbolLazinessSpecified)
-                throw RegexParsingError();
+                throw RegexParsingError(buf, "Nothing to repeat");
             buf++;
             if (symbolCountSpecified)
             {
@@ -543,10 +543,10 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
             break;
         case '{':
             if (!symbol || symbolCountSpecified || symbolLazinessSpecified)
-                throw RegexParsingError();
+                throw RegexParsingError(buf, "Nothing to repeat");
             buf++;
             if (!inrange(*buf, '0', '9'))
-                throw RegexParsingError();
+                throw RegexParsingError(buf, "Non-numeric character after {");
             symbol->minCount = readNumericConstant<Uint>(buf);
             if (*buf == '}')
             {
@@ -566,14 +566,14 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 {
                     symbol->maxCount = readNumericConstant<Uint>(buf);
                     if (symbol->maxCount < symbol->minCount)
-                        throw RegexParsingError();
+                        throw RegexParsingError(buf, "Numbers out of order in {} quantifier");
                     if (*buf != '}')
-                        throw RegexParsingError();
+                        throw RegexParsingError(buf, "Missing closing } in quantifier");
                     buf++;
                 }
             }
             else
-                throw RegexParsingError();
+                throw RegexParsingError(buf, "{ at end of pattern");
             fixLookaheadQuantifier();
             symbolCountSpecified = true;
             break;

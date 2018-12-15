@@ -201,7 +201,13 @@ public:
     }
 };
 
-class RegexParsingError {};
+class RegexParsingError
+{
+public:
+    const char *buf;
+    const char *msg;
+    RegexParsingError(const char *buf, const char *msg) : buf(buf), msg(msg) {}
+};
 class RegexInternalError {};
 
 #ifdef _MSC_VER
