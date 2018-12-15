@@ -1295,9 +1295,9 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 delete [] copy;
 
 #ifdef _DEBUG
-                fprintf(stderr, "Step %llu: {%llu} <%llu> ", numSteps, position, stack.getStackDepth());
+                fprintf(stderr, "Step %llu: {%llu|%llu} <%llu> ", numSteps, position, input - position, stack.getStackDepth());
 #else
-                fprintf(stderr, "Step %llu: {%llu} ", numSteps, position);
+                fprintf(stderr, "Step %llu: {%llu|%llu} ", numSteps, position, input - position);
 #endif
                 for (Uint *i=captureStackBase; i<captureStackTop; i++)
                     fprintf(stderr, "\\%u=%llu%s", *i+1, captures[*i], i<captureStackTop-1 ? ", " : "");
