@@ -58,6 +58,7 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
 
 // todo: implement these as class members rather than global variables?
 bool debugTrace = false;
+bool free_spacing_mode = true;
 bool emulate_ECMA_NPCGs = true;
 bool allow_empty_character_classes = true;
 Uint optimizationLevel = 2;
@@ -80,6 +81,10 @@ Options:\n\
                       N identical characters. The parameter CHAR defines which\n\
                       repeated character is to be used. By convention this is\n\
                       usually \"x\", but it is configurable.\n\
+  --fs{-|+}           Disables or enables free-spacing mode. In this mode, all\n\
+                      whitespace will be ignored unless it occurs inside a\n\
+                      parsable unit. \"-\" disables this and \"+\" enables it.\n\
+                      By default it is enabled.\n\
   --npcg{-|+}         Specifies the behavior of non-participating capture\n\
                       groups. \"-\" makes them match nothing (as in most regex\n\
                       engines), and \"+\" makes them match an empty string (as\n\
@@ -194,6 +199,14 @@ int main(int argc, char *argv[])
                         return -1;
                     }
                     mathMode = arg[0];
+                }
+                else
+                if (strncmp(&argv[i][2], "fs", strlength("fs"))==0 &&
+                    (argv[i][2 + strlength("fs")] == '-' ||
+                     argv[i][2 + strlength("fs")] == '+' ) &&
+                    !argv[i][2 + strlength("fs") + 1])
+                {
+                    free_spacing_mode = argv[i][2 + strlength("fs")] == '+';
                 }
                 else
                 if (strncmp(&argv[i][2], "npcg", strlength("npcg"))==0 &&

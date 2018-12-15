@@ -180,21 +180,25 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
         case '\v':
         case '\r':
         case '\n':
-            do
-                buf++;
-            while (*buf==' ' || *buf=='\t' || *buf=='\v' || *buf=='\r' || *buf=='\n');
+            if (free_spacing_mode)
+            {
+                do
+                    buf++;
+                while (*buf==' ' || *buf=='\t' || *buf=='\v' || *buf=='\r' || *buf=='\n');
+                break;
+            }
+            // else fall through
+        default:
+            symbol = new RegexSymbol(RegexSymbol_Character);
+            symbol->characterAny = false;
+            symbol->character = *buf;
+            addSymbol(buf++, symbol);
             break;
         case '^':
             addSymbol(buf++, symbol = new RegexSymbol(RegexSymbol_AnchorStart));
             break;
         case '$':
             addSymbol(buf++, symbol = new RegexSymbol(RegexSymbol_AnchorEnd));
-            break;
-        default:
-            symbol = new RegexSymbol(RegexSymbol_Character);
-            symbol->characterAny = false;
-            symbol->character = *buf;
-            addSymbol(buf++, symbol);
             break;
         case '.':
             addSymbol(buf++, symbol = new RegexSymbol(RegexSymbol_Character));

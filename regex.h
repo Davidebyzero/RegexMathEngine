@@ -20,6 +20,7 @@
 #include "tools.h"
 
 extern bool debugTrace;
+extern bool free_spacing_mode;
 extern bool emulate_ECMA_NPCGs;
 extern bool allow_empty_character_classes;
 extern Uint optimizationLevel;
