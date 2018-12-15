@@ -207,7 +207,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 bool inverted = *buf == '^';
                 if (inverted)
                     buf++;
-                if (*buf == ']')
+                if (*buf == ']' && !allow_empty_character_classes)
                     throw RegexParsingError();
                 Uint8 allowedChars[256/8];
                 memset(allowedChars, 0, sizeof(allowedChars));

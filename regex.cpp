@@ -59,6 +59,7 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
 // todo: implement these as class members rather than global variables?
 bool debugTrace = false;
 bool emulate_ECMA_NPCGs = true;
+bool allow_empty_character_classes = true;
 Uint optimizationLevel = 2;
 
 static void printShortUsage(const char *argv0)
@@ -83,6 +84,10 @@ Options:\n\
                       groups. \"-\" makes them match nothing (as in most regex\n\
                       engines), and \"+\" makes them match an empty string (as\n\
                       in ECMAScript). The default is \"+\".\n\
+  --ecc{-|+}          Specifies whether an empty character class, i.e. \"[]\",\n\
+                      or \"[^]\", is permitted. \"-\" makes it an error to attempt\n\
+                      to use them (as in most regex engines), and \"+\" allows\n\
+                      them (as in ECMAScript). The default is \"+\".\n\
   -o                  Show only the part of the line that matched\n\
   -O NUMBER           Specifies the optimization level, from 0 to 2. This\n\
                       controls whether optimizations are enabled which skip\n\
@@ -197,6 +202,14 @@ int main(int argc, char *argv[])
                     !argv[i][2 + strlength("npcg") + 1])
                 {
                     emulate_ECMA_NPCGs = argv[i][2 + strlength("npcg")] == '+';
+                }
+                else
+                if (strncmp(&argv[i][2], "ecc", strlength("ecc"))==0 &&
+                    (argv[i][2 + strlength("ecc")] == '-' ||
+                     argv[i][2 + strlength("ecc")] == '+' ) &&
+                    !argv[i][2 + strlength("ecc") + 1])
+                {
+                    allow_empty_character_classes = argv[i][2 + strlength("ecc")] == '+';
                 }
                 else
                 if (strcmp(&argv[i][2], "trace")==0)
