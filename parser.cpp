@@ -207,8 +207,6 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 bool inverted = *buf == '^';
                 if (inverted)
                     buf++;
-                if (*buf == ']' && !allow_empty_character_classes)
-                    throw RegexParsingError(buf, "Empty character class");
                 Uint8 allowedChars[256/8];
                 memset(allowedChars, 0, sizeof(allowedChars));
                 int inRange = 0; /* -1 = the last char was part of an escape code that cannot be part of a range
@@ -216,11 +214,11 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                                      1 = a hyphen at this point will denote a range unless it's the last character between the brackets
                                      2 = the upcoming character or escape code will denote the end of a range */
                 Uint8 ch, firstCharInRange;
-                for (;;)
+                for (bool firstCharInCharacterClass = true;; firstCharInCharacterClass=false)
                 {
                     if (!*buf)
                         throw RegexParsingError(buf, "Missing terminating ] for character class");
-                    if (*buf == ']')
+                    if (*buf == ']' && (!firstCharInCharacterClass || allow_empty_character_classes))
                     {
                         buf++;
                         break;
