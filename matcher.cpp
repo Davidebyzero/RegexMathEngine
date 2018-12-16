@@ -442,7 +442,14 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                         else
                         {
                             if (USE_STRINGS && repetend)
+                            {
                                 countRepetendMatches(repetend, multiple);
+                                if (currentMatch < thisSymbol->minCount)
+                                {
+                                    nonMatch();
+                                    return;
+                                }
+                            }
                             pushStack();
                         }
                         position += currentMatch * multiple;
@@ -504,7 +511,14 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                             else
                                             {
                                                 if (USE_STRINGS && repetend)
+                                                {
                                                     countRepetendMatches(repetend, multiple);
+                                                    if (currentMatch < thisSymbol->minCount)
+                                                    {
+                                                        nonMatch();
+                                                        return;
+                                                    }
+                                                }
                                                 pushStack();
                                             }
                                             position += currentMatch * multiple;
@@ -647,7 +661,14 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                 else
                                 {
                                     if (USE_STRINGS && repetend)
+                                    {
                                         countRepetendMatches(repetend, multiple);
+                                        if (currentMatch < thisSymbol->minCount)
+                                        {
+                                            nonMatch();
+                                            return;
+                                        }
+                                    }
                                     if (currentMatch != (thisSymbol->lazy ? MAX_EXTEND(thisSymbol->maxCount) : thisSymbol->minCount))
                                         pushStack();
                                 }
