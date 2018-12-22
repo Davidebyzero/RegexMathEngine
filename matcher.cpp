@@ -1368,19 +1368,21 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 
         stack.flush();
 
-        if (match > 0 || anchored)
+        if (match > 0)
         {
             if (debugTrace)
-                fputc('\n', stderr);
+                fprintf(stderr, "Match found at {%llu}\n\n", curPosition);
             break;
         }
         if (debugTrace)
         {
             fputs("No match found", stderr);
-            if (curPosition+1 <= input)
+            if (curPosition+1 <= input && !anchored)
                 fprintf(stderr, "; trying at {%llu}", curPosition+1);
             fputs("\n\n", stderr);
         }
+        if (anchored)
+            break;
     }
 
     returnMatchOffset = curPosition;
