@@ -200,6 +200,8 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     inline void (RegexMatcher<USE_STRINGS>::*chooseBuiltinCharacterClassFunction(bool (*characterMatchFunction)(Uchar ch), void (RegexMatcher<USE_STRINGS>::*matchFunction)(RegexSymbol *thisSymbol)))(RegexSymbol *thisSymbol);
     inline void virtualizeSymbols(RegexGroup *rootGroup);
 
+    inline void fprintCaptures(FILE *f);
+
 public:
     inline RegexMatcher();
     inline ~RegexMatcher();

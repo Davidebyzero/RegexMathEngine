@@ -1321,8 +1321,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 #else
                 fprintf(stderr, "Step %llu: {%llu|%llu} ", numSteps, position, input - position);
 #endif
-                for (Uint *i=captureStackBase; i<captureStackTop; i++)
-                    fprintf(stderr, "\\%u=%llu%s", *i+1, captures[*i], i<captureStackTop-1 ? ", " : "");
+                fprintCaptures(stderr);
                 fputc('\n', stderr);
 
                 for (GroupStackNode *i=groupStackBase; i<=groupStackTop; i++)
@@ -1370,6 +1369,34 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
     returnMatchLength = (size_t)(position - curPosition);
     
     return match > 0;
+}
+
+void RegexMatcher<false>::fprintCaptures(FILE *f)
+{
+    for (Uint *i=captureStackBase; i<captureStackTop; i++)
+        fprintf(stderr, "\\%u=%llu%s", *i+1, captures[*i], i<captureStackTop-1 ? ", " : "");
+}
+
+void RegexMatcher<true>::fprintCaptures(FILE *f)
+{
+    for (Uint *i=captureStackBase; i<captureStackTop; i++)
+    {
+        fprintf(stderr, "\\%u=\"", *i+1);
+        const char *s = captureOffsets[*i];
+        for (Uint64 len=captures[*i]; len!=0; len--)
+        {
+            switch (*s)
+            {
+            case '\\': fputs("\\\\", stderr); break;
+            case '"':  fputs("\\\"", stderr); break;
+            default:
+                fputc(*s, stderr);
+                break;
+            }
+            s++;
+        }
+        fprintf(stderr, "\" (%llu:%llu)%s", captureOffsets[*i] - stringToMatchAgainst, captures[*i], i<captureStackTop-1 ? ", " : "");
+    }
 }
 
 template bool RegexMatcher<false>::Match(RegexGroup &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
