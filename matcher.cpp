@@ -15,6 +15,9 @@
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::nonMatch()
 {
+    if (debugTrace)
+        fputs(": non-match", stderr);
+
     position = groupStackTop->position;
 
     for (;;)
@@ -1192,7 +1195,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 
         match = 0;
 
-        do
+        for (;;)
         {
             RegexSymbol *thisSymbol = *symbol;
             if (!thisSymbol) // exiting a group?
@@ -1347,22 +1350,37 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 }
                 for (GroupStackNode *i=groupStackTop; i>groupStackBase; i--)
                     fputc(')', stderr);
-                fputc('\n', stderr);
 
-                fputc('\n', stderr);
                 numSteps++;
             }
-            (this->*matchFunction(thisSymbol))(thisSymbol);
+
+            (this->*matchFunction(thisSymbol))(thisSymbol); // in debugTrace mode, nonMatch() will print that there was a non-match
+
+            if (debugTrace)
+                fputc('\n', stderr);
+
+            if (match)
+                break;
+
+            if (debugTrace)
+                fputc('\n', stderr);
         }
-        while (!match);
 
         stack.flush();
 
-        if (match > 0)
+        if (match > 0 || anchored)
+        {
+            if (debugTrace)
+                fputc('\n', stderr);
             break;
-
-        if (anchored)
-            break;
+        }
+        if (debugTrace)
+        {
+            fputs("No match found", stderr);
+            if (curPosition+1 <= input)
+                fprintf(stderr, "; trying at {%llu}", curPosition+1);
+            fputs("\n\n", stderr);
+        }
     }
 
     returnMatchOffset = curPosition;
