@@ -974,6 +974,7 @@ template<> void (RegexMatcher<true>::*RegexMatcher<true>::chooseBuiltinCharacter
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
 {
+    // Note that this group iterator code is redundant with that at the end of RegexParser::RegexParser(); todo: Factor it out into a separate function
     RegexPattern **thisAlternative;
     RegexSymbol  **thisSymbol = &(RegexSymbol*&)rootGroup;
     for (;;)

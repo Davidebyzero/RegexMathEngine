@@ -443,7 +443,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 delete stack;
                 stack = stackDown;
                 if (!stack)
-                    return;
+                    goto finished_parsing;
 
                 symbol = group;
                 symbolCountSpecified = false;
@@ -581,4 +581,49 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
             break;
         }
     }
+finished_parsing:
+
+    // Note that this group iterator code is redundant with that in RegexMatcher::virtualizeSymbols(); todo: Factor it out into a separate function
+    RegexGroup **groupStackBase = new RegexGroup *[maxGroupDepth];
+    RegexGroup **groupStackTop = groupStackBase;
+    RegexGroup *rootGroup = &regex;
+    RegexPattern **thisAlternative;
+    RegexSymbol  **thisSymbol = &(RegexSymbol*&)rootGroup;
+    for (;;)
+    {
+        if (*thisSymbol)
+        {
+            switch ((*thisSymbol)->type)
+            {
+            case RegexSymbol_Backref:
+                if (((RegexBackref*)(*thisSymbol))->index >= backrefIndex)
+                    throw RegexParsingError((*thisSymbol)->originalCode, "reference to non-existent capture group");
+                // fall through
+            default:
+                thisSymbol++;
+                break;
+            case RegexSymbol_Group:
+                RegexGroup *group = (RegexGroup*)(*thisSymbol);
+                *groupStackTop++ = group;
+                thisAlternative = group->alternatives;
+                thisSymbol      = group->alternatives[0]->symbols;
+                break;
+            }
+        }
+        else
+        {
+            thisAlternative++;
+            if (*thisAlternative)
+                thisSymbol = (*thisAlternative)->symbols;
+            else
+            {
+                RegexGroup *group = *--groupStackTop;
+                if (groupStackTop == groupStackBase)
+                    break;
+                thisAlternative = group->parentAlternative;
+                thisSymbol      = group->self + 1;
+            }
+        }
+    }
+    delete [] groupStackBase;
 }
