@@ -13,10 +13,15 @@
 #include "matcher.h"
 
 template <bool USE_STRINGS>
-void RegexMatcher<USE_STRINGS>::nonMatch()
+void RegexMatcher<USE_STRINGS>::nonMatch(bool negativeLookahead)
 {
     if (debugTrace)
-        fputs(": non-match", stderr);
+    {
+        if (negativeLookahead)
+            fputs("Match found inside negative lookahead, resulting in a non-match outside it\n\n", stderr);
+        else
+            fputs(": non-match", stderr);
+    }
 
     position = groupStackTop->position;
 
@@ -1268,7 +1273,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     while (groupStackTop >= groupStackOldTop);
 
                     // if we've reached here, it means a match was found inside the negative lookahead, which makes it a non-match outside
-                    nonMatch();
+                    nonMatch(true);
                     continue;
                 }
 
