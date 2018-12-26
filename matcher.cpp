@@ -499,8 +499,14 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                                                 nonMatch();
                                                 return;
                                             }
-                                            Uint64 spaceLeft = target - position;
+                                            Uint64 spaceLeft = target - groupStackTop->position;
                                             currentMatch = spaceLeft / (multiple * (1 + currentSymbol->minCount));
+                                            if (currentMatch < position - groupStackTop->position)
+                                            {
+                                                nonMatch();
+                                                return;
+                                            }
+                                            currentMatch -= position - groupStackTop->position;
                                             if (currentMatch < thisSymbol->minCount)
                                             {
                                                 nonMatch();
