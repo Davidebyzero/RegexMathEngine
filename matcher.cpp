@@ -1195,7 +1195,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 
         match = 0;
 
-        for (;;)
+        do
         {
             RegexSymbol *thisSymbol = *symbol;
             if (!thisSymbol) // exiting a group?
@@ -1365,6 +1365,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
             if (debugTrace)
                 fputc('\n', stderr);
         }
+        while (!match); // this check is redundant with the one directly above, unless a "continue" was used inside the loop
 
         stack.flush();
 
