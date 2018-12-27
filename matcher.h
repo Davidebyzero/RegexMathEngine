@@ -571,6 +571,7 @@ class MatchingStack_LeaveGroupLazily : public MatchingStack_LeaveGroup<USE_STRIN
         MatchingStack_LeaveGroup<USE_STRINGS>::popTo(matcher);
         matcher.groupStackTop->loopCount++;
         matcher.position = matcher.groupStackTop->position;
+        matcher.alternative = group->alternatives;
         matcher.symbol = (*matcher.alternative)->symbols;
         matcher.currentMatch = ULLONG_MAX;
         return true;
@@ -619,7 +620,7 @@ class MatchingStack_TryLazyAlternatives : public MatchingStackNode<USE_STRINGS>
     }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
-        return false;
+        return true;
     }
 };
 
