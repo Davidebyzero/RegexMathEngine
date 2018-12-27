@@ -1291,17 +1291,15 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 else
                 if (!group->lazy && inrangex64(groupStackTop->loopCount, group->minCount, MAX_EXTEND(group->maxCount)))
                 {
-                    bool selfCapture = group->type == RegexGroup_Capturing;
                     Uint64 oldPosition = groupStackTop->position;
                     Uint alternativeNum = (Uint)(alternative - groupStackTop->group->alternatives);
-                    size_t privateSpace = sizeof(Uint64) + (selfCapture ? sizeof(Uint64) : 0); // first term has sizeof(Uint64) instead of sizeof(Uint) for alignment
+                    size_t privateSpace = sizeof(Uint64) + sizeof(Uint64); // first term has sizeof(Uint64) instead of sizeof(Uint) for alignment
                     void *buffer = loopGroup(
                         stack.template push< MatchingStack_LoopGroupGreedily<USE_STRINGS> >(MatchingStack_LoopGroupGreedily<USE_STRINGS>::get_size(groupStackTop->numCaptured, privateSpace)),
                         privateSpace,
                         position);
                     *(Uint*)buffer = alternativeNum;
-                    if (selfCapture)
-                        ((Uint64*)buffer)[1] = oldPosition;
+                    ((Uint64*)buffer)[1] = oldPosition;
                 }
                 else
                 {

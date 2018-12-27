@@ -714,24 +714,20 @@ class MatchingStack_LoopGroupGreedily : public MatchingStack_LoopGroup<USE_STRIN
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
     {
         RegexGroup *group = matcher.groupStackTop->group;
-        bool selfCapture = group->type == RegexGroup_Capturing;
-        return this->get_size(this->numCaptured, sizeof(Uint64) + (selfCapture ? sizeof(Uint64) : 0));
+        return this->get_size(this->numCaptured, sizeof(Uint64) + sizeof(Uint64));
     }
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
-        bool selfCapture = matcher.groupStackTop->group->type == RegexGroup_Capturing;
-        MatchingStack_LoopGroup<USE_STRINGS>::popTo(matcher, sizeof(Uint64) + (selfCapture ? sizeof(Uint64) : 0)); // first term has sizeof(Uint64) instead of sizeof(Uint) for alignment
+        MatchingStack_LoopGroup<USE_STRINGS>::popTo(matcher, sizeof(Uint64) + sizeof(Uint64)); // first term has sizeof(Uint64) instead of sizeof(Uint) for alignment
         matcher.alternative = matcher.groupStackTop->group->alternatives + *(Uint*)this->buffer;
-        if (selfCapture)
-            matcher.groupStackTop->position = ((Uint64*)this->buffer)[1];
+        matcher.groupStackTop->position = ((Uint64*)this->buffer)[1];
         matcher.position = this->position;
         matcher.leaveGroup(matcher.stack.template push< MatchingStack_LeaveGroup<USE_STRINGS> >(), matcher.groupStackTop->position);
         return true;
     }
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
     {
-        bool selfCapture = matcher.groupStackTop->group->type == RegexGroup_Capturing;
-        MatchingStack_LoopGroup<USE_STRINGS>::popForNegativeLookahead(matcher, sizeof(Uint64) + (selfCapture ? sizeof(Uint64) : 0)); // first term has sizeof(Uint64) instead of sizeof(Uint) for alignment
+        MatchingStack_LoopGroup<USE_STRINGS>::popForNegativeLookahead(matcher, sizeof(Uint64) + sizeof(Uint64)); // first term has sizeof(Uint64) instead of sizeof(Uint) for alignment
     }
 };
 
