@@ -1192,7 +1192,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
         position      = curPosition;
         currentMatch  = ULLONG_MAX;
 
-        groupStackTop->position    = 0;
+        groupStackTop->position    = curPosition;
         groupStackTop->loopCount   = 1;
         groupStackTop->group       = &regex;
         groupStackTop->numCaptured = 0;
