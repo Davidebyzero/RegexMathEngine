@@ -1404,28 +1404,28 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 void RegexMatcher<false>::fprintCaptures(FILE *f)
 {
     for (Uint *i=captureStackBase; i<captureStackTop; i++)
-        fprintf(stderr, "\\%u=%llu%s", *i+1, captures[*i], i<captureStackTop-1 ? ", " : "");
+        fprintf(f, "\\%u=%llu%s", *i+1, captures[*i], i<captureStackTop-1 ? ", " : "");
 }
 
 void RegexMatcher<true>::fprintCaptures(FILE *f)
 {
     for (Uint *i=captureStackBase; i<captureStackTop; i++)
     {
-        fprintf(stderr, "\\%u=\"", *i+1);
+        fprintf(f, "\\%u=\"", *i+1);
         const char *s = captureOffsets[*i];
         for (Uint64 len=captures[*i]; len!=0; len--)
         {
             switch (*s)
             {
-            case '\\': fputs("\\\\", stderr); break;
-            case '"':  fputs("\\\"", stderr); break;
+            case '\\': fputs("\\\\", f); break;
+            case '"':  fputs("\\\"", f); break;
             default:
-                fputc(*s, stderr);
+                fputc(*s, f);
                 break;
             }
             s++;
         }
-        fprintf(stderr, "\" (%llu:%llu)%s", captureOffsets[*i] - stringToMatchAgainst, captures[*i], i<captureStackTop-1 ? ", " : "");
+        fprintf(f, "\" (%llu:%llu)%s", captureOffsets[*i] - stringToMatchAgainst, captures[*i], i<captureStackTop-1 ? ", " : "");
     }
 }
 
