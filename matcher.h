@@ -115,7 +115,6 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     friend class MatchingStack_LeaveGroup<USE_STRINGS>;
     friend class MatchingStack_LeaveGroupLazily<USE_STRINGS>;
     friend class MatchingStack_LeaveMolecularLookahead<USE_STRINGS>;
-    friend class MatchingStack_TryLazyAlternatives<USE_STRINGS>;
     friend class MatchingStack_LoopGroup<USE_STRINGS>;
     friend class MatchingStack_TryMatch<USE_STRINGS>;
 
@@ -255,8 +254,6 @@ class GroupStackNode
     friend class MatchingStack_LeaveGroupLazily<true>;
     friend class MatchingStack_LeaveMolecularLookahead<false>;
     friend class MatchingStack_LeaveMolecularLookahead<true>;
-    friend class MatchingStack_TryLazyAlternatives<false>;
-    friend class MatchingStack_TryLazyAlternatives<true>;
     friend class MatchingStack_LoopGroup<false>;
     friend class MatchingStack_LoopGroup<true>;
     friend class MatchingStack_TryMatch<false>;
@@ -563,24 +560,8 @@ protected:
 template <bool USE_STRINGS>
 class MatchingStack_LeaveGroupLazily : public MatchingStack_LeaveGroup<USE_STRINGS>
 {
-    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
-    {
-        MatchingStack_LeaveGroup<USE_STRINGS>::popTo(matcher);
-        matcher.groupStackTop->loopCount++;
-        matcher.position = matcher.groupStackTop->position;
-        matcher.alternative = group->alternatives;
-        matcher.symbol = (*matcher.alternative)->symbols;
-        matcher.currentMatch = ULLONG_MAX;
-        return true;
-    }
-};
-
-template <bool USE_STRINGS>
-class MatchingStack_TryLazyAlternatives : public MatchingStackNode<USE_STRINGS>
-{
     friend class RegexMatcher<USE_STRINGS>;
-    Uint64 position;
-    Uint alternative;
+    Uint64 positionDiff; // could be a boolean, but would that mess with alignment?
 
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -588,35 +569,19 @@ class MatchingStack_TryLazyAlternatives : public MatchingStackNode<USE_STRINGS>
     }
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
-        Uint numCaptured = matcher.groupStackTop->numCaptured;
-        for (Uint i=0; i<numCaptured; i++)
-        {
-            Uint index = matcher.captureStackTop[(int)i - (int)numCaptured];
-            matcher.captures[index] = NON_PARTICIPATING_CAPTURE_GROUP;
-        }
-        matcher.captureStackTop -= numCaptured;
+        MatchingStack_LeaveGroup<USE_STRINGS>::popTo(matcher);
 
-        matcher.groupStackTop->position = position;
-        matcher.groupStackTop->loopCount--;
-        matcher.position = position;
-        matcher.alternative = matcher.groupStackTop->group->alternatives + alternative + 1;
-        if (*matcher.alternative)
+        if (matcher.groupStackTop->loopCount == MAX_EXTEND(group->maxCount) ||
+            positionDiff == 0 && matcher.groupStackTop->group->maxCount == UINT_MAX && matcher.groupStackTop->loopCount >= matcher.groupStackTop->group->minCount)
         {
-            matcher.symbol = (*matcher.alternative)->symbols;
-            matcher.currentMatch = ULLONG_MAX;
-            return true;
+            matcher.position = matcher.groupStackTop->position -= positionDiff;
+            static RegexPattern *dummy = NULL;
+            matcher.alternative = &dummy;
+            return false;
         }
-        return false;
-    }
-    virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
-    {
-    }
-    virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)
-    {
-        return 0;
-    }
-    virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
-    {
+
+        matcher.position = matcher.groupStackTop->position;
+        matcher.loopGroup(matcher.stack.template push< MatchingStack_LoopGroup<USE_STRINGS> >(MatchingStack_LoopGroup<USE_STRINGS>::get_size(matcher.groupStackTop->numCaptured)), matcher.position, matcher.position - positionDiff, (Uint)(matcher.alternative - matcher.groupStackTop->group->alternatives));
         return true;
     }
 };
@@ -625,6 +590,7 @@ template <bool USE_STRINGS>
 class MatchingStack_LoopGroup : public MatchingStackNode<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
+    friend class MatchingStack_LeaveGroupLazily<USE_STRINGS>;
 
 protected:
     Uint64 position;
@@ -672,7 +638,7 @@ protected:
         matcher.alternative = matcher.groupStackTop->group->alternatives + alternative;
         matcher.groupStackTop->position = oldPosition;
         matcher.position = position;
-        if (matcher.groupStackTop->loopCount < matcher.groupStackTop->group->minCount)
+        if (matcher.groupStackTop->group->lazy || matcher.groupStackTop->loopCount < matcher.groupStackTop->group->minCount)
             return false;
         matcher.leaveGroup(matcher.stack.template push< MatchingStack_LeaveGroup<USE_STRINGS> >(), matcher.groupStackTop->position);
         return true;

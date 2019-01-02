@@ -107,10 +107,9 @@ void RegexMatcher<USE_STRINGS>::leaveGroup(MatchingStack_LeaveGroup<USE_STRINGS>
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::leaveLazyGroup()
 {
-    MatchingStack_TryLazyAlternatives<USE_STRINGS> *pushStack = stack.template push< MatchingStack_TryLazyAlternatives<USE_STRINGS> >();
-    pushStack->position    = groupStackTop->position;
-    pushStack->alternative = (Uint)(alternative - groupStackTop->group->alternatives);
-    leaveGroup(stack.template push< MatchingStack_LeaveGroupLazily<USE_STRINGS> >(), position);
+    MatchingStack_LeaveGroupLazily<USE_STRINGS> *pushStack = stack.template push< MatchingStack_LeaveGroupLazily<USE_STRINGS> >();
+    pushStack->positionDiff = position - groupStackTop->position;
+    leaveGroup(pushStack, position);
 }
 
 template <bool USE_STRINGS>

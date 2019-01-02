@@ -65,7 +65,6 @@ template<bool> class MatchingStack_LeaveGroup;
 template<bool> class MatchingStack_LoopGroup;
 template<bool> class MatchingStack_LeaveGroupLazily;
 template<bool> class MatchingStack_LeaveMolecularLookahead;
-template<bool> class MatchingStack_TryLazyAlternatives;
 template<bool> class MatchingStack_TryMatch;
 
 class RegexSymbol
@@ -124,8 +123,6 @@ class RegexPattern
     friend class RegexMatcher<true>;
     friend class MatchingStack_LeaveGroupLazily<false>;
     friend class MatchingStack_LeaveGroupLazily<true>;
-    friend class MatchingStack_TryLazyAlternatives<false>;
-    friend class MatchingStack_TryLazyAlternatives<true>;
     friend class MatchingStack_LoopGroup<false>;
     friend class MatchingStack_LoopGroup<true>;
     RegexSymbol **symbols; // list terminated with NULL
@@ -147,8 +144,6 @@ class RegexGroup : public RegexSymbol
     friend class MatchingStack_LeaveGroupLazily<true>;
     friend class MatchingStack_LeaveMolecularLookahead<false>;
     friend class MatchingStack_LeaveMolecularLookahead<true>;
-    friend class MatchingStack_TryLazyAlternatives<false>;
-    friend class MatchingStack_TryLazyAlternatives<true>;
     friend class MatchingStack_LoopGroup<false>;
     friend class MatchingStack_LoopGroup<true>;
     friend class MatchingStack_LookaheadCapture<false>;
