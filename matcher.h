@@ -332,7 +332,7 @@ template <bool USE_STRINGS>
 void MatchingStack<USE_STRINGS>::pop(RegexMatcher<USE_STRINGS> &matcher, bool delayChunkDeletion/* = false*/)
 {
 #ifdef _DEBUG
-    stackDepth++;
+    stackDepth--;
 #endif
     Uint8 *next = (Uint8*)nextToBePopped + nextToBePopped->getSize(matcher);
     if (next == chunkBase + CHUNK_SIZE - sizeof(ChunkInfo) && chunkBase != firstChunk)
