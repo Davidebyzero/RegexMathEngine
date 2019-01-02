@@ -120,7 +120,7 @@ void RegexMatcher<USE_STRINGS>::leaveMaxedOutGroup()
 }
 
 template <bool USE_STRINGS>
-void *RegexMatcher<USE_STRINGS>::loopGroup(MatchingStack_LoopGroup<USE_STRINGS> *pushLoop, size_t privateSpace, Uint64 pushPosition)
+void *RegexMatcher<USE_STRINGS>::loopGroup(MatchingStack_LoopGroup<USE_STRINGS> *pushLoop, Uint64 pushPosition, Uint64 oldPosition, Uint alternativeNum)
 {
     groupStackTop->loopCount++;
 
@@ -131,7 +131,7 @@ void *RegexMatcher<USE_STRINGS>::loopGroup(MatchingStack_LoopGroup<USE_STRINGS> 
     pushLoop->numCaptured = numCaptured;
 
     const char *&dummy = (const char *&)pushLoop->buffer;
-    Uint64 *values = (Uint64*)(pushLoop->buffer + privateSpace);
+    Uint64 *values = (Uint64*)pushLoop->buffer;
     const char **offsets;
     Uint *indexes;
     if (!USE_STRINGS)
@@ -153,6 +153,9 @@ void *RegexMatcher<USE_STRINGS>::loopGroup(MatchingStack_LoopGroup<USE_STRINGS> 
     symbol      = groupStackTop->group->alternatives[0]->symbols;
     groupStackTop->position = position;
     currentMatch = ULLONG_MAX;
+
+    pushLoop->oldPosition = oldPosition;
+    pushLoop->alternative = alternativeNum;
 
     return (void*)pushLoop->buffer;
 }
@@ -1291,17 +1294,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || group->maxCount == UINT_MAX && groupStackTop->loopCount >= group->minCount && position == groupStackTop->position)
                     leaveMaxedOutGroup();
                 else
-                {
-                    Uint64 oldPosition = groupStackTop->position;
-                    Uint alternativeNum = (Uint)(alternative - groupStackTop->group->alternatives);
-                    size_t privateSpace = sizeof(Uint64) + sizeof(Uint64); // first term has sizeof(Uint64) instead of sizeof(Uint) for alignment
-                    void *buffer = loopGroup(
-                        stack.template push< MatchingStack_LoopGroupGreedily<USE_STRINGS> >(MatchingStack_LoopGroupGreedily<USE_STRINGS>::get_size(groupStackTop->numCaptured, privateSpace)),
-                        privateSpace,
-                        position);
-                    *(Uint*)buffer = alternativeNum;
-                    ((Uint64*)buffer)[1] = oldPosition;
-                }
+                    loopGroup(stack.template push< MatchingStack_LoopGroup<USE_STRINGS> >(MatchingStack_LoopGroup<USE_STRINGS>::get_size(groupStackTop->numCaptured)), position, groupStackTop->position, (Uint)(alternative - groupStackTop->group->alternatives));
                 continue;
             }
             if (debugTrace)

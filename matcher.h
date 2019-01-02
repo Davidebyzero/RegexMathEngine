@@ -117,7 +117,6 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     friend class MatchingStack_LeaveMolecularLookahead<USE_STRINGS>;
     friend class MatchingStack_TryLazyAlternatives<USE_STRINGS>;
     friend class MatchingStack_LoopGroup<USE_STRINGS>;
-    friend class MatchingStack_LoopGroupGreedily<USE_STRINGS>;
     friend class MatchingStack_TryMatch<USE_STRINGS>;
 
 #ifdef _DEBUG
@@ -150,7 +149,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void leaveGroup(MatchingStack_LeaveGroup<USE_STRINGS> *pushStack, Uint64 pushPosition);
     void leaveLazyGroup();
     void leaveMaxedOutGroup();
-    void *loopGroup(MatchingStack_LoopGroup<USE_STRINGS> *pushLoop, size_t privateSpace, Uint64 pushPosition);
+    void *loopGroup(MatchingStack_LoopGroup<USE_STRINGS> *pushLoop, Uint64 pushPosition, Uint64 oldPosition, Uint alternativeNum);
 
     inline void initInput(Uint64 _input, Uint numCaptureGroups);
     inline void  readCapture(Uint index, Uint64 &multiple, const char *&pBackref);
@@ -260,8 +259,6 @@ class GroupStackNode
     friend class MatchingStack_TryLazyAlternatives<true>;
     friend class MatchingStack_LoopGroup<false>;
     friend class MatchingStack_LoopGroup<true>;
-    friend class MatchingStack_LoopGroupGreedily<false>;
-    friend class MatchingStack_LoopGroupGreedily<true>;
     friend class MatchingStack_TryMatch<false>;
     friend class MatchingStack_TryMatch<true>;
 
@@ -632,20 +629,22 @@ class MatchingStack_LoopGroup : public MatchingStackNode<USE_STRINGS>
 protected:
     Uint64 position;
     Uint numCaptured;
+    Uint alternative;
+    Uint64 oldPosition;
     Uint8 buffer[1]; // variable number of elements
 
-    static size_t get_size(Uint numCaptured, size_t privateSpace)
+    static size_t get_size(Uint numCaptured)
     {
-        return (size_t)&((MatchingStack_LoopGroup*)0)->buffer + privateSpace + (sizeof(Uint64) + (USE_STRINGS ? sizeof(const char*) : 0) + sizeof(Uint))*numCaptured;
+        return (size_t)&((MatchingStack_LoopGroup*)0)->buffer + (sizeof(Uint64) + (USE_STRINGS ? sizeof(const char*) : 0) + sizeof(Uint))*numCaptured;
     }
 
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
     {
-        return get_size(numCaptured, 0);
+        return get_size(numCaptured);
     }
-    void popTo(RegexMatcher<USE_STRINGS> &matcher, size_t privateSpace)
+    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
-        Uint64 *values = (Uint64*)(buffer + privateSpace);
+        Uint64 *values = (Uint64*)buffer;
         const char **offsets;
         Uint *indexes;
         if (!USE_STRINGS)
@@ -669,10 +668,18 @@ protected:
             *matcher.captureStackTop++ = indexes[i];
             matcher.writeCapture(indexes[i], values[i], USE_STRINGS ? offsets[i] : NULL);
         }
+
+        matcher.alternative = matcher.groupStackTop->group->alternatives + alternative;
+        matcher.groupStackTop->position = oldPosition;
+        matcher.position = position;
+        if (matcher.groupStackTop->loopCount < matcher.groupStackTop->group->minCount)
+            return false;
+        matcher.leaveGroup(matcher.stack.template push< MatchingStack_LeaveGroup<USE_STRINGS> >(), matcher.groupStackTop->position);
+        return true;
     }
-    virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher, size_t privateSpace)
+    virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
     {
-        Uint64 *values = (Uint64*)(buffer + privateSpace);
+        Uint64 *values = (Uint64*)buffer;
         const char **offsets;
         Uint *indexes;
         if (!USE_STRINGS)
@@ -687,15 +694,6 @@ protected:
             *matcher.captureStackTop++ = indexes[i];
     }
 
-    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
-    {
-        popTo(matcher, 0);
-        return false;
-    }
-    virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
-    {
-        popForNegativeLookahead(matcher, 0);
-    }
     virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)
     {
         return -(int)numCaptured;
@@ -703,34 +701,6 @@ protected:
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
         return true;
-    }
-};
-
-template <bool USE_STRINGS>
-class MatchingStack_LoopGroupGreedily : public MatchingStack_LoopGroup<USE_STRINGS>
-{
-    friend class RegexMatcher<USE_STRINGS>;
-    // this class must have no member variables
-
-    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
-    {
-        RegexGroup *group = matcher.groupStackTop->group;
-        return this->get_size(this->numCaptured, sizeof(Uint64) + sizeof(Uint64));
-    }
-    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
-    {
-        MatchingStack_LoopGroup<USE_STRINGS>::popTo(matcher, sizeof(Uint64) + sizeof(Uint64)); // first term has sizeof(Uint64) instead of sizeof(Uint) for alignment
-        matcher.alternative = matcher.groupStackTop->group->alternatives + *(Uint*)this->buffer;
-        matcher.groupStackTop->position = ((Uint64*)this->buffer)[1];
-        matcher.position = this->position;
-        if (matcher.groupStackTop->loopCount < matcher.groupStackTop->group->minCount)
-            return false;
-        matcher.leaveGroup(matcher.stack.template push< MatchingStack_LeaveGroup<USE_STRINGS> >(), matcher.groupStackTop->position);
-        return true;
-    }
-    virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
-    {
-        MatchingStack_LoopGroup<USE_STRINGS>::popForNegativeLookahead(matcher, sizeof(Uint64) + sizeof(Uint64)); // first term has sizeof(Uint64) instead of sizeof(Uint) for alignment
     }
 };
 

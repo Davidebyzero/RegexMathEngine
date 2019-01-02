@@ -63,7 +63,6 @@ template<bool> class MatchingStack_SkipGroup;
 template<bool> class MatchingStack_EnterGroup;
 template<bool> class MatchingStack_LeaveGroup;
 template<bool> class MatchingStack_LoopGroup;
-template<bool> class MatchingStack_LoopGroupGreedily;
 template<bool> class MatchingStack_LeaveGroupLazily;
 template<bool> class MatchingStack_LeaveMolecularLookahead;
 template<bool> class MatchingStack_TryLazyAlternatives;
@@ -81,8 +80,6 @@ class RegexSymbol
     friend class MatchingStack_EnterGroup<true>;
     friend class MatchingStack_LoopGroup<false>;
     friend class MatchingStack_LoopGroup<true>;
-    friend class MatchingStack_LoopGroupGreedily<false>;
-    friend class MatchingStack_LoopGroupGreedily<true>;
     friend class MatchingStack_TryMatch<false>;
     friend class MatchingStack_TryMatch<true>;
     const char *originalCode;
@@ -129,8 +126,8 @@ class RegexPattern
     friend class MatchingStack_LeaveGroupLazily<true>;
     friend class MatchingStack_TryLazyAlternatives<false>;
     friend class MatchingStack_TryLazyAlternatives<true>;
-    friend class MatchingStack_LoopGroupGreedily<false>;
-    friend class MatchingStack_LoopGroupGreedily<true>;
+    friend class MatchingStack_LoopGroup<false>;
+    friend class MatchingStack_LoopGroup<true>;
     RegexSymbol **symbols; // list terminated with NULL
 };
 
@@ -152,8 +149,8 @@ class RegexGroup : public RegexSymbol
     friend class MatchingStack_LeaveMolecularLookahead<true>;
     friend class MatchingStack_TryLazyAlternatives<false>;
     friend class MatchingStack_TryLazyAlternatives<true>;
-    friend class MatchingStack_LoopGroupGreedily<false>;
-    friend class MatchingStack_LoopGroupGreedily<true>;
+    friend class MatchingStack_LoopGroup<false>;
+    friend class MatchingStack_LoopGroup<true>;
     friend class MatchingStack_LookaheadCapture<false>;
     friend class MatchingStack_LookaheadCapture<true>;
     RegexPattern **alternatives; // list terminated with NULL
