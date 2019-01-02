@@ -1281,13 +1281,16 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     continue;
                 }
 
+#ifdef _DEBUG
+                if (groupStackTop->loopCount > MAX_EXTEND(group->maxCount))
+                    THROW_ENGINEBUG;
+#endif
                 if (group->lazy && groupStackTop->loopCount >= group->minCount)
                     leaveLazyGroup();
                 else
                 if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || group->maxCount == UINT_MAX && groupStackTop->loopCount >= group->minCount && position == groupStackTop->position)
                     leaveMaxedOutGroup();
                 else
-                if (groupStackTop->loopCount < group->minCount || !group->lazy && inrangex64(groupStackTop->loopCount, group->minCount, MAX_EXTEND(group->maxCount)))
                 {
                     Uint64 oldPosition = groupStackTop->position;
                     Uint alternativeNum = (Uint)(alternative - groupStackTop->group->alternatives);
@@ -1298,10 +1301,6 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                         position);
                     *(Uint*)buffer = alternativeNum;
                     ((Uint64*)buffer)[1] = oldPosition;
-                }
-                else
-                {
-                    loopGroup(stack.template push< MatchingStack_LoopGroup<USE_STRINGS> >(MatchingStack_LoopGroup<USE_STRINGS>::get_size(groupStackTop->numCaptured, 0)), 0, position);
                 }
                 continue;
             }
