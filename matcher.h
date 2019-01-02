@@ -14,15 +14,15 @@
 #pragma warning(push)
 #pragma warning(disable : 4355)
 
-template <bool> class MatchingStackNode;
+template <bool> class BacktrackNode;
 template <bool> class RegexMatcher;
 class GroupStackNode;
 
 template <bool USE_STRINGS>
-class MatchingStack
+class Backtrack
 {
 #ifdef _DEBUG
-    MatchingStack<USE_STRINGS> &stack;
+    Backtrack<USE_STRINGS> &stack;
     Uint64 stackDepth;
 #endif
     // todo: fix the problem that a constant chunk size limits the maximum number of capture groups (to something very very large, but still)
@@ -30,16 +30,16 @@ class MatchingStack
     Uint8 *firstChunk;
     Uint8 *chunkBase;
     Uint8 *pendingChunkDeletion;
-    MatchingStackNode<USE_STRINGS> *nextToBePopped;
+    BacktrackNode<USE_STRINGS> *nextToBePopped;
 
     struct ChunkInfo
     {
         Uint8 *baseOfPreviousChunk;
-        MatchingStackNode<USE_STRINGS> *previousNode;
+        BacktrackNode<USE_STRINGS> *previousNode;
     };
 
 public:
-    MatchingStack()
+    Backtrack()
         : pendingChunkDeletion(NULL)
 #ifdef _DEBUG
         , stack(*this), stackDepth(0)
@@ -47,16 +47,16 @@ public:
     {
         firstChunk = (Uint8*)malloc(CHUNK_SIZE);
         chunkBase = firstChunk;
-        nextToBePopped = (MatchingStackNode<USE_STRINGS>*)(chunkBase + CHUNK_SIZE);
+        nextToBePopped = (BacktrackNode<USE_STRINGS>*)(chunkBase + CHUNK_SIZE);
     }
-    ~MatchingStack()
+    ~Backtrack()
     {
         free(chunkBase); // assume that flush() has already been called
     }
     void flush();
     bool empty()
     {
-        return nextToBePopped == (MatchingStackNode<USE_STRINGS>*)(chunkBase + CHUNK_SIZE);
+        return nextToBePopped == (BacktrackNode<USE_STRINGS>*)(chunkBase + CHUNK_SIZE);
     }
     template <class NODE_TYPE> NODE_TYPE *push(size_t size);
     template <class NODE_TYPE> NODE_TYPE *push() { return push<NODE_TYPE>(sizeof(NODE_TYPE)); }
@@ -69,11 +69,11 @@ public:
             pendingChunkDeletion = NULL;
         }
     }
-    MatchingStackNode<USE_STRINGS> &operator*()
+    BacktrackNode<USE_STRINGS> &operator*()
     {
         return *nextToBePopped;
     }
-    MatchingStackNode<USE_STRINGS> *operator->()
+    BacktrackNode<USE_STRINGS> *operator->()
     {
         return nextToBePopped;
     }
@@ -107,16 +107,16 @@ struct RegexMatcherBase<true>
 template <bool USE_STRINGS>
 class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
 {
-    friend class MatchingStack<USE_STRINGS>;
-    friend class MatchingStackNode<USE_STRINGS>;
-    friend class MatchingStack_LookaheadCapture<USE_STRINGS>;
-    friend class MatchingStack_SkipGroup<USE_STRINGS>;
-    friend class MatchingStack_EnterGroup<USE_STRINGS>;
-    friend class MatchingStack_LeaveGroup<USE_STRINGS>;
-    friend class MatchingStack_LeaveGroupLazily<USE_STRINGS>;
-    friend class MatchingStack_LeaveMolecularLookahead<USE_STRINGS>;
-    friend class MatchingStack_LoopGroup<USE_STRINGS>;
-    friend class MatchingStack_TryMatch<USE_STRINGS>;
+    friend class Backtrack<USE_STRINGS>;
+    friend class BacktrackNode<USE_STRINGS>;
+    friend class Backtrack_LookaheadCapture<USE_STRINGS>;
+    friend class Backtrack_SkipGroup<USE_STRINGS>;
+    friend class Backtrack_EnterGroup<USE_STRINGS>;
+    friend class Backtrack_LeaveGroup<USE_STRINGS>;
+    friend class Backtrack_LeaveGroupLazily<USE_STRINGS>;
+    friend class Backtrack_LeaveMolecularLookahead<USE_STRINGS>;
+    friend class Backtrack_LoopGroup<USE_STRINGS>;
+    friend class Backtrack_TryMatch<USE_STRINGS>;
 
 #ifdef _DEBUG
     RegexMatcher<USE_STRINGS> &matcher;
@@ -125,7 +125,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     Uint64 input;
     Uint64 *captures;
 
-    MatchingStack<USE_STRINGS> stack;
+    Backtrack<USE_STRINGS> stack;
     Uint *captureStackBase;
     Uint *captureStackTop;
     GroupStackNode *groupStackBase;
@@ -145,10 +145,10 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void yesMatch(Uint64 newPosition, bool haveChoice);
     void pushStack();
     void enterGroup(RegexGroup *group);
-    void leaveGroup(MatchingStack_LeaveGroup<USE_STRINGS> *pushStack, Uint64 pushPosition);
+    void leaveGroup(Backtrack_LeaveGroup<USE_STRINGS> *pushStack, Uint64 pushPosition);
     void leaveLazyGroup();
     void leaveMaxedOutGroup();
-    void *loopGroup(MatchingStack_LoopGroup<USE_STRINGS> *pushLoop, Uint64 pushPosition, Uint64 oldPosition, Uint alternativeNum);
+    void *loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pushLoop, Uint64 pushPosition, Uint64 oldPosition, Uint alternativeNum);
 
     inline void initInput(Uint64 _input, Uint numCaptureGroups);
     inline void  readCapture(Uint index, Uint64 &multiple, const char *&pBackref);
@@ -240,24 +240,24 @@ class GroupStackNode
 {
     friend class RegexMatcher<false>;
     friend class RegexMatcher<true>;
-    friend class MatchingStackNode<false>;
-    friend class MatchingStackNode<true>;
-    friend class MatchingStack_LookaheadCapture<false>;
-    friend class MatchingStack_LookaheadCapture<true>;
-    friend class MatchingStack_SkipGroup<false>;
-    friend class MatchingStack_SkipGroup<true>;
-    friend class MatchingStack_EnterGroup<false>;
-    friend class MatchingStack_EnterGroup<true>;
-    friend class MatchingStack_LeaveGroup<false>;
-    friend class MatchingStack_LeaveGroup<true>;
-    friend class MatchingStack_LeaveGroupLazily<false>;
-    friend class MatchingStack_LeaveGroupLazily<true>;
-    friend class MatchingStack_LeaveMolecularLookahead<false>;
-    friend class MatchingStack_LeaveMolecularLookahead<true>;
-    friend class MatchingStack_LoopGroup<false>;
-    friend class MatchingStack_LoopGroup<true>;
-    friend class MatchingStack_TryMatch<false>;
-    friend class MatchingStack_TryMatch<true>;
+    friend class BacktrackNode<false>;
+    friend class BacktrackNode<true>;
+    friend class Backtrack_LookaheadCapture<false>;
+    friend class Backtrack_LookaheadCapture<true>;
+    friend class Backtrack_SkipGroup<false>;
+    friend class Backtrack_SkipGroup<true>;
+    friend class Backtrack_EnterGroup<false>;
+    friend class Backtrack_EnterGroup<true>;
+    friend class Backtrack_LeaveGroup<false>;
+    friend class Backtrack_LeaveGroup<true>;
+    friend class Backtrack_LeaveGroupLazily<false>;
+    friend class Backtrack_LeaveGroupLazily<true>;
+    friend class Backtrack_LeaveMolecularLookahead<false>;
+    friend class Backtrack_LeaveMolecularLookahead<true>;
+    friend class Backtrack_LoopGroup<false>;
+    friend class Backtrack_LoopGroup<true>;
+    friend class Backtrack_TryMatch<false>;
+    friend class Backtrack_TryMatch<true>;
 
     union
     {
@@ -276,13 +276,13 @@ class GroupStackNode
     Uint numCaptured; // how many capture groups inside this group (including nested groups) have been pushed onto the capture stack
 };
 
-template <bool> class MatchingStack_ConnectingChunk;
+template <bool> class Backtrack_ConnectingChunk;
 
 template <bool USE_STRINGS>
-class MatchingStackNode
+class BacktrackNode
 {
     friend class RegexMatcher<USE_STRINGS>;
-    friend class MatchingStack<USE_STRINGS>;
+    friend class Backtrack<USE_STRINGS>;
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)=0;
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)=0; // returns true if the popping can finish with this one
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)=0;
@@ -291,7 +291,7 @@ class MatchingStackNode
 };
 
 template <bool USE_STRINGS>
-void MatchingStack<USE_STRINGS>::flush()
+void Backtrack<USE_STRINGS>::flush()
 {
     while (chunkBase != firstChunk)
     {
@@ -300,11 +300,11 @@ void MatchingStack<USE_STRINGS>::flush()
         chunkBase = node->baseOfPreviousChunk;
         free(oldChunk);
     }
-    nextToBePopped = (MatchingStackNode<USE_STRINGS>*)(chunkBase + CHUNK_SIZE);
+    nextToBePopped = (BacktrackNode<USE_STRINGS>*)(chunkBase + CHUNK_SIZE);
 }
 
 template <bool USE_STRINGS>
-template <class NODE_TYPE> NODE_TYPE *MatchingStack<USE_STRINGS>::push(size_t size)
+template <class NODE_TYPE> NODE_TYPE *Backtrack<USE_STRINGS>::push(size_t size)
 {
 #ifdef _DEBUG
     stackDepth++;
@@ -319,11 +319,11 @@ template <class NODE_TYPE> NODE_TYPE *MatchingStack<USE_STRINGS>::push(size_t si
         chunkBase = newChunk;
         newNode = (Uint8*)node - size;
     }
-    return new(nextToBePopped = (MatchingStackNode<USE_STRINGS>*)newNode) NODE_TYPE();
+    return new(nextToBePopped = (BacktrackNode<USE_STRINGS>*)newNode) NODE_TYPE();
 }
 
 template <bool USE_STRINGS>
-void MatchingStack<USE_STRINGS>::pop(RegexMatcher<USE_STRINGS> &matcher, bool delayChunkDeletion/* = false*/)
+void Backtrack<USE_STRINGS>::pop(RegexMatcher<USE_STRINGS> &matcher, bool delayChunkDeletion/* = false*/)
 {
 #ifdef _DEBUG
     stackDepth--;
@@ -341,11 +341,11 @@ void MatchingStack<USE_STRINGS>::pop(RegexMatcher<USE_STRINGS> &matcher, bool de
             free(oldChunk);
         return;
     }
-    nextToBePopped = (MatchingStackNode<USE_STRINGS>*)next;
+    nextToBePopped = (BacktrackNode<USE_STRINGS>*)next;
 }
 
 template <bool USE_STRINGS>
-class MatchingStack_LookaheadCapture : public MatchingStackNode<USE_STRINGS>
+class Backtrack_LookaheadCapture : public BacktrackNode<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
     Uint numCaptured;
@@ -379,7 +379,7 @@ class MatchingStack_LookaheadCapture : public MatchingStackNode<USE_STRINGS>
 };
 
 template <bool USE_STRINGS>
-class MatchingStack_SkipGroup : public MatchingStackNode<USE_STRINGS>
+class Backtrack_SkipGroup : public BacktrackNode<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
     Uint64 position;
@@ -410,7 +410,7 @@ class MatchingStack_SkipGroup : public MatchingStackNode<USE_STRINGS>
 };
 
 template <bool USE_STRINGS>
-class MatchingStack_EnterGroup : public MatchingStackNode<USE_STRINGS>
+class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
 {
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -457,7 +457,7 @@ class MatchingStack_EnterGroup : public MatchingStackNode<USE_STRINGS>
 };
 
 template <bool USE_STRINGS>
-class MatchingStack_LeaveMolecularLookahead : public MatchingStackNode<USE_STRINGS>
+class Backtrack_LeaveMolecularLookahead : public BacktrackNode<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
     Uint64 position;
@@ -497,7 +497,7 @@ class MatchingStack_LeaveMolecularLookahead : public MatchingStackNode<USE_STRIN
 };
 
 template <bool USE_STRINGS>
-class MatchingStack_LeaveGroup : public MatchingStackNode<USE_STRINGS>
+class Backtrack_LeaveGroup : public BacktrackNode<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
     Uint64 position;
@@ -558,7 +558,7 @@ protected:
 };
 
 template <bool USE_STRINGS>
-class MatchingStack_LeaveGroupLazily : public MatchingStack_LeaveGroup<USE_STRINGS>
+class Backtrack_LeaveGroupLazily : public Backtrack_LeaveGroup<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
     Uint64 positionDiff; // could be a boolean, but would that mess with alignment?
@@ -569,7 +569,7 @@ class MatchingStack_LeaveGroupLazily : public MatchingStack_LeaveGroup<USE_STRIN
     }
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
-        MatchingStack_LeaveGroup<USE_STRINGS>::popTo(matcher);
+        Backtrack_LeaveGroup<USE_STRINGS>::popTo(matcher);
 
         if (matcher.groupStackTop->loopCount == MAX_EXTEND(group->maxCount) ||
             positionDiff == 0 && matcher.groupStackTop->group->maxCount == UINT_MAX && matcher.groupStackTop->loopCount >= matcher.groupStackTop->group->minCount)
@@ -581,16 +581,16 @@ class MatchingStack_LeaveGroupLazily : public MatchingStack_LeaveGroup<USE_STRIN
         }
 
         matcher.position = matcher.groupStackTop->position;
-        matcher.loopGroup(matcher.stack.template push< MatchingStack_LoopGroup<USE_STRINGS> >(MatchingStack_LoopGroup<USE_STRINGS>::get_size(matcher.groupStackTop->numCaptured)), matcher.position, matcher.position - positionDiff, (Uint)(matcher.alternative - matcher.groupStackTop->group->alternatives));
+        matcher.loopGroup(matcher.stack.template push< Backtrack_LoopGroup<USE_STRINGS> >(Backtrack_LoopGroup<USE_STRINGS>::get_size(matcher.groupStackTop->numCaptured)), matcher.position, matcher.position - positionDiff, (Uint)(matcher.alternative - matcher.groupStackTop->group->alternatives));
         return true;
     }
 };
 
 template <bool USE_STRINGS>
-class MatchingStack_LoopGroup : public MatchingStackNode<USE_STRINGS>
+class Backtrack_LoopGroup : public BacktrackNode<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
-    friend class MatchingStack_LeaveGroupLazily<USE_STRINGS>;
+    friend class Backtrack_LeaveGroupLazily<USE_STRINGS>;
 
 protected:
     Uint64 position;
@@ -601,7 +601,7 @@ protected:
 
     static size_t get_size(Uint numCaptured)
     {
-        return (size_t)&((MatchingStack_LoopGroup*)0)->buffer + (sizeof(Uint64) + (USE_STRINGS ? sizeof(const char*) : 0) + sizeof(Uint))*numCaptured;
+        return (size_t)&((Backtrack_LoopGroup*)0)->buffer + (sizeof(Uint64) + (USE_STRINGS ? sizeof(const char*) : 0) + sizeof(Uint))*numCaptured;
     }
 
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
@@ -640,7 +640,7 @@ protected:
         matcher.position = position;
         if (matcher.groupStackTop->group->lazy || matcher.groupStackTop->loopCount < matcher.groupStackTop->group->minCount)
             return false;
-        matcher.leaveGroup(matcher.stack.template push< MatchingStack_LeaveGroup<USE_STRINGS> >(), matcher.groupStackTop->position);
+        matcher.leaveGroup(matcher.stack.template push< Backtrack_LeaveGroup<USE_STRINGS> >(), matcher.groupStackTop->position);
         return true;
     }
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
@@ -671,7 +671,7 @@ protected:
 };
 
 template <bool USE_STRINGS>
-class MatchingStack_TryMatch : public MatchingStackNode<USE_STRINGS>
+class Backtrack_TryMatch : public BacktrackNode<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
 

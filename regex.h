@@ -58,14 +58,14 @@ enum RegexGroupType
 class RegexPattern;
 
 template<bool> class RegexMatcher;
-template<bool> class MatchingStack_LookaheadCapture;
-template<bool> class MatchingStack_SkipGroup;
-template<bool> class MatchingStack_EnterGroup;
-template<bool> class MatchingStack_LeaveGroup;
-template<bool> class MatchingStack_LoopGroup;
-template<bool> class MatchingStack_LeaveGroupLazily;
-template<bool> class MatchingStack_LeaveMolecularLookahead;
-template<bool> class MatchingStack_TryMatch;
+template<bool> class Backtrack_LookaheadCapture;
+template<bool> class Backtrack_SkipGroup;
+template<bool> class Backtrack_EnterGroup;
+template<bool> class Backtrack_LeaveGroup;
+template<bool> class Backtrack_LoopGroup;
+template<bool> class Backtrack_LeaveGroupLazily;
+template<bool> class Backtrack_LeaveMolecularLookahead;
+template<bool> class Backtrack_TryMatch;
 
 class RegexSymbol
 {
@@ -73,14 +73,14 @@ class RegexSymbol
     friend class RegexParser;
     friend class RegexMatcher<false>;
     friend class RegexMatcher<true>;
-    friend class MatchingStack_SkipGroup<false>;
-    friend class MatchingStack_SkipGroup<true>;
-    friend class MatchingStack_EnterGroup<false>;
-    friend class MatchingStack_EnterGroup<true>;
-    friend class MatchingStack_LoopGroup<false>;
-    friend class MatchingStack_LoopGroup<true>;
-    friend class MatchingStack_TryMatch<false>;
-    friend class MatchingStack_TryMatch<true>;
+    friend class Backtrack_SkipGroup<false>;
+    friend class Backtrack_SkipGroup<true>;
+    friend class Backtrack_EnterGroup<false>;
+    friend class Backtrack_EnterGroup<true>;
+    friend class Backtrack_LoopGroup<false>;
+    friend class Backtrack_LoopGroup<true>;
+    friend class Backtrack_TryMatch<false>;
+    friend class Backtrack_TryMatch<true>;
     const char *originalCode;
     RegexPattern **parentAlternative;
     RegexSymbol  **self;
@@ -121,10 +121,10 @@ class RegexPattern
     friend class RegexParser;
     friend class RegexMatcher<false>;
     friend class RegexMatcher<true>;
-    friend class MatchingStack_LeaveGroupLazily<false>;
-    friend class MatchingStack_LeaveGroupLazily<true>;
-    friend class MatchingStack_LoopGroup<false>;
-    friend class MatchingStack_LoopGroup<true>;
+    friend class Backtrack_LeaveGroupLazily<false>;
+    friend class Backtrack_LeaveGroupLazily<true>;
+    friend class Backtrack_LoopGroup<false>;
+    friend class Backtrack_LoopGroup<true>;
     RegexSymbol **symbols; // list terminated with NULL
 };
 
@@ -134,20 +134,20 @@ class RegexGroup : public RegexSymbol
     friend class RegexParser;
     friend class RegexMatcher<false>;
     friend class RegexMatcher<true>;
-    friend class MatchingStack_SkipGroup<false>;
-    friend class MatchingStack_SkipGroup<true>;
-    friend class MatchingStack_EnterGroup<false>;
-    friend class MatchingStack_EnterGroup<true>;
-    friend class MatchingStack_LeaveGroup<false>;
-    friend class MatchingStack_LeaveGroup<true>;
-    friend class MatchingStack_LeaveGroupLazily<false>;
-    friend class MatchingStack_LeaveGroupLazily<true>;
-    friend class MatchingStack_LeaveMolecularLookahead<false>;
-    friend class MatchingStack_LeaveMolecularLookahead<true>;
-    friend class MatchingStack_LoopGroup<false>;
-    friend class MatchingStack_LoopGroup<true>;
-    friend class MatchingStack_LookaheadCapture<false>;
-    friend class MatchingStack_LookaheadCapture<true>;
+    friend class Backtrack_SkipGroup<false>;
+    friend class Backtrack_SkipGroup<true>;
+    friend class Backtrack_EnterGroup<false>;
+    friend class Backtrack_EnterGroup<true>;
+    friend class Backtrack_LeaveGroup<false>;
+    friend class Backtrack_LeaveGroup<true>;
+    friend class Backtrack_LeaveGroupLazily<false>;
+    friend class Backtrack_LeaveGroupLazily<true>;
+    friend class Backtrack_LeaveMolecularLookahead<false>;
+    friend class Backtrack_LeaveMolecularLookahead<true>;
+    friend class Backtrack_LoopGroup<false>;
+    friend class Backtrack_LoopGroup<true>;
+    friend class Backtrack_LookaheadCapture<false>;
+    friend class Backtrack_LookaheadCapture<true>;
     RegexPattern **alternatives; // list terminated with NULL
     RegexGroupType type;
 public:
@@ -162,8 +162,8 @@ class RegexGroupCapturing : public RegexGroup
 {
     friend class RegexMatcher<false>;
     friend class RegexMatcher<true>;
-    friend class MatchingStack_LeaveGroup<false>;
-    friend class MatchingStack_LeaveGroup<true>;
+    friend class Backtrack_LeaveGroup<false>;
+    friend class Backtrack_LeaveGroup<true>;
     Uint backrefIndex; // zero-numbered; 0 corresponds to \1
 public:
     RegexGroupCapturing(Uint backrefIndex) : RegexGroup(RegexGroup_Capturing), backrefIndex(backrefIndex) {}

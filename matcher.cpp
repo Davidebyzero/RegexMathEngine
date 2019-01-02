@@ -45,7 +45,7 @@ void RegexMatcher<USE_STRINGS>::nonMatch(bool negativeLookahead)
             return;
         }
 
-        MatchingStackNode<USE_STRINGS> &formerTop = *stack;
+        BacktrackNode<USE_STRINGS> &formerTop = *stack;
         stack.pop(*this, true);
         bool stopHere = formerTop.popTo(*this);
         stack.deletePendingChunk();
@@ -58,7 +58,7 @@ void RegexMatcher<USE_STRINGS>::nonMatch(bool negativeLookahead)
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::pushStack()
 {
-    MatchingStack_TryMatch<USE_STRINGS> *pushStack = stack.template push< MatchingStack_TryMatch<USE_STRINGS> >();
+    Backtrack_TryMatch<USE_STRINGS> *pushStack = stack.template push< Backtrack_TryMatch<USE_STRINGS> >();
     pushStack->position     = position;
     pushStack->currentMatch = currentMatch;
     pushStack->symbol       = *symbol;
@@ -76,11 +76,11 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
     alternative = group->alternatives;
     symbol      = group->alternatives[0]->symbols;
 
-    stack.template push< MatchingStack_EnterGroup<USE_STRINGS> >();
+    stack.template push< Backtrack_EnterGroup<USE_STRINGS> >();
 }
 
 template <bool USE_STRINGS>
-void RegexMatcher<USE_STRINGS>::leaveGroup(MatchingStack_LeaveGroup<USE_STRINGS> *pushStack, Uint64 pushPosition)
+void RegexMatcher<USE_STRINGS>::leaveGroup(Backtrack_LeaveGroup<USE_STRINGS> *pushStack, Uint64 pushPosition)
 {
     pushStack->position    = pushPosition;
     pushStack->loopCount   = groupStackTop->loopCount;
@@ -107,7 +107,7 @@ void RegexMatcher<USE_STRINGS>::leaveGroup(MatchingStack_LeaveGroup<USE_STRINGS>
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::leaveLazyGroup()
 {
-    MatchingStack_LeaveGroupLazily<USE_STRINGS> *pushStack = stack.template push< MatchingStack_LeaveGroupLazily<USE_STRINGS> >();
+    Backtrack_LeaveGroupLazily<USE_STRINGS> *pushStack = stack.template push< Backtrack_LeaveGroupLazily<USE_STRINGS> >();
     pushStack->positionDiff = position - groupStackTop->position;
     leaveGroup(pushStack, position);
 }
@@ -115,11 +115,11 @@ void RegexMatcher<USE_STRINGS>::leaveLazyGroup()
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::leaveMaxedOutGroup()
 {
-    leaveGroup(stack.template push< MatchingStack_LeaveGroup<USE_STRINGS> >(), groupStackTop->position);
+    leaveGroup(stack.template push< Backtrack_LeaveGroup<USE_STRINGS> >(), groupStackTop->position);
 }
 
 template <bool USE_STRINGS>
-void *RegexMatcher<USE_STRINGS>::loopGroup(MatchingStack_LoopGroup<USE_STRINGS> *pushLoop, Uint64 pushPosition, Uint64 oldPosition, Uint alternativeNum)
+void *RegexMatcher<USE_STRINGS>::loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pushLoop, Uint64 pushPosition, Uint64 oldPosition, Uint alternativeNum)
 {
     groupStackTop->loopCount++;
 
@@ -830,7 +830,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Group(RegexSymbol *thisSymbol)
     }
     if (group->lazy && group->minCount == 0)
     {
-        MatchingStack_SkipGroup<USE_STRINGS> *pushStack = stack.template push< MatchingStack_SkipGroup<USE_STRINGS> >();
+        Backtrack_SkipGroup<USE_STRINGS> *pushStack = stack.template push< Backtrack_SkipGroup<USE_STRINGS> >();
         pushStack->position = position;
         pushStack->group    = group;
         symbol++;
@@ -1235,7 +1235,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 
                     if (numCapturedDelta)
                     {
-                        MatchingStack_LookaheadCapture<USE_STRINGS> *pushStack = stack.template push< MatchingStack_LookaheadCapture<USE_STRINGS> >();
+                        Backtrack_LookaheadCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_LookaheadCapture<USE_STRINGS> >();
                         pushStack->numCaptured       = numCapturedDelta;
                         pushStack->parentAlternative = group->parentAlternative;
                     }
@@ -1249,7 +1249,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 else
                 if (group->type == RegexGroup_LookaheadMolecular)
                 {
-                    MatchingStack_LeaveMolecularLookahead<USE_STRINGS> *pushStack = stack.template push< MatchingStack_LeaveMolecularLookahead<USE_STRINGS> >();
+                    Backtrack_LeaveMolecularLookahead<USE_STRINGS> *pushStack = stack.template push< Backtrack_LeaveMolecularLookahead<USE_STRINGS> >();
 
                     pushStack->position    = groupStackTop->position;
                     pushStack->group       = group;
@@ -1293,7 +1293,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || group->maxCount == UINT_MAX && groupStackTop->loopCount >= group->minCount && position == groupStackTop->position)
                     leaveMaxedOutGroup();
                 else
-                    loopGroup(stack.template push< MatchingStack_LoopGroup<USE_STRINGS> >(MatchingStack_LoopGroup<USE_STRINGS>::get_size(groupStackTop->numCaptured)), position, groupStackTop->position, (Uint)(alternative - groupStackTop->group->alternatives));
+                    loopGroup(stack.template push< Backtrack_LoopGroup<USE_STRINGS> >(Backtrack_LoopGroup<USE_STRINGS>::get_size(groupStackTop->numCaptured)), position, groupStackTop->position, (Uint)(alternative - groupStackTop->group->alternatives));
                 continue;
             }
             if (debugTrace)
