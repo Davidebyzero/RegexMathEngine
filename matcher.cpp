@@ -1287,7 +1287,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || position == groupStackTop->position)
                     leaveMaxedOutGroup();
                 else
-                if (!group->lazy && inrangex64(groupStackTop->loopCount, group->minCount, MAX_EXTEND(group->maxCount)))
+                if (groupStackTop->loopCount < group->minCount || !group->lazy && inrangex64(groupStackTop->loopCount, group->minCount, MAX_EXTEND(group->maxCount)))
                 {
                     Uint64 oldPosition = groupStackTop->position;
                     Uint alternativeNum = (Uint)(alternative - groupStackTop->group->alternatives);

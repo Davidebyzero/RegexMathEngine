@@ -723,6 +723,8 @@ class MatchingStack_LoopGroupGreedily : public MatchingStack_LoopGroup<USE_STRIN
         matcher.alternative = matcher.groupStackTop->group->alternatives + *(Uint*)this->buffer;
         matcher.groupStackTop->position = ((Uint64*)this->buffer)[1];
         matcher.position = this->position;
+        if (matcher.groupStackTop->loopCount < matcher.groupStackTop->group->minCount)
+            return false;
         matcher.leaveGroup(matcher.stack.template push< MatchingStack_LeaveGroup<USE_STRINGS> >(), matcher.groupStackTop->position);
         return true;
     }
