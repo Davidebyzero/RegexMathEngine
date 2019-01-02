@@ -823,8 +823,6 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Group(RegexSymbol *thisSymbol)
     RegexGroup *group = (RegexGroup*)thisSymbol;
     if (group->maxCount == 0)
     {
-        if (group->type == RegexGroup_Capturing)
-            captures[((RegexGroupCapturing*)group)->backrefIndex] = NON_PARTICIPATING_CAPTURE_GROUP;
         symbol++;
         return;
     }
