@@ -1284,7 +1284,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 if (group->lazy && groupStackTop->loopCount >= group->minCount)
                     leaveLazyGroup();
                 else
-                if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || position == groupStackTop->position)
+                if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || group->maxCount == UINT_MAX && groupStackTop->loopCount >= group->minCount && position == groupStackTop->position)
                     leaveMaxedOutGroup();
                 else
                 if (groupStackTop->loopCount < group->minCount || !group->lazy && inrangex64(groupStackTop->loopCount, group->minCount, MAX_EXTEND(group->maxCount)))
