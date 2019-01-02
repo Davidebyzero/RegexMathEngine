@@ -12,6 +12,8 @@
 #include "regex.h"
 #include "matcher.h"
 
+RegexPattern *nullAlternative = NULL;
+
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::nonMatch(bool negativeLookahead)
 {
@@ -77,6 +79,9 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
     symbol      = group->alternatives[0]->symbols;
 
     stack.template push< Backtrack_EnterGroup<USE_STRINGS> >();
+
+    if (group->type == RegexGroup_Atomic)
+        stack.template push< Backtrack_BeginAtomicGroup<USE_STRINGS> >();
 }
 
 template <bool USE_STRINGS>
@@ -155,6 +160,9 @@ void *RegexMatcher<USE_STRINGS>::loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pus
 
     pushLoop->oldPosition = oldPosition;
     pushLoop->alternative = alternativeNum;
+
+    if (groupStackTop->group->type == RegexGroup_Atomic)
+        stack.template push< Backtrack_BeginAtomicGroup<USE_STRINGS> >();
 
     return (void*)pushLoop->buffer;
 }
@@ -1219,6 +1227,27 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 
                 RegexGroup *group = groupStackTop->group;
 
+                if (group->type == RegexGroup_Atomic)
+                {
+                    int numCapturedDelta = 0;
+
+                    for (GroupStackNode *groupStackOldTop = groupStackTop;;)
+                    {
+                        bool done = groupStackTop == groupStackOldTop && stack->isAtomicGroup();
+                        numCapturedDelta += stack->popForAtomicCapture(*this);
+                        stack.pop(*this);
+                        if (done)
+                            break;
+                    }
+
+                    if (numCapturedDelta)
+                    {
+                        Backtrack_AtomicCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_AtomicCapture<USE_STRINGS> >();
+                        pushStack->numCaptured       = numCapturedDelta;
+                        pushStack->parentAlternative = group->parentAlternative;
+                    }
+                }
+                else
                 if (group->type == RegexGroup_Lookahead)
                 {
                     position = groupStackTop->position;
@@ -1228,14 +1257,14 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     GroupStackNode *groupStackOldTop = groupStackTop;
                     do
                     {
-                        numCapturedDelta += stack->popForLookahead(*this);
+                        numCapturedDelta += stack->popForAtomicCapture(*this);
                         stack.pop(*this);
                     }
                     while (groupStackTop >= groupStackOldTop);
 
                     if (numCapturedDelta)
                     {
-                        Backtrack_LookaheadCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_LookaheadCapture<USE_STRINGS> >();
+                        Backtrack_AtomicCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_AtomicCapture<USE_STRINGS> >();
                         pushStack->numCaptured       = numCapturedDelta;
                         pushStack->parentAlternative = group->parentAlternative;
                     }
@@ -1341,6 +1370,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     default:
                     case RegexGroup_NonCapturing:       openSymbol=" (?:"; break;
                     case RegexGroup_Capturing:          openSymbol=" (";   break;
+                    case RegexGroup_Atomic:             openSymbol=" (?>"; break;
                     case RegexGroup_Lookahead:          openSymbol=" (?="; break;
                     case RegexGroup_LookaheadMolecular: openSymbol=" (?*"; break;
                     case RegexGroup_NegativeLookahead:  openSymbol=" (?!"; break;

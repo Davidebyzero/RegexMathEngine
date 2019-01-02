@@ -62,6 +62,7 @@ bool free_spacing_mode = true;
 bool emulate_ECMA_NPCGs = true;
 bool allow_empty_character_classes = true;
 bool allow_molecular_lookahead = false;
+bool allow_atomic_groups = false;
 Uint optimizationLevel = 2;
 
 static void printShortUsage(const char *argv0)
@@ -96,6 +97,7 @@ Options:\n\
                       them (as in ECMAScript). The default is \"+\".\n\
   -x EXT,EXT,...      Enable extensions. Currently available extensions are:\n\
                       ml  Molecular (non-atomic) lookahead: (?*...)\n\
+                      ag  Atomic Grouping: (?>...)\n\
   -o                  Show only the part of the line that matched\n\
   -O NUMBER           Specifies the optimization level, from 0 to 2. This\n\
                       controls whether optimizations are enabled which skip\n\
@@ -259,6 +261,12 @@ int main(int argc, char *argv[])
                     {
                         s += strlength("ml");
                         allow_molecular_lookahead = true;
+                    }
+                    else
+                    if (strncmp(s, "ag", strlength("ag"))==0)
+                    {
+                        s += strlength("ag");
+                        allow_atomic_groups = true;
                     }
                     else
                     {

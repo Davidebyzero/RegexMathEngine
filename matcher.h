@@ -14,6 +14,8 @@
 #pragma warning(push)
 #pragma warning(disable : 4355)
 
+extern RegexPattern *nullAlternative;
+
 template <bool> class BacktrackNode;
 template <bool> class RegexMatcher;
 class GroupStackNode;
@@ -110,7 +112,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
 {
     friend class Backtrack<USE_STRINGS>;
     friend class BacktrackNode<USE_STRINGS>;
-    friend class Backtrack_LookaheadCapture<USE_STRINGS>;
+    friend class Backtrack_AtomicCapture<USE_STRINGS>;
     friend class Backtrack_SkipGroup<USE_STRINGS>;
     friend class Backtrack_EnterGroup<USE_STRINGS>;
     friend class Backtrack_LeaveGroup<USE_STRINGS>;
@@ -244,8 +246,8 @@ class GroupStackNode
     friend class RegexMatcher<true>;
     friend class BacktrackNode<false>;
     friend class BacktrackNode<true>;
-    friend class Backtrack_LookaheadCapture<false>;
-    friend class Backtrack_LookaheadCapture<true>;
+    friend class Backtrack_AtomicCapture<false>;
+    friend class Backtrack_AtomicCapture<true>;
     friend class Backtrack_SkipGroup<false>;
     friend class Backtrack_SkipGroup<true>;
     friend class Backtrack_EnterGroup<false>;
@@ -288,8 +290,12 @@ class BacktrackNode
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)=0;
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)=0; // returns true if the popping can finish with this one
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)=0;
-    virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)=0; // returns the numCaptured delta
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)=0; // returns the numCaptured delta
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)=0;
+    virtual bool isAtomicGroup()
+    {
+        return false;
+    }
     virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)=0;
 };
 
@@ -370,7 +376,7 @@ void Backtrack<USE_STRINGS>::fprint(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
 }
 
 template <bool USE_STRINGS>
-class Backtrack_LookaheadCapture : public BacktrackNode<USE_STRINGS>
+class Backtrack_AtomicCapture : public BacktrackNode<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
     Uint numCaptured;
@@ -393,7 +399,7 @@ class Backtrack_LookaheadCapture : public BacktrackNode<USE_STRINGS>
         for (Uint i=0; i<numCaptured; i++)
             matcher.captures[*--matcher.captureStackTop] = NON_PARTICIPATING_CAPTURE_GROUP;
     }
-    virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
         return (int)numCaptured;
     }
@@ -403,7 +409,7 @@ class Backtrack_LookaheadCapture : public BacktrackNode<USE_STRINGS>
     }
     virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
     {
-        fprintf(f, "Backtrack_LookaheadCapture: numCaptured=%u\n", numCaptured);
+        fprintf(f, "Backtrack_AtomicCapture: numCaptured=%u\n", numCaptured);
     }
 };
 
@@ -428,7 +434,7 @@ class Backtrack_SkipGroup : public BacktrackNode<USE_STRINGS>
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
     {
     }
-    virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
         return 0;
     }
@@ -478,7 +484,7 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
     {
         matcher.groupStackTop--;
     }
-    virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
         matcher.groupStackTop--;
         return 0;
@@ -490,6 +496,38 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
     virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
     {
         fprintf(f, "Backtrack_EnterGroup\n");
+    }
+};
+
+template <bool USE_STRINGS>
+class Backtrack_BeginAtomicGroup : public BacktrackNode<USE_STRINGS>
+{
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return sizeof(*this);
+    }
+    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return false;
+    }
+    virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    {
+    }
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return 0;
+    }
+    virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return false;
+    }
+    virtual bool isAtomicGroup()
+    {
+        return true;
+    }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fprintf(f, "Backtrack_BeginAtomicGroup\n");
     }
 };
 
@@ -521,7 +559,7 @@ class Backtrack_LeaveMolecularLookahead : public BacktrackNode<USE_STRINGS>
         matcher.groupStackTop++;
         matcher.groupStackTop->group = group;
     }
-    virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
         matcher.groupStackTop++;
         matcher.groupStackTop->group = group;
@@ -577,6 +615,11 @@ protected:
         matcher.groupStackTop->numCaptured = numCaptured;
         matcher.groupStackTop[-1].numCaptured -= numCaptured;
         popCaptureGroup(matcher);
+        if (group->type == RegexGroup_Atomic)
+        {
+            matcher.alternative = &nullAlternative;
+            return false;
+        }
         matcher.alternative = group->alternatives + alternative;
         return false;
     }
@@ -586,7 +629,7 @@ protected:
         matcher.groupStackTop->group = group;
         popCaptureGroup(matcher);
     }
-    virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
         matcher.groupStackTop++;
         matcher.groupStackTop->group = group;
@@ -626,8 +669,7 @@ class Backtrack_LeaveGroupLazily : public Backtrack_LeaveGroup<USE_STRINGS>
             positionDiff == 0 && matcher.groupStackTop->group->maxCount == UINT_MAX && matcher.groupStackTop->loopCount >= matcher.groupStackTop->group->minCount)
         {
             matcher.position = matcher.groupStackTop->position -= positionDiff;
-            static RegexPattern *dummy = NULL;
-            matcher.alternative = &dummy;
+            matcher.alternative = &nullAlternative;
             return false;
         }
 
@@ -720,7 +762,7 @@ protected:
             *matcher.captureStackTop++ = indexes[i];
     }
 
-    virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
         return -(int)numCaptured;
     }
@@ -778,7 +820,7 @@ class Backtrack_TryMatch : public BacktrackNode<USE_STRINGS>
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
     {
     }
-    virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
         return 0;
     }

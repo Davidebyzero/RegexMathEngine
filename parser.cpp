@@ -379,6 +379,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                     switch (buf[1])
                     {
                     case ':':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_NonCapturing);       break;
+                    case '>': if (!allow_atomic_groups      ) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_Atomic);             break;
                     case '=':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_Lookahead);          break;
                     case '*': if (!allow_molecular_lookahead) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_LookaheadMolecular); break;
                     case '!':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_NegativeLookahead);  break;

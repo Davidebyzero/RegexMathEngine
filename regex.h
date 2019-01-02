@@ -24,6 +24,7 @@ extern bool free_spacing_mode;
 extern bool emulate_ECMA_NPCGs;
 extern bool allow_empty_character_classes;
 extern bool allow_molecular_lookahead;
+extern bool allow_atomic_groups;
 extern Uint optimizationLevel;
 
 enum RegexSymbolType
@@ -51,6 +52,7 @@ enum RegexGroupType
 {
     RegexGroup_NonCapturing,
     RegexGroup_Capturing,
+    RegexGroup_Atomic,
     RegexGroup_Lookahead,
     RegexGroup_LookaheadMolecular,
     RegexGroup_NegativeLookahead,
@@ -59,9 +61,10 @@ enum RegexGroupType
 class RegexPattern;
 
 template<bool> class RegexMatcher;
-template<bool> class Backtrack_LookaheadCapture;
+template<bool> class Backtrack_AtomicCapture;
 template<bool> class Backtrack_SkipGroup;
 template<bool> class Backtrack_EnterGroup;
+template<bool> class Backtrack_BeginAtomicGroup;
 template<bool> class Backtrack_LeaveGroup;
 template<bool> class Backtrack_LoopGroup;
 template<bool> class Backtrack_LeaveGroupLazily;
@@ -147,8 +150,8 @@ class RegexGroup : public RegexSymbol
     friend class Backtrack_LeaveMolecularLookahead<true>;
     friend class Backtrack_LoopGroup<false>;
     friend class Backtrack_LoopGroup<true>;
-    friend class Backtrack_LookaheadCapture<false>;
-    friend class Backtrack_LookaheadCapture<true>;
+    friend class Backtrack_AtomicCapture<false>;
+    friend class Backtrack_AtomicCapture<true>;
     RegexPattern **alternatives; // list terminated with NULL
     RegexGroupType type;
 public:
