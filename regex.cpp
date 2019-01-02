@@ -57,7 +57,7 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
 //#define TEST_NUMBERS_FIBONACCI
 
 // todo: implement these as class members rather than global variables?
-bool debugTrace = false;
+Uint debugTrace = 0;
 bool free_spacing_mode = true;
 bool emulate_ECMA_NPCGs = true;
 bool allow_empty_character_classes = true;
@@ -102,7 +102,9 @@ Options:\n\
   -t NUM0[..NUM1]     (In numerical mode only) Test the range of numbers from\n\
                       NUM0 to NUM1, inclusive. If NUM1 is not specified, only\n\
                       one number, NUM0, shall be tested.\n\
-  --trace             Enable printout of debug trace\n\
+  --trace             Enable printout of debug trace. Use this parameter twice\n\
+                      to include a dump of the backtracking stack at every step\n\
+                      (which is extremely verbose).\n\
   --verbose           Print both matches and non-matches along with the input\n\
                       number. Currently works only in numerical mode when\n\
                       taking input from standard input.\n\
@@ -227,7 +229,7 @@ int main(int argc, char *argv[])
                 else
                 if (strcmp(&argv[i][2], "trace")==0)
                 {
-                    debugTrace = true;
+                    debugTrace++;
                 }
                 else
                 {

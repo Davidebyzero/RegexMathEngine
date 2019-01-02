@@ -1322,8 +1322,16 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 #else
                 fprintf(stderr, "Step %llu: {%llu|%llu} ", numSteps, position, input - position);
 #endif
-                fprintCaptures(stderr);
+                for (Uint *i=captureStackBase; i<captureStackTop; i++)
+                {
+                    fprintCapture(stderr, *i);
+                    if (i<captureStackTop-1)
+                        fputs(", ", stderr);
+                }
                 fputc('\n', stderr);
+
+                if (debugTrace > 1)
+                    stack.fprint(*this, stderr);
 
                 for (GroupStackNode *i=groupStackBase; i<=groupStackTop; i++)
                 {
@@ -1390,32 +1398,36 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
     return match > 0;
 }
 
-void RegexMatcher<false>::fprintCaptures(FILE *f)
+void RegexMatcher<false>::fprintCapture(FILE *f, Uint i, Uint64 length, const char *offset)
 {
-    for (Uint *i=captureStackBase; i<captureStackTop; i++)
-        fprintf(f, "\\%u=%llu%s", *i+1, captures[*i], i<captureStackTop-1 ? ", " : "");
+    fprintf(f, "\\%u=%llu", i+1, length);
+}
+void RegexMatcher<false>::fprintCapture(FILE *f, Uint i)
+{
+    fprintf(f, "\\%u=%llu", i+1, captures[i]);
 }
 
-void RegexMatcher<true>::fprintCaptures(FILE *f)
+void RegexMatcher<true>::fprintCapture(FILE *f, Uint i, Uint64 length, const char *offset)
 {
-    for (Uint *i=captureStackBase; i<captureStackTop; i++)
+    fprintf(f, "\\%u=\"", i+1);
+    const char *s = offset;
+    for (Uint64 len=length; len!=0; len--)
     {
-        fprintf(f, "\\%u=\"", *i+1);
-        const char *s = captureOffsets[*i];
-        for (Uint64 len=captures[*i]; len!=0; len--)
+        switch (*s)
         {
-            switch (*s)
-            {
-            case '\\': fputs("\\\\", f); break;
-            case '"':  fputs("\\\"", f); break;
-            default:
-                fputc(*s, f);
-                break;
-            }
-            s++;
+        case '\\': fputs("\\\\", f); break;
+        case '"':  fputs("\\\"", f); break;
+        default:
+            fputc(*s, f);
+            break;
         }
-        fprintf(f, "\" (%llu:%llu)%s", captureOffsets[*i] - stringToMatchAgainst, captures[*i], i<captureStackTop-1 ? ", " : "");
+        s++;
     }
+    fprintf(f, "\" (%llu:%llu)", offset - stringToMatchAgainst, length);
+}
+void RegexMatcher<true>::fprintCapture(FILE *f, Uint i)
+{
+    fprintCapture(f, i, captures[i], captureOffsets[i]);
 }
 
 template bool RegexMatcher<false>::Match(RegexGroup &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);

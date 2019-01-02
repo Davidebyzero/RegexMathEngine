@@ -61,6 +61,7 @@ public:
     template <class NODE_TYPE> NODE_TYPE *push(size_t size);
     template <class NODE_TYPE> NODE_TYPE *push() { return push<NODE_TYPE>(sizeof(NODE_TYPE)); }
     void pop(RegexMatcher<USE_STRINGS> &matcher, bool delayChunkDeletion = false);
+    void fprint(RegexMatcher<USE_STRINGS> &matcher, FILE *f);
     void deletePendingChunk()
     {
         if (pendingChunkDeletion)
@@ -198,7 +199,8 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     inline void (RegexMatcher<USE_STRINGS>::*chooseBuiltinCharacterClassFunction(bool (*characterMatchFunction)(Uchar ch), void (RegexMatcher<USE_STRINGS>::*matchFunction)(RegexSymbol *thisSymbol)))(RegexSymbol *thisSymbol);
     inline void virtualizeSymbols(RegexGroup *rootGroup);
 
-    inline void fprintCaptures(FILE *f);
+    inline void fprintCapture(FILE *f, Uint i);
+    inline void fprintCapture(FILE *f, Uint i, Uint64 length, const char *offset);
 
 public:
     inline RegexMatcher();
@@ -288,6 +290,7 @@ class BacktrackNode
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)=0;
     virtual int popForLookahead(RegexMatcher<USE_STRINGS> &matcher)=0; // returns the numCaptured delta
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)=0;
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)=0;
 };
 
 template <bool USE_STRINGS>
@@ -345,6 +348,28 @@ void Backtrack<USE_STRINGS>::pop(RegexMatcher<USE_STRINGS> &matcher, bool delayC
 }
 
 template <bool USE_STRINGS>
+void Backtrack<USE_STRINGS>::fprint(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+{
+    BacktrackNode<USE_STRINGS> *nextPop = nextToBePopped;
+    Uint8 *base = chunkBase;
+    while (nextPop != (BacktrackNode<USE_STRINGS>*)(chunkBase + CHUNK_SIZE))
+    {
+        nextPop->fprintDebug(matcher, f);
+
+        Uint8 *next = (Uint8*)nextPop + nextPop->getSize(matcher);
+        if (next == base + CHUNK_SIZE - sizeof(ChunkInfo) && base != firstChunk)
+        {
+            ChunkInfo *node = (ChunkInfo*)next;
+            Uint8 *oldChunk = base;
+            base = node->baseOfPreviousChunk;
+            nextPop = node->previousNode;
+        }
+        else
+            nextPop = (BacktrackNode<USE_STRINGS>*)next;
+    }
+}
+
+template <bool USE_STRINGS>
 class Backtrack_LookaheadCapture : public BacktrackNode<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
@@ -376,6 +401,10 @@ class Backtrack_LookaheadCapture : public BacktrackNode<USE_STRINGS>
     {
         return false;
     }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fprintf(f, "Backtrack_LookaheadCapture: numCaptured=%u\n", numCaptured);
+    }
 };
 
 template <bool USE_STRINGS>
@@ -406,6 +435,10 @@ class Backtrack_SkipGroup : public BacktrackNode<USE_STRINGS>
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
         return false;
+    }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fprintf(f, "Backtrack_SkipGroup: position=%llu\n", position);
     }
 };
 
@@ -454,6 +487,10 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
     {
         return true;
     }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fprintf(f, "Backtrack_EnterGroup\n");
+    }
 };
 
 template <bool USE_STRINGS>
@@ -493,6 +530,10 @@ class Backtrack_LeaveMolecularLookahead : public BacktrackNode<USE_STRINGS>
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
         return false;
+    }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fprintf(f, "Backtrack_LeaveMolecularLookahead: position=%llu, numCaptured=%u, alternative=%u\n", position, numCaptured, alternative);
     }
 };
 
@@ -555,6 +596,16 @@ protected:
     {
         return false;
     }
+    virtual void fprintDebugBase(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fprintf(f, ": position=%llu, loopCount=%llu, numCaptured=%u, alternative=%u", position, loopCount, numCaptured, alternative);
+    }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fputs("Backtrack_LeaveGroup", f);
+        fprintDebugBase(matcher, f);
+        fputc('\n', f);
+    }
 };
 
 template <bool USE_STRINGS>
@@ -584,7 +635,16 @@ class Backtrack_LeaveGroupLazily : public Backtrack_LeaveGroup<USE_STRINGS>
         matcher.loopGroup(matcher.stack.template push< Backtrack_LoopGroup<USE_STRINGS> >(Backtrack_LoopGroup<USE_STRINGS>::get_size(matcher.groupStackTop->numCaptured)), matcher.position, matcher.position - positionDiff, (Uint)(matcher.alternative - matcher.groupStackTop->group->alternatives));
         return true;
     }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fputs("Backtrack_LeaveGroupLazily", f);
+        Backtrack_LeaveGroup::fprintDebugBase(matcher, f);
+        fprintf(f, ", positionDiff=%llu\n", positionDiff);
+    }
 };
+
+#pragma warning(push)
+#pragma warning(disable : 4700) // for passing "offsets" to fprintCapture() with USE_STRINGS=false
 
 template <bool USE_STRINGS>
 class Backtrack_LoopGroup : public BacktrackNode<USE_STRINGS>
@@ -668,7 +728,31 @@ protected:
     {
         return true;
     }
+    void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fprintf(f, "Backtrack_LoopGroup: position=%llu, numCaptured=%u, alternative=%u, oldPosition=%llu", position, numCaptured, alternative, oldPosition);
+
+        Uint64 *values = (Uint64*)buffer;
+        const char **offsets;
+        Uint *indexes;
+        if (!USE_STRINGS)
+            indexes = (Uint*)(values + numCaptured);
+        else
+        {
+            offsets = (const char **)(values + numCaptured);
+            indexes = (Uint*)(offsets + numCaptured);
+        }
+
+        for (Uint i=0; i<numCaptured; i++)
+        {
+            fputs(", ", f);
+            matcher.fprintCapture(f, indexes[i], values[i], offsets[i]);
+        }
+        fputc('\n', f);
+    }
 };
+
+#pragma warning(pop)
 
 template <bool USE_STRINGS>
 class Backtrack_TryMatch : public BacktrackNode<USE_STRINGS>
@@ -701,6 +785,10 @@ class Backtrack_TryMatch : public BacktrackNode<USE_STRINGS>
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
         return false;
+    }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fprintf(f, "Backtrack_TryMatch: position=%llu, currentMatch=%llu\n", position, currentMatch);
     }
 };
 
