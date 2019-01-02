@@ -61,6 +61,7 @@ Uint debugTrace = 0;
 bool free_spacing_mode = true;
 bool emulate_ECMA_NPCGs = true;
 bool allow_empty_character_classes = true;
+bool allow_molecular_lookahead = false;
 Uint optimizationLevel = 2;
 
 static void printShortUsage(const char *argv0)
@@ -93,6 +94,8 @@ Options:\n\
                       or \"[^]\", is permitted. \"-\" makes it an error to attempt\n\
                       to use them (as in most regex engines), and \"+\" allows\n\
                       them (as in ECMAScript). The default is \"+\".\n\
+  -x EXT,EXT,...      Enable extensions. Currently available extensions are:\n\
+                      ml  Molecular (non-atomic) lookahead: (?*...)\n\
   -o                  Show only the part of the line that matched\n\
   -O NUMBER           Specifies the optimization level, from 0 to 2. This\n\
                       controls whether optimizations are enabled which skip\n\
@@ -236,6 +239,43 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "Error: Unrecognized option \"%s\"\n", argv[i]);
                     printShortUsage(argv[0]);
                     return -1;
+                }
+            }
+            else
+            if (argv[i][1]=='x')
+            {
+                const char *arg = &argv[i][2];
+                if (!*arg && ++i < argc)
+                    arg = argv[i];
+                if (!*arg)
+                {
+                    fprintf(stderr, "Error: \"-x\" requires arguments\n");
+                    printShortUsage(argv[0]);
+                    return -1;
+                }
+                for (const char *s = arg;;)
+                {
+                    if (strncmp(s, "ml", strlength("ml"))==0)
+                    {
+                        s += strlength("ml");
+                        allow_molecular_lookahead = true;
+                    }
+                    else
+                    {
+                        fprintf(stderr, "Error: Unrecognized argument after \"-x\"\n");
+                        printShortUsage(argv[0]);
+                        return -1;
+                    }
+                    if (!*s)
+                        break;
+                    if (*s == ',')
+                        s++;
+                    else
+                    {
+                        fprintf(stderr, "Error: Unrecognized argument after \"-x\"\n");
+                        printShortUsage(argv[0]);
+                        return -1;
+                    }
                 }
             }
             else

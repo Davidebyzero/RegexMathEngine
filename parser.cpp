@@ -378,10 +378,10 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 case '?':
                     switch (buf[1])
                     {
-                    case ':': buf+=2; group = new RegexGroup(RegexGroup_NonCapturing);       break;
-                    case '=': buf+=2; group = new RegexGroup(RegexGroup_Lookahead);          break;
-                    case '*': buf+=2; group = new RegexGroup(RegexGroup_LookaheadMolecular); break;
-                    case '!': buf+=2; group = new RegexGroup(RegexGroup_NegativeLookahead);  break;
+                    case ':':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_NonCapturing);       break;
+                    case '=':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_Lookahead);          break;
+                    case '*': if (!allow_molecular_lookahead) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_LookaheadMolecular); break;
+                    case '!':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_NegativeLookahead);  break;
                     case '#':
                         buf+=2;
                         for (;;)
