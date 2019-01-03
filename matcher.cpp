@@ -372,8 +372,15 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Backref(RegexSymbol *thisSymbol)
     Uint64 multiple;
     const char *pBackref;
     readCapture(((RegexBackref*)thisSymbol)->index, multiple, pBackref);
-    if (multiple == NON_PARTICIPATING_CAPTURE_GROUP && emulate_ECMA_NPCGs)
+    if (multiple == NON_PARTICIPATING_CAPTURE_GROUP)
+    {
+        if (!emulate_ECMA_NPCGs)
+        {
+            nonMatch();
+            return;
+        }
         multiple = 0;
+    }
     if (multiple == 0) // don't backtrack when it will make no difference to do so
     {
         symbol++;
