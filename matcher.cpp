@@ -1017,6 +1017,9 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
         {
             switch ((*thisSymbol)->type)
             {
+            case RegexSymbol_NoOp:
+                matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_AlwaysMatch;
+                break;
             case RegexSymbol_Character:
                 if (characterCanMatch(*thisSymbol))
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_Character;
@@ -1043,7 +1046,10 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                 break;
             case RegexSymbol_AnchorStart:
                 if ((*thisSymbol)->minCount == 0)
+                {
+                    (*thisSymbol)->type = RegexSymbol_NoOp;
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_AlwaysMatch;
+                }
                 else
                 {
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_AnchorStart;
@@ -1052,19 +1058,28 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                 break;
             case RegexSymbol_AnchorEnd:
                 if ((*thisSymbol)->minCount == 0)
+                {
+                    (*thisSymbol)->type = RegexSymbol_NoOp;
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_AlwaysMatch;
+                }
                 else
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_AnchorEnd;
                 break;
             case RegexSymbol_WordBoundaryNot:
                 if ((*thisSymbol)->minCount == 0)
+                {
+                    (*thisSymbol)->type = RegexSymbol_NoOp;
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_AlwaysMatch;
+                }
                 else
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_WordBoundaryNot;
                 break;
             case RegexSymbol_WordBoundary:
                 if ((*thisSymbol)->minCount == 0)
+                {
+                    (*thisSymbol)->type = RegexSymbol_NoOp;
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_AlwaysMatch;
+                }
                 else
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_WordBoundary;
                 break;

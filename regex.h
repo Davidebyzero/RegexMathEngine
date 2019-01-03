@@ -31,6 +31,7 @@ extern Uint optimizationLevel;
 
 enum RegexSymbolType
 {
+    RegexSymbol_NoOp,
     RegexSymbol_Group,
     RegexSymbol_Character,
     RegexSymbol_CharacterClass,
