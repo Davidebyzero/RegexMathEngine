@@ -120,6 +120,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     friend class Backtrack_LeaveMolecularLookahead<USE_STRINGS>;
     friend class Backtrack_LoopGroup<USE_STRINGS>;
     friend class Backtrack_TryMatch<USE_STRINGS>;
+    friend class Backtrack_ResetStart<USE_STRINGS>;
 
 #ifdef _DEBUG
     RegexMatcher<USE_STRINGS> &matcher;
@@ -134,7 +135,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     GroupStackNode *groupStackBase;
     GroupStackNode *groupStackTop;
 
-    Uint64 position;
+    Uint64 position, startPosition;
     Uint64 currentMatch; // ULLONG_MAX means no match has been tried yet
     RegexPattern **alternative;
     RegexSymbol  **symbol;
@@ -180,6 +181,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void matchSymbol_CharacterClass       (RegexSymbol *thisSymbol);
     void matchSymbol_Backref              (RegexSymbol *thisSymbol);
     void matchSymbol_Group                (RegexSymbol *thisSymbol);
+    void matchSymbol_ResetStart           (RegexSymbol *thisSymbol);
     void matchSymbol_AnchorStart          (RegexSymbol *thisSymbol);
     void matchSymbol_AnchorEnd            (RegexSymbol *thisSymbol);
     void matchSymbol_WordBoundaryNot      (RegexSymbol *thisSymbol);
@@ -831,6 +833,39 @@ class Backtrack_TryMatch : public BacktrackNode<USE_STRINGS>
     virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
     {
         fprintf(f, "Backtrack_TryMatch: position=%llu, currentMatch=%llu\n", position, currentMatch);
+    }
+};
+
+template <bool USE_STRINGS>
+class Backtrack_ResetStart : public BacktrackNode<USE_STRINGS>
+{
+    friend class RegexMatcher<USE_STRINGS>;
+
+    Uint64 startPosition;
+
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return sizeof(*this);
+    }
+    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        matcher.startPosition = startPosition;
+        return false;
+    }
+    virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    {
+    }
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return 0;
+    }
+    virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return false;
+    }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fprintf(f, "Backtrack_ResetStart: startPosition=%llu\n", startPosition);
     }
 };
 

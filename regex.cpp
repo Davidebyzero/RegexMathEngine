@@ -64,6 +64,7 @@ bool emulate_ECMA_NPCGs = true;
 bool allow_empty_character_classes = true;
 bool allow_molecular_lookahead = false;
 bool allow_atomic_groups = false;
+bool allow_reset_start = false;
 Uint optimizationLevel = 2;
 
 static void printShortUsage(const char *argv0)
@@ -97,8 +98,9 @@ Options:\n\
                       to use them (as in most regex engines), and \"+\" allows\n\
                       them (as in ECMAScript). The default is \"+\".\n\
   -x EXT,EXT,...      Enable extensions. Currently available extensions are:\n\
-                      ml  Molecular (non-atomic) lookahead: (?*...)\n\
-                      ag  Atomic Grouping: (?>...)\n\
+                      ml   Molecular (non-atomic) lookahead: (?*...)\n\
+                      ag   Atomic Grouping: (?>...)\n\
+                      rs   Reset Start: \\K\n\
   -o                  Show only the part of the line that matched\n\
   -O NUMBER           Specifies the optimization level, from 0 to 2. This\n\
                       controls whether optimizations are enabled which skip\n\
@@ -268,6 +270,12 @@ int main(int argc, char *argv[])
                     {
                         s += strlength("ag");
                         allow_atomic_groups = true;
+                    }
+                    else
+                    if (strncmp(s, "rs", strlength("rs"))==0)
+                    {
+                        s += strlength("rs");
+                        allow_reset_start = true;
                     }
                     else
                     {

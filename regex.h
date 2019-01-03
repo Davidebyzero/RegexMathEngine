@@ -25,6 +25,7 @@ extern bool emulate_ECMA_NPCGs;
 extern bool allow_empty_character_classes;
 extern bool allow_molecular_lookahead;
 extern bool allow_atomic_groups;
+extern bool allow_reset_start;
 extern Uint optimizationLevel;
 
 enum RegexSymbolType
@@ -34,6 +35,7 @@ enum RegexSymbolType
     RegexSymbol_CharacterClass,
     RegexSymbol_String,
     RegexSymbol_Backref,
+    RegexSymbol_ResetStart,
     RegexSymbol_AnchorStart,
     RegexSymbol_AnchorEnd,
     RegexSymbol_WordBoundaryNot,
@@ -70,6 +72,7 @@ template<bool> class Backtrack_LoopGroup;
 template<bool> class Backtrack_LeaveGroupLazily;
 template<bool> class Backtrack_LeaveMolecularLookahead;
 template<bool> class Backtrack_TryMatch;
+template<bool> class Backtrack_ResetStart;
 
 class RegexSymbol
 {

@@ -848,6 +848,18 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Group(RegexSymbol *thisSymbol)
 }
 
 template <bool USE_STRINGS>
+void RegexMatcher<USE_STRINGS>::matchSymbol_ResetStart(RegexSymbol *thisSymbol)
+{
+    if (startPosition < position)
+    {
+        Backtrack_ResetStart<USE_STRINGS> *pushStack = stack.template push< Backtrack_ResetStart<USE_STRINGS> >();
+        pushStack->startPosition = startPosition;
+        startPosition = position;
+    }
+    symbol++;
+}
+
+template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::matchSymbol_AnchorStart(RegexSymbol *thisSymbol)
 {
     if (position == 0)
@@ -1026,6 +1038,9 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
             case RegexSymbol_Backref:
                 matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_Backref;
                 break;
+            case RegexSymbol_ResetStart:
+                matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_ResetStart;
+                break;
             case RegexSymbol_AnchorStart:
                 if ((*thisSymbol)->minCount == 0)
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_AlwaysMatch;
@@ -1198,6 +1213,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
         alternative   = regex.alternatives;
         symbol        = regex.alternatives[0]->symbols;
         position      = curPosition;
+        startPosition = curPosition;
         currentMatch  = ULLONG_MAX;
 
         groupStackTop->position    = curPosition;
@@ -1422,8 +1438,15 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
             break;
     }
 
-    returnMatchOffset = curPosition;
-    returnMatchLength = (size_t)(position - curPosition);
+    if (startPosition > position) // if \K comes after the end of the match due to use of lookahead, swap the two positions
+    {
+        curPosition = position;
+        position = startPosition;
+        startPosition = curPosition;
+    }
+
+    returnMatchOffset = startPosition;
+    returnMatchLength = (size_t)(position - startPosition);
     
     return match > 0;
 }

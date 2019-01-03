@@ -480,12 +480,20 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                     case 'f': ch = '\f'; goto process_char;
                     case 'r': ch = '\r'; goto process_char;
                     default:
+                    process_literal_char:
                         ch = *buf;
                     process_char:
                         symbol = new RegexSymbol(RegexSymbol_Character);
                         symbol->characterAny = false;
                         symbol->character = ch;
                         addSymbol(buf0, symbol);
+                        buf++;
+                        break;
+                    case 'K':
+                        if (!allow_reset_start)
+                            goto process_literal_char;
+                        addSymbol(buf0, new RegexSymbol(RegexSymbol_ResetStart));
+                        symbol = NULL; // don't allow this symbol to be quantified
                         buf++;
                         break;
                     case 'B':
