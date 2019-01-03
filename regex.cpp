@@ -55,6 +55,7 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
 }
 
 //#define TEST_NUMBERS_FIBONACCI
+#define TEST_FOR_FALSE_POSITIVES
 
 // todo: implement these as class members rather than global variables?
 Uint debugTrace = 0;
@@ -462,7 +463,12 @@ int main(int argc, char *argv[])
                 if (regex.MatchNumber(a, mathMode, returnMatch))
                     printf("%llu -> %llu\n", a, returnMatch);
                 else
-                    printf("%llu -> no match\n", a);
+                    printf("%llu -> no match (FALSE NEGATIVE)\n", a);
+#   if defined(TEST_FOR_FALSE_POSITIVES)
+                for (Uint64 i=a+1; i<b; i++)
+                    if (regex.MatchNumber(i, mathMode, returnMatch))
+                        printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+#   endif
                 Uint64 c = a + b;
                 a = b;
                 b = c;
