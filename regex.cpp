@@ -451,11 +451,6 @@ int main(int argc, char *argv[])
     try
     {
         Regex regex(buf);
-        //__debugbreak();
-
-        /*Uint64 returnMatch_;
-        if (regex.MatchNumber(256, 'x', returnMatch_))
-            printf("%llu\n", returnMatch_);*/
 
         if (mathMode)
         {
