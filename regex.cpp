@@ -62,6 +62,7 @@ Uint debugTrace = 0;
 bool free_spacing_mode = true;
 bool emulate_ECMA_NPCGs = true;
 bool allow_empty_character_classes = true;
+bool allow_quantifiers_on_assertions = true;
 bool allow_molecular_lookahead = false;
 bool allow_atomic_groups = false;
 bool allow_reset_start = false;
@@ -97,6 +98,12 @@ Options:\n\
                       or \"[^]\", is permitted. \"-\" makes it an error to attempt\n\
                       to use them (as in most regex engines), and \"+\" allows\n\
                       them (as in ECMAScript). The default is \"+\".\n\
+  --qa{-|+}           Specifies whether to allow quantifiers on assertions:\n\
+                      lookaheads, anchors, and word boundaries/nonboundaries.\n\
+                      \"-\" disallows them, and \"+\" allows them (the default).\n\
+                      Note that this is the default because ECMAScript as\n\
+                      implemented in most browsers allows it, even though the\n\
+                      specification disallows it.\n\
   -x EXT,EXT,...      Enable extensions. Currently available extensions are:\n\
                       ml   Molecular (non-atomic) lookahead: (?*...)\n\
                       ag   Atomic Grouping: (?>...)\n\
@@ -234,6 +241,14 @@ int main(int argc, char *argv[])
                     !argv[i][2 + strlength("ecc") + 1])
                 {
                     allow_empty_character_classes = argv[i][2 + strlength("ecc")] == '+';
+                }
+                else
+                if (strncmp(&argv[i][2], "qa", strlength("qa"))==0 &&
+                    (argv[i][2 + strlength("qa")] == '-' ||
+                     argv[i][2 + strlength("qa")] == '+' ) &&
+                    !argv[i][2 + strlength("qa") + 1])
+                {
+                    allow_quantifiers_on_assertions = argv[i][2 + strlength("qa")] == '+';
                 }
                 else
                 if (strcmp(&argv[i][2], "trace")==0)

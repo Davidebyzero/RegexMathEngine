@@ -23,6 +23,7 @@ extern Uint debugTrace;
 extern bool free_spacing_mode;
 extern bool emulate_ECMA_NPCGs;
 extern bool allow_empty_character_classes;
+extern bool allow_quantifiers_on_assertions;
 extern bool allow_molecular_lookahead;
 extern bool allow_atomic_groups;
 extern bool allow_reset_start;

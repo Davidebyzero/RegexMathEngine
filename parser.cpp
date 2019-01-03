@@ -196,9 +196,11 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
             break;
         case '^':
             addSymbol(buf++, symbol = new RegexSymbol(RegexSymbol_AnchorStart));
+            if (!allow_quantifiers_on_assertions) symbol = NULL;
             break;
         case '$':
             addSymbol(buf++, symbol = new RegexSymbol(RegexSymbol_AnchorEnd));
+            if (!allow_quantifiers_on_assertions) symbol = NULL;
             break;
         case '.':
             addSymbol(buf++, symbol = new RegexSymbol(RegexSymbol_Character));
@@ -499,6 +501,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                     case 'B':
                     case 'b':
                         addSymbol(buf0, symbol = new RegexSymbol(symbolWithLowercaseOpposite(RegexSymbol_WordBoundaryNot, RegexSymbol_WordBoundary, *buf, 'B')));
+                        if (!allow_quantifiers_on_assertions) symbol = NULL;
                         buf++;
                         break;
                     case 'D':
