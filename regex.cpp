@@ -101,6 +101,7 @@ Options:\n\
                       ml   Molecular (non-atomic) lookahead: (?*...)\n\
                       ag   Atomic Grouping: (?>...)\n\
                       rs   Reset Start: \\K\n\
+                      all  Enable all of the above extensions\n\
   -o                  Show only the part of the line that matched\n\
   -O NUMBER           Specifies the optimization level, from 0 to 2. This\n\
                       controls whether optimizations are enabled which skip\n\
@@ -275,6 +276,14 @@ int main(int argc, char *argv[])
                     if (strncmp(s, "rs", strlength("rs"))==0)
                     {
                         s += strlength("rs");
+                        allow_reset_start = true;
+                    }
+                    else
+                    if (strncmp(s, "all", strlength("all"))==0)
+                    {
+                        s += strlength("all");
+                        allow_molecular_lookahead = true;
+                        allow_atomic_groups = true;
                         allow_reset_start = true;
                     }
                     else
