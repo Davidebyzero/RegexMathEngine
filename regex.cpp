@@ -59,7 +59,7 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
 
 // todo: implement these as class members rather than global variables?
 Uint debugTrace = 0;
-bool free_spacing_mode = true;
+bool free_spacing_mode = false;
 bool emulate_ECMA_NPCGs = true;
 bool allow_empty_character_classes = true;
 bool allow_quantifiers_on_assertions = true;
@@ -89,7 +89,7 @@ Options:\n\
   --fs{-|+}           Disables or enables free-spacing mode. In this mode, all\n\
                       whitespace will be ignored unless it occurs inside a\n\
                       parsable unit. \"-\" disables this and \"+\" enables it.\n\
-                      By default it is enabled.\n\
+                      By default it is disabled.\n\
   --npcg{-|+}         Specifies the behavior of non-participating capture\n\
                       groups. \"-\" makes them match nothing (as in most regex\n\
                       engines), and \"+\" makes them match an empty string (as\n\
