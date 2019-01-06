@@ -54,8 +54,13 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
     return result;
 }
 
+
 //#define TEST_NUMBERS_FIBONACCI
-#define TEST_FOR_FALSE_POSITIVES
+//#define TEST_NUMBERS_POWER_OF_2
+//#define TEST_NUMBERS_TRIANGULAR
+
+#define TEST_FOR_FALSE_POSITIVES  // combines with all other tests
+
 
 // todo: implement these as class members rather than global variables?
 Uint debugTrace = 0;
@@ -504,6 +509,44 @@ int main(int argc, char *argv[])
                 Uint64 c = a + b;
                 a = b;
                 b = c;
+            }
+#elif defined(TEST_NUMBERS_POWER_OF_2)
+#   if defined(TEST_FOR_FALSE_POSITIVES)
+            Uint64 z=0;
+#   endif
+            Uint64 a=1;
+            for(;;)
+            {
+                Uint64 returnMatch;
+#   if defined(TEST_FOR_FALSE_POSITIVES)
+                for (Uint64 i=z; i<a; i++)
+                    if (regex.MatchNumber(i, mathMode, returnMatch))
+                        printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+                z = a+1;
+#   endif
+                if (regex.MatchNumber(a, mathMode, returnMatch))
+                    printf("%llu -> %llu\n", a, returnMatch);
+                else
+                    printf("%llu -> no match (FALSE NEGATIVE)\n", a);
+                a += a;
+            }
+#elif defined(TEST_NUMBERS_TRIANGULAR)
+            Uint n=0, m=1, z=0;
+            for (;;)
+            {
+                Uint64 returnMatch;
+#   if defined(TEST_FOR_FALSE_POSITIVES)
+                for (Uint64 i=z; i<n; i++)
+                    if (regex.MatchNumber(i, mathMode, returnMatch))
+                        printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+                z = n+1;
+#   endif
+                if (regex.MatchNumber(n, mathMode, returnMatch))
+                    printf("%llu -> %llu\n", n, returnMatch);
+                else
+                    printf("%llu -> no match (FALSE NEGATIVE)\n", n);
+                n += m;
+                m++;
             }
 #else
             if (testNumInc)
