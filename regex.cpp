@@ -55,6 +55,11 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
 }
 
 
+// strings mode
+//#define TEST_TRIPLES
+//#define TEST_MULTIPLICATION
+
+// numerical mode
 //#define TEST_NUMBERS_FIBONACCI
 //#define TEST_NUMBERS_POWER_OF_2
 //#define TEST_NUMBERS_TRIANGULAR
@@ -594,6 +599,79 @@ int main(int argc, char *argv[])
         }
         else
         {
+#if defined(TEST_TRIPLES)
+            for (Uint64 n=0;;)
+            {
+                bool positive = n % 3 == 0;
+#   ifndef TEST_FOR_FALSE_POSITIVES
+                if (positive)
+#   endif
+                {
+                    char str[strlength("18446744073709551615")+1];
+                    sprintf(str, "%llu", n);
+
+                    const char *returnMatch;
+                    size_t returnMatchLength;
+                    if (regex.MatchString(str, returnMatch, returnMatchLength))
+                    {
+                        if (!positive)
+                            printf("%s - FALSE POSITIVE!\n", str);
+                    }
+                    else
+                    {
+                        if (positive)
+                            printf("%s - FALSE NEGATIVE!\n", str);
+                    }
+                    if (n % 0x10000 == 0)
+                        printf("%s\n", str);
+                }
+                if (++n == 0)
+                    break;
+            }
+#elif defined(TEST_MULTIPLICATION)
+            const Uint range = 25;
+            char str[range + strlength("*") + range + strlength("=") + range*range + 1];
+            for (Uint a=1; a<=range; a++)
+            {
+                for (Uint i=0; i<a; i++)
+                    str[i] = 'x';
+                str[a] = '*';
+                for (Uint b=1; b<=range; b++)
+                {
+                    for (Uint i=0; i<b; i++)
+                        str[a+1+i] = 'x';
+                    str[a+1+b] = '=';
+#   ifdef TEST_FOR_FALSE_POSITIVES
+                    for (Uint c=1; c<=range*range; c++)
+#   else
+                    Uint c = a * b;
+#   endif
+                    {
+                        for (Uint i=0; i<c; i++)
+                            str[a+1+b+1+i] = 'x';
+                        str[a+1+b+1+c] = '\0';
+
+                        bool positive = a * b == c;
+
+                        const char *returnMatch;
+                        size_t returnMatchLength;
+                        if (regex.MatchString(str, returnMatch, returnMatchLength))
+                        {
+                            printf("%u * %u = %u", a, b, c);
+                            if (!positive)
+                                fputs(" - FALSE POSITIVE!\n", stdout);
+                            else
+                                fputc('\n', stdout);
+                        }
+                        else
+                        {
+                            if (positive)
+                                printf("%u * %u = %u - FALSE NEGATIVE!\n", a, b, c);
+                        }
+                    }
+                }
+            }
+#else
             LineGetter lineGetter(1<<15);
             const char newline = '\n';
             for (;;)
@@ -613,6 +691,7 @@ int main(int argc, char *argv[])
                         fflush(stdout);
                 }
             }
+#endif
         }
 
         return 0;
