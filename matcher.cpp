@@ -374,7 +374,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Backref(RegexSymbol *thisSymbol)
     readCapture(((RegexBackref*)thisSymbol)->index, multiple, pBackref);
     if (multiple == NON_PARTICIPATING_CAPTURE_GROUP)
     {
-        if (!emulate_ECMA_NPCGs)
+        if (!emulate_ECMA_NPCGs && thisSymbol->minCount != 0)
         {
             nonMatch();
             return;
