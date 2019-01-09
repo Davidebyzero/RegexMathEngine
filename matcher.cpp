@@ -29,7 +29,7 @@ void RegexMatcher<USE_STRINGS>::nonMatch(bool negativeLookahead)
 
     for (;;)
     {
-        if (*alternative && (stack.empty() || stack->okayToTryAlternatives(*this)))
+        if (*alternative && (stack.empty() || stack->okayToTryAlternatives(*this)) && groupStackTop->group->type != RegexGroup_Conditional)
         {
             alternative++;
             if (*alternative)
@@ -69,14 +69,32 @@ void RegexMatcher<USE_STRINGS>::pushStack()
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
 {
+    RegexPattern **alternativeTmp = group->alternatives;
+
+    if (group->type == RegexGroup_Conditional)
+    {
+        Uint64 multiple;
+        const char *pBackref;
+        readCapture(((RegexConditional*)group)->backrefIndex, multiple, pBackref);
+        if (multiple == NON_PARTICIPATING_CAPTURE_GROUP)
+        {
+            alternativeTmp++;
+            if (*alternativeTmp == NULL)
+            {
+                symbol++;
+                return;
+            }
+        }
+    }
+
+    alternative = alternativeTmp;
+    symbol = (*alternative)->symbols;
+
     groupStackTop++;
     groupStackTop->position    = position;
     groupStackTop->loopCount   = 1;
     groupStackTop->group       = group;
     groupStackTop->numCaptured = 0;
-
-    alternative = group->alternatives;
-    symbol      = group->alternatives[0]->symbols;
 
     stack.template push< Backtrack_EnterGroup<USE_STRINGS> >();
 
@@ -1412,6 +1430,13 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     case RegexGroup_Lookahead:          openSymbol=" (?="; break;
                     case RegexGroup_LookaheadMolecular: openSymbol=" (?*"; break;
                     case RegexGroup_NegativeLookahead:  openSymbol=" (?!"; break;
+                    case RegexGroup_Conditional:
+                        {
+                            char conditionalStr[strlength(" (?(4294967296)")+1];
+                            sprintf(conditionalStr, " (?(%u)", ((RegexConditional*)i->group)->backrefIndex + 1);
+                            openSymbol = conditionalStr;
+                            break;
+                        }
                     }
                     if (i > groupStackBase)
                     {

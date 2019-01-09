@@ -75,6 +75,7 @@ bool allow_empty_character_classes = true;
 bool allow_quantifiers_on_assertions = true;
 bool allow_molecular_lookahead = false;
 bool allow_atomic_groups = false;
+bool allow_conditionals = false;
 bool allow_reset_start = false;
 Uint optimizationLevel = 2;
 
@@ -117,6 +118,7 @@ Options:\n\
   -x EXT,EXT,...      Enable extensions. Currently available extensions are:\n\
                       ml   Molecular (non-atomic) lookahead: (?*...)\n\
                       ag   Atomic Grouping: (?>...)\n\
+                      cnd  Conditionals: (?(N)...|...) where N=backref number\n\
                       rs   Reset Start: \\K\n\
                       all  Enable all of the above extensions\n\
   -o                  Show only the part of the line that matched\n\
@@ -298,6 +300,12 @@ int main(int argc, char *argv[])
                         allow_atomic_groups = true;
                     }
                     else
+                    if (strncmp(s, "cnd", strlength("cnd"))==0)
+                    {
+                        s += strlength("cnd");
+                        allow_conditionals = true;
+                    }
+                    else
                     if (strncmp(s, "rs", strlength("rs"))==0)
                     {
                         s += strlength("rs");
@@ -309,6 +317,7 @@ int main(int argc, char *argv[])
                         s += strlength("all");
                         allow_molecular_lookahead = true;
                         allow_atomic_groups = true;
+                        allow_conditionals = true;
                         allow_reset_start = true;
                     }
                     else

@@ -385,6 +385,20 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                     case '=':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_Lookahead);          break;
                     case '*': if (!allow_molecular_lookahead) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_LookaheadMolecular); break;
                     case '!':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_NegativeLookahead);  break;
+                    case '(':
+                        if (!allow_conditionals)
+                            throw RegexParsingError(buf, "Unrecognized character after (?");
+                        buf+=2;
+                        if (inrange(*buf, '0', '9'))
+                        {
+                            group = new RegexConditional(readNumericConstant<Uint>(buf) - 1);
+                            if (*buf != ')')
+                                throw RegexParsingError(buf, "Missing closing parenthesis for condition");
+                            buf++;
+                        }
+                        else
+                            throw RegexParsingError(buf, "Backreference number expected in condition");
+                        break;
                     case '#':
                         buf+=2;
                         for (;;)
@@ -454,6 +468,8 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 break;
             }
         case '|':
+            if (stack->group->type == RegexGroup_Conditional && stack->alternatives.size() == 2)
+                throw RegexParsingError(buf, "Conditional group contains more than two branches");
             buf++;
             closeAlternative(stack->alternatives.back()->symbols, stack->symbols);
             stack->alternatives.push(new RegexPattern);
@@ -616,6 +632,8 @@ finished_parsing:
                 break;
             case RegexSymbol_Group:
                 RegexGroup *group = (RegexGroup*)(*thisSymbol);
+                if (group->type == RegexGroup_Conditional && ((RegexConditional*)group)->backrefIndex >= backrefIndex)
+                    throw RegexParsingError((*thisSymbol)->originalCode, "reference to non-existent capture group");
                 *groupStackTop++ = group;
                 thisAlternative = group->alternatives;
                 thisSymbol      = group->alternatives[0]->symbols;
