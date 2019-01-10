@@ -58,6 +58,8 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
 // strings mode
 //#define TEST_TRIPLES
 //#define TEST_MULTIPLICATION
+//#define TEST_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED
+//#define TEST_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED
 
 // numerical mode
 //#define TEST_NUMBERS_FIBONACCI
@@ -680,6 +682,39 @@ int main(int argc, char *argv[])
                     }
                 }
             }
+#elif defined(TEST_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED) || defined(TEST_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED)
+            const char *returnMatch;
+            size_t returnMatchLength;
+            Uint i;
+            const Uint maxZeroPadding = 4;
+            char str[maxZeroPadding + strlength("4294967295") + 1];
+            for (i=0; i<256; i++)
+                for (Uint j=0; j<=maxZeroPadding; j++)
+                {
+                    memset(str, '0', maxZeroPadding);
+                    sprintf(str+j, "%u", i);
+#   ifdef TEST_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED
+                    const bool shouldMatch = true;
+#   else
+                    const bool shouldMatch = j == 0;
+#   endif
+#   ifndef TEST_FOR_FALSE_POSITIVES
+                    if (!shouldMatch)
+                        continue;
+#   endif
+                    if (regex.MatchString(str, returnMatch, returnMatchLength) != shouldMatch)
+                        printf("%s - FALSE %s!\n", str, shouldMatch ? "NEGATIVE" : "POSITIVE");
+                }
+#   ifdef TEST_FOR_FALSE_POSITIVES
+            for (;; i++)
+                for (Uint j=0; j<=maxZeroPadding; j++)
+                {
+                    memset(str, '0', maxZeroPadding);
+                    sprintf(str+j, "%u", i);
+                    if (regex.MatchString(str, returnMatch, returnMatchLength))
+                        printf("%s - FALSE POSITIVE!\n", str);
+                }
+#   endif
 #else
             LineGetter lineGetter(1<<15);
             const char newline = '\n';
