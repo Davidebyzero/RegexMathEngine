@@ -105,24 +105,43 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::leaveGroup(Backtrack_LeaveGroup<USE_STRINGS> *pushStack, Uint64 pushPosition)
 {
+    RegexGroup *const group = groupStackTop->group;
+
     pushStack->position    = pushPosition;
     pushStack->loopCount   = groupStackTop->loopCount;
-    pushStack->group       = groupStackTop->group;
+    pushStack->group       = group;
     pushStack->numCaptured = groupStackTop->numCaptured;
-    pushStack->alternative = (Uint)(alternative - groupStackTop->group->alternatives);
+    pushStack->alternative = (Uint)(alternative - group->alternatives);
 
-    RegexGroup *group = groupStackTop->group;
+    Uint numCaptured;
+    if (enable_persistent_backrefs)
+    {
+        numCaptured = 0;
+        /*for (Uint i=1; i<=groupStackTop->numCaptured; i++)
+            if (captures[captureStackTop[-(int)i]] == NON_PARTICIPATING_CAPTURE_GROUP)
+                numCaptured++;*/
+    }
+
     if (group->type == RegexGroup_Capturing)
     {
         Uint backrefIndex = ((RegexGroupCapturing*)group)->backrefIndex;
+        Uint64 prevValue = captures[backrefIndex];
         writeCaptureRelative(backrefIndex, groupStackTop->position, position);
-        *captureStackTop++ = backrefIndex;
-        groupStackTop->numCaptured++;
+        if (!enable_persistent_backrefs || prevValue == NON_PARTICIPATING_CAPTURE_GROUP)
+        {
+            *captureStackTop++ = backrefIndex;
+            groupStackTop->numCaptured++;
+            if (enable_persistent_backrefs)
+                numCaptured++;
+        }
     }
 
-    alternative = groupStackTop->group->parentAlternative;
-    symbol      = groupStackTop->group->self + 1;
-    groupStackTop[-1].numCaptured += groupStackTop->numCaptured;
+    if (!enable_persistent_backrefs)
+        numCaptured = groupStackTop->numCaptured;
+
+    alternative = group->parentAlternative;
+    symbol      = group->self + 1;
+    groupStackTop[-1].numCaptured += numCaptured;
     groupStackTop--;
     currentMatch = ULLONG_MAX;
 }
@@ -130,7 +149,14 @@ void RegexMatcher<USE_STRINGS>::leaveGroup(Backtrack_LeaveGroup<USE_STRINGS> *pu
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::leaveLazyGroup()
 {
-    Backtrack_LeaveGroupLazily<USE_STRINGS> *pushStack = stack.template push< Backtrack_LeaveGroupLazily<USE_STRINGS> >();
+    Backtrack_LeaveGroupLazily<USE_STRINGS> *pushStack;
+    if (enable_persistent_backrefs && groupStackTop->group->type == RegexGroup_Capturing)
+    {
+        Backtrack_LeaveCaptureGroupLazily<USE_STRINGS> *pushStackCapture = stack.template push< Backtrack_LeaveCaptureGroupLazily<USE_STRINGS> >();
+        pushStackCapture->setCapture(*this);
+    }
+    else
+        pushStack = stack.template push< Backtrack_LeaveGroupLazily<USE_STRINGS> >();
     pushStack->positionDiff = position - groupStackTop->position;
     leaveGroup(pushStack, position);
 }
@@ -138,7 +164,35 @@ void RegexMatcher<USE_STRINGS>::leaveLazyGroup()
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::leaveMaxedOutGroup()
 {
-    leaveGroup(stack.template push< Backtrack_LeaveGroup<USE_STRINGS> >(), groupStackTop->position);
+    Backtrack_LeaveGroup<USE_STRINGS> *pushStack;
+    if (enable_persistent_backrefs && groupStackTop->group->type == RegexGroup_Capturing)
+    {
+        Backtrack_LeaveCaptureGroup<USE_STRINGS> *pushStackCapture = stack.template push< Backtrack_LeaveCaptureGroup<USE_STRINGS> >();
+        pushStackCapture->setCapture(*this);
+        pushStack = pushStackCapture;
+    }
+    else
+        pushStack = stack.template push< Backtrack_LeaveGroup<USE_STRINGS> >();
+    leaveGroup(pushStack, groupStackTop->position);
+}
+
+template <bool USE_STRINGS>
+Backtrack_LoopGroup<USE_STRINGS> *RegexMatcher<USE_STRINGS>::pushStack_LoopGroup()
+{
+    Uint64 size;
+    int set_numCaptured = -1;
+    if (!enable_persistent_backrefs)
+        size = Backtrack_LoopGroup<USE_STRINGS>::get_size(groupStackTop->numCaptured);
+    else
+    {
+        Uint backrefIndex = ((RegexGroupCapturing*)groupStackTop->group)->backrefIndex;
+        set_numCaptured = (groupStackTop->group->type == RegexGroup_Capturing && captures[backrefIndex] != NON_PARTICIPATING_CAPTURE_GROUP) ? 1 : 0;
+        size = Backtrack_LoopGroup<USE_STRINGS>::get_size(set_numCaptured);
+    }
+    Backtrack_LoopGroup<USE_STRINGS> *pushStack = stack.template push< Backtrack_LoopGroup<USE_STRINGS> >(size);
+    if (set_numCaptured >= 0)
+        pushStack->numCaptured = set_numCaptured;
+    return pushStack;
 }
 
 template <bool USE_STRINGS>
@@ -146,40 +200,64 @@ void *RegexMatcher<USE_STRINGS>::loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pus
 {
     groupStackTop->loopCount++;
 
-    Uint numCaptured = groupStackTop->numCaptured;
-    groupStackTop->numCaptured = 0;
+    pushLoop->position = pushPosition;
 
-    pushLoop->position    = pushPosition;
-    pushLoop->numCaptured = numCaptured;
+    const RegexGroup *group = groupStackTop->group;
 
-    const char *&dummy = (const char *&)pushLoop->buffer;
-    Uint64 *values = (Uint64*)pushLoop->buffer;
-    const char **offsets;
-    Uint *indexes;
-    if (!USE_STRINGS)
-        indexes = (Uint*)(values + numCaptured);
+    if (!enable_persistent_backrefs)
+    {
+        const Uint numCaptured = groupStackTop->numCaptured;
+        pushLoop->numCaptured = numCaptured;
+        groupStackTop->numCaptured = 0;
+
+        const char *&dummy = (const char *&)pushLoop->buffer;
+        Uint64 *values = (Uint64*)pushLoop->buffer;
+        const char **offsets;
+        Uint *indexes;
+        if (!USE_STRINGS)
+            indexes = (Uint*)(values + numCaptured);
+        else
+        {
+            offsets = (const char **)(values + numCaptured);
+            indexes = (Uint*)(offsets + numCaptured);
+        }
+        for (Uint i=0; i<numCaptured; i++)
+        {
+            indexes[i] = captureStackTop[(int)i - (int)numCaptured];
+            readCapture(indexes[i], values[i], USE_STRINGS ? offsets[i] : dummy);
+            if (!enable_persistent_backrefs)
+                captures[indexes[i]] = NON_PARTICIPATING_CAPTURE_GROUP;
+        }
+        captureStackTop -= numCaptured;
+    }
     else
+    if (group->type == RegexGroup_Capturing)
     {
-        offsets = (const char **)(values + numCaptured);
-        indexes = (Uint*)(offsets + numCaptured);
+        Uint backrefIndex = ((RegexGroupCapturing*)group)->backrefIndex;
+        if (pushLoop->numCaptured = captures[backrefIndex] != NON_PARTICIPATING_CAPTURE_GROUP)
+        {
+            const char *&dummy = (const char *&)pushLoop->buffer;
+            if (!USE_STRINGS)
+                readCapture(backrefIndex, *(Uint64*)(pushLoop->buffer                      ), dummy);
+            else
+                readCapture(backrefIndex, *(Uint64*)(pushLoop->buffer + sizeof(const char*)), *(const char**)pushLoop->buffer);
+        }
+        if (writeCaptureRelative(backrefIndex, groupStackTop->position, position) && pushLoop->numCaptured == 0)
+        {
+            *captureStackTop++ = backrefIndex;
+            groupStackTop->numCaptured++;
+        }
     }
-    for (Uint i=0; i<numCaptured; i++)
-    {
-        indexes[i] = captureStackTop[(int)i - (int)numCaptured];
-        readCapture(indexes[i], values[i], USE_STRINGS ? offsets[i] : dummy);
-        captures[indexes[i]] = NON_PARTICIPATING_CAPTURE_GROUP;
-    }
-    captureStackTop -= numCaptured;
 
-    alternative = groupStackTop->group->alternatives;
-    symbol      = groupStackTop->group->alternatives[0]->symbols;
+    alternative = group->alternatives;
+    symbol      = group->alternatives[0]->symbols;
     groupStackTop->position = position;
     currentMatch = ULLONG_MAX;
 
     pushLoop->oldPosition = oldPosition;
     pushLoop->alternative = alternativeNum;
 
-    if (groupStackTop->group->type == RegexGroup_Atomic)
+    if (group->type == RegexGroup_Atomic)
         stack.template push< Backtrack_BeginAtomicGroup<USE_STRINGS> >();
 
     return (void*)pushLoop->buffer;
@@ -200,6 +278,11 @@ template<> void RegexMatcher<true>::initInput(Uint64 _input, Uint numCaptureGrou
     captureOffsets = new const char * [numCaptureGroups];
     for (Uint i=0; i<numCaptureGroups; i++)
         captureOffsets[i] = stringToMatchAgainst;
+    if (enable_persistent_backrefs)
+    {
+        delete [] captureOffsetsAtomicTmp;
+        captureOffsetsAtomicTmp = new const char * [numCaptureGroups];
+    }
 }
 
 template<> bool RegexMatcher<false>::doesRepetendMatch(const char *pBackref, Uint64 multiple, Uint64 count)
@@ -1229,6 +1312,48 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
     }
 }
 
+template<>
+void RegexMatcher<false>::writeCaptureAtomicTmp(captureTuple capture)
+{
+    if (!captureIndexUsedAtomicTmp[capture.index])
+    {
+        captureIndexUsedAtomicTmp[capture.index] = true;
+        captureIndexesAtomicTmp[captureIndexNumUsedAtomicTmp++] = capture.index;
+    }
+    capturesAtomicTmp[capture.index] = capture.length;
+}
+
+template<>
+void RegexMatcher<true>::writeCaptureAtomicTmp(captureTuple capture)
+{
+    if (!captureIndexUsedAtomicTmp[capture.index])
+    {
+        captureIndexUsedAtomicTmp[capture.index] = true;
+        captureIndexesAtomicTmp[captureIndexNumUsedAtomicTmp++] = capture.index;
+    }
+    capturesAtomicTmp[capture.index] = capture.length;
+    captureOffsetsAtomicTmp[capture.index] = capture.offset;
+}
+
+template<>
+void RegexMatcher<false>::readCaptureAtomicTmp(Uint i, Uint &index, Uint64 &length, const char *&offset)
+{
+    Uint backrefIndex = captureIndexesAtomicTmp[i];
+    index = backrefIndex;
+    length = capturesAtomicTmp[backrefIndex];
+    captureIndexUsedAtomicTmp[backrefIndex] = false; // erase this capture from the temporary list (but leave it to the caller to do the final step)
+}
+
+template<>
+void RegexMatcher<true>::readCaptureAtomicTmp(Uint i, Uint &index, Uint64 &length, const char *&offset)
+{
+    Uint backrefIndex = captureIndexesAtomicTmp[i];
+    index = backrefIndex;
+    length = capturesAtomicTmp[backrefIndex];
+    offset = captureOffsetsAtomicTmp[backrefIndex];
+    captureIndexUsedAtomicTmp[backrefIndex] = false; // erase this capture from the temporary list (but leave it to the caller to do the final step)
+}
+
 template <bool USE_STRINGS>
 bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength)
 {
@@ -1240,6 +1365,18 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 
     delete [] captures;
     captures = new Uint64 [numCaptureGroups];
+
+    if (enable_persistent_backrefs)
+    {
+        delete [] captureIndexUsedAtomicTmp;
+        captureIndexUsedAtomicTmp = new bool [numCaptureGroups];
+        delete [] captureIndexesAtomicTmp;
+        captureIndexesAtomicTmp = new Uint [numCaptureGroups];
+        delete [] capturesAtomicTmp;
+        captureIndexNumUsedAtomicTmp = 0;
+        capturesAtomicTmp = new Uint64 [numCaptureGroups];
+        memset(captureIndexUsedAtomicTmp, false, numCaptureGroups * sizeof(bool));
+    }
 
     delete [] captureStackBase;
     captureStackBase = new Uint[numCaptureGroups];
@@ -1290,17 +1427,25 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     for (GroupStackNode *groupStackOldTop = groupStackTop;;)
                     {
                         bool done = groupStackTop == groupStackOldTop && stack->isAtomicGroup();
-                        numCapturedDelta += stack->popForAtomicCapture(*this);
+                        int numCaptured = stack->popForAtomicCapture(*this);
+                        numCapturedDelta += numCaptured;
+                        if (enable_persistent_backrefs)
+                            for (int i=0; i<numCaptured; i++)
+                                writeCaptureAtomicTmp(stack->popForAtomicForwardCapture(*this, i));
                         stack.pop(*this);
                         if (done)
                             break;
                     }
 
+                    // the following is needed for atomic lookahead but not for atomic groups... todo: reacquaint myself with the reason for this, and make the two more similar if it makes sense to do so
+                    //groupStackTop->numCaptured += enable_persistent_backrefs ? captureIndexNumUsedAtomicTmp : numCapturedDelta;
+
                     if (numCapturedDelta)
                     {
-                        Backtrack_AtomicCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_AtomicCapture<USE_STRINGS> >();
-                        pushStack->numCaptured       = numCapturedDelta;
+                        Backtrack_AtomicCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_AtomicCapture<USE_STRINGS> >(Backtrack_AtomicCapture<USE_STRINGS>::get_size(enable_persistent_backrefs ? captureIndexNumUsedAtomicTmp : numCapturedDelta));
+                        pushStack->numCaptured       = numCapturedDelta; // will be overridding by "transfer" call below if we're in enable_persistent_backrefs mode
                         pushStack->parentAlternative = group->parentAlternative;
+                        pushStack->transfer(*this);
                     }
                 }
                 else
@@ -1313,19 +1458,24 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     GroupStackNode *groupStackOldTop = groupStackTop;
                     do
                     {
-                        numCapturedDelta += stack->popForAtomicCapture(*this);
+                        int numCaptured = stack->popForAtomicCapture(*this);
+                        numCapturedDelta += numCaptured;
+                        if (enable_persistent_backrefs)
+                            for (int i=0; i<numCaptured; i++)
+                                writeCaptureAtomicTmp(stack->popForAtomicForwardCapture(*this, i));
                         stack.pop(*this);
                     }
                     while (groupStackTop >= groupStackOldTop);
 
+                    groupStackTop->numCaptured += enable_persistent_backrefs ? captureIndexNumUsedAtomicTmp : numCapturedDelta;
+
                     if (numCapturedDelta)
                     {
-                        Backtrack_AtomicCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_AtomicCapture<USE_STRINGS> >();
-                        pushStack->numCaptured       = numCapturedDelta;
+                        Backtrack_AtomicCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_AtomicCapture<USE_STRINGS> >(Backtrack_AtomicCapture<USE_STRINGS>::get_size(enable_persistent_backrefs ? captureIndexNumUsedAtomicTmp : numCapturedDelta));
+                        pushStack->numCaptured       = numCapturedDelta; // will be overridding by "transfer" call below if we're in enable_persistent_backrefs mode
                         pushStack->parentAlternative = group->parentAlternative;
+                        pushStack->transfer(*this);
                     }
-
-                    groupStackTop->numCaptured += numCapturedDelta;
 
                     alternative = group->parentAlternative;
                     symbol      = group->self + 1;
@@ -1378,7 +1528,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || group->maxCount == UINT_MAX && groupStackTop->loopCount >= group->minCount && position == groupStackTop->position)
                     leaveMaxedOutGroup();
                 else
-                    loopGroup(stack.template push< Backtrack_LoopGroup<USE_STRINGS> >(Backtrack_LoopGroup<USE_STRINGS>::get_size(groupStackTop->numCaptured)), position, groupStackTop->position, (Uint)(alternative - groupStackTop->group->alternatives));
+                    loopGroup(pushStack_LoopGroup(), position, groupStackTop->position, (Uint)(alternative - groupStackTop->group->alternatives));
                 continue;
             }
             if (debugTrace)
@@ -1498,18 +1648,33 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
     return match > 0;
 }
 
-void RegexMatcher<false>::fprintCapture(FILE *f, Uint i, Uint64 length, const char *offset)
+template <>
+void RegexMatcher<false>::fprintCapture(FILE *f, Uint64 length, const char *offset)
 {
-    fprintf(f, "\\%u=%llu", i+1, length);
+    if (length == NON_PARTICIPATING_CAPTURE_GROUP)
+        fputs("NPCG", f);
+    else
+        fprintf(f, "%llu", length);
 }
+template <>
 void RegexMatcher<false>::fprintCapture(FILE *f, Uint i)
 {
-    fprintf(f, "\\%u=%llu", i+1, captures[i]);
+    fprintf(f, "\\%u=", i+1);
+    if (captures[i] == NON_PARTICIPATING_CAPTURE_GROUP)
+        fputs("NPCG", f);
+    else
+        fprintf(f, "%llu", captures[i]);
 }
 
-void RegexMatcher<true>::fprintCapture(FILE *f, Uint i, Uint64 length, const char *offset)
+template <>
+void RegexMatcher<true>::fprintCapture(FILE *f, Uint64 length, const char *offset)
 {
-    fprintf(f, "\\%u=\"", i+1);
+    if (length == NON_PARTICIPATING_CAPTURE_GROUP)
+    {
+        fputs("NPCG", f);
+        return;
+    }
+    fputc('\"', f);
     const char *s = offset;
     for (Uint64 len=length; len!=0; len--)
     {
@@ -1525,9 +1690,11 @@ void RegexMatcher<true>::fprintCapture(FILE *f, Uint i, Uint64 length, const cha
     }
     fprintf(f, "\" (%llu:%llu)", offset - stringToMatchAgainst, length);
 }
+template <>
 void RegexMatcher<true>::fprintCapture(FILE *f, Uint i)
 {
-    fprintCapture(f, i, captures[i], captureOffsets[i]);
+    fprintf(f, "\\%u=", i+1);
+    fprintCapture(f, captures[i], captureOffsets[i]);
 }
 
 template bool RegexMatcher<false>::Match(RegexGroup &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);

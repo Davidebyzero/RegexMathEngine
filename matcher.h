@@ -88,6 +88,14 @@ public:
 #endif
 };
 
+struct captureTuple
+{
+    Uint64 length;
+    const char *offset;
+    Uint index;
+    captureTuple(Uint64 length, const char *offset, Uint index) : length(length), offset(offset), index(index) {}
+};
+
 template <bool>
 struct RegexMatcherBase
 {
@@ -105,6 +113,7 @@ struct RegexMatcherBase<true>
 {
     const char *stringToMatchAgainst;
     const char **captureOffsets;
+    const char **captureOffsetsAtomicTmp; // only used with enable_persistent_backrefs
 };
 
 template <bool USE_STRINGS>
@@ -117,6 +126,8 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     friend class Backtrack_EnterGroup<USE_STRINGS>;
     friend class Backtrack_LeaveGroup<USE_STRINGS>;
     friend class Backtrack_LeaveGroupLazily<USE_STRINGS>;
+    friend class Backtrack_LeaveCaptureGroup_Base<false, USE_STRINGS>;
+    friend class Backtrack_LeaveCaptureGroup_Base<true , USE_STRINGS>;
     friend class Backtrack_LeaveMolecularLookahead<USE_STRINGS>;
     friend class Backtrack_LoopGroup<USE_STRINGS>;
     friend class Backtrack_TryMatch<USE_STRINGS>;
@@ -128,6 +139,10 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
 
     Uint64 input;
     Uint64 *captures;
+    Uint captureIndexNumUsedAtomicTmp; // only used with enable_persistent_backrefs
+    bool *captureIndexUsedAtomicTmp; // only used with enable_persistent_backrefs
+    Uint *captureIndexesAtomicTmp; // only used with enable_persistent_backrefs
+    Uint64 *capturesAtomicTmp; // only used with enable_persistent_backrefs
 
     Backtrack<USE_STRINGS> stack;
     Uint *captureStackBase;
@@ -152,12 +167,16 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void leaveGroup(Backtrack_LeaveGroup<USE_STRINGS> *pushStack, Uint64 pushPosition);
     void leaveLazyGroup();
     void leaveMaxedOutGroup();
+    Backtrack_LoopGroup<USE_STRINGS> *pushStack_LoopGroup();
     void *loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pushLoop, Uint64 pushPosition, Uint64 oldPosition, Uint alternativeNum);
 
     inline void initInput(Uint64 _input, Uint numCaptureGroups);
     inline void  readCapture(Uint index, Uint64 &multiple, const char *&pBackref);
     inline void writeCapture(Uint index, Uint64  multiple, const char * pBackref);
-    inline void writeCaptureRelative(Uint index, Uint64 start, Uint64 end);
+    inline bool writeCaptureRelative(Uint index, Uint64 start, Uint64 end); // returns true iff this changes the capture's value
+
+    void writeCaptureAtomicTmp(captureTuple capture);
+    void  readCaptureAtomicTmp(Uint i, Uint &index, Uint64 &length, const char *&offset);
 
     inline bool doesRepetendMatchOnce(const char *pBackref, Uint64 multiple, Uint64 count);
     inline bool doesRepetendMatchOnce(bool (*matchFunction)(Uchar ch), Uint64 multiple, Uint64 count);
@@ -204,7 +223,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     inline void virtualizeSymbols(RegexGroup *rootGroup);
 
     inline void fprintCapture(FILE *f, Uint i);
-    inline void fprintCapture(FILE *f, Uint i, Uint64 length, const char *offset);
+    inline void fprintCapture(FILE *f, Uint64 length, const char *offset);
 
 public:
     inline RegexMatcher();
@@ -232,14 +251,19 @@ template<> inline void RegexMatcher<true>::writeCapture(Uint index, Uint64 multi
     captureOffsets[index] = pBackref;
 }
 
-template<> inline void RegexMatcher<false>::writeCaptureRelative(Uint index, Uint64 start, Uint64 end)
+template<> inline bool RegexMatcher<false>::writeCaptureRelative(Uint index, Uint64 start, Uint64 end)
 {
+    Uint64 prevLength = captures[index];
     captures[index] = end - start;
+    return captures[index] != prevLength;
 }
-template<> inline void RegexMatcher<true>::writeCaptureRelative(Uint index, Uint64 start, Uint64 end)
+template<> inline bool RegexMatcher<true>::writeCaptureRelative(Uint index, Uint64 start, Uint64 end)
 {
+    Uint64      prevLength = captures      [index];
+    const char *prevOffset = captureOffsets[index];
     captures      [index] = end - start;
     captureOffsets[index] = stringToMatchAgainst + start;
+    return captures[index] != prevLength || captureOffsets[index] != prevOffset;
 }
 
 class GroupStackNode
@@ -258,6 +282,8 @@ class GroupStackNode
     friend class Backtrack_LeaveGroup<true>;
     friend class Backtrack_LeaveGroupLazily<false>;
     friend class Backtrack_LeaveGroupLazily<true>;
+    friend class Backtrack_LeaveCaptureGroup_Base<true, false>;
+    friend class Backtrack_LeaveCaptureGroup_Base<true, true >;
     friend class Backtrack_LeaveMolecularLookahead<false>;
     friend class Backtrack_LeaveMolecularLookahead<true>;
     friend class Backtrack_LoopGroup<false>;
@@ -282,8 +308,6 @@ class GroupStackNode
     Uint numCaptured; // how many capture groups inside this group (including nested groups) have been pushed onto the capture stack
 };
 
-template <bool> class Backtrack_ConnectingChunk;
-
 template <bool USE_STRINGS>
 class BacktrackNode
 {
@@ -293,6 +317,7 @@ class BacktrackNode
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)=0; // returns true if the popping can finish with this one
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)=0;
     virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)=0; // returns the numCaptured delta
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)=0;
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)=0;
     virtual bool isAtomicGroup()
     {
@@ -377,43 +402,178 @@ void Backtrack<USE_STRINGS>::fprint(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
     }
 }
 
+#pragma warning(push)
+#pragma warning(disable : 4700) // for passing "offsets" to fprintCapture() with USE_STRINGS=false
+
 template <bool USE_STRINGS>
 class Backtrack_AtomicCapture : public BacktrackNode<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
-    Uint numCaptured;
     RegexPattern **parentAlternative;
+    Uint numCaptured;
+    Uint8 buffer[1]; // variable number of elements
+
+    static size_t get_size(Uint numCaptured)
+    {
+        return (size_t)&((Backtrack_AtomicCapture*)0)->buffer + (enable_persistent_backrefs ? (sizeof(Uint64) + (USE_STRINGS ? sizeof(const char*) : 0) + sizeof(Uint))*numCaptured : 0);
+    }
 
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
     {
-        return sizeof(*this);
+        return get_size(numCaptured);
     }
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
-        for (Uint i=0; i<numCaptured; i++)
-            matcher.captures[*--matcher.captureStackTop] = NON_PARTICIPATING_CAPTURE_GROUP;
-        matcher.groupStackTop->numCaptured -= numCaptured;
+        if (enable_persistent_backrefs)
+        {
+            const Uint64 *values = (Uint64*)buffer;
+            const char **offsets;
+            const Uint *indexes;
+            if (!USE_STRINGS)
+                indexes = (Uint*)(values + numCaptured);
+            else
+            {
+                offsets = (const char **)(values + numCaptured);
+                indexes = (Uint*)(offsets + numCaptured);
+            }
+
+            for (Uint i=0; i<numCaptured; i++)
+            {
+                matcher.writeCapture(indexes[i], values[i], USE_STRINGS ? offsets[i] : NULL);
+                if (values[i] == NON_PARTICIPATING_CAPTURE_GROUP)
+                {
+#ifdef _DEBUG
+                    if (matcher.captureStackTop[-1] != indexes[i])
+                        THROW_ENGINEBUG;
+#endif
+                    matcher.captureStackTop--;
+                    matcher.groupStackTop->numCaptured--;
+                }
+            }
+        }
+        else
+        {
+            for (Uint i=0; i<numCaptured; i++)
+                matcher.captures[*--matcher.captureStackTop] = NON_PARTICIPATING_CAPTURE_GROUP;
+            matcher.groupStackTop->numCaptured -= numCaptured;
+        }
         matcher.alternative = parentAlternative;
         return false;
     }
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
     {
-        for (Uint i=0; i<numCaptured; i++)
-            matcher.captures[*--matcher.captureStackTop] = NON_PARTICIPATING_CAPTURE_GROUP;
+        if (enable_persistent_backrefs)
+        {
+            const Uint64 *values = (Uint64*)buffer;
+            const char **offsets;
+            const Uint *indexes;
+            if (!USE_STRINGS)
+                indexes = (Uint*)(values + numCaptured);
+            else
+            {
+                offsets = (const char **)(values + numCaptured);
+                indexes = (Uint*)(offsets + numCaptured);
+            }
+
+            for (Uint i=0; i<numCaptured; i++)
+            {
+                if (values[i] == NON_PARTICIPATING_CAPTURE_GROUP)
+                {
+#ifdef _DEBUG
+                    if (matcher.captureStackTop[-1] != indexes[i])
+                        THROW_ENGINEBUG;
+#endif
+                    matcher.captureStackTop--;
+                    matcher.groupStackTop->numCaptured--;
+                }
+            }
+        }
+        else
+        {
+            for (Uint i=0; i<numCaptured; i++)
+                matcher.captures[*--matcher.captureStackTop] = NON_PARTICIPATING_CAPTURE_GROUP;
+        }
     }
     virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
         return (int)numCaptured;
     }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
+    {
+        const Uint64 *values = (Uint64*)buffer;
+        const char **offsets;
+        const Uint *indexes;
+        if (!USE_STRINGS)
+            indexes = (Uint*)(values + numCaptured);
+        else
+        {
+            offsets = (const char **)(values + numCaptured);
+            indexes = (Uint*)(offsets + numCaptured);
+        }
+
+        return USE_STRINGS ? captureTuple(values[captureNum], offsets[captureNum], indexes[captureNum])
+                           : captureTuple(values[captureNum], NULL               , indexes[captureNum]);
+    }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
         return false;
     }
+
+    void transfer(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        if (!enable_persistent_backrefs)
+            return;
+
+        numCaptured = matcher.captureIndexNumUsedAtomicTmp;
+
+        const char *&dummy = (const char *&)buffer;
+        Uint64 *values = (Uint64*)buffer;
+        const char **offsets;
+        Uint *indexes;
+        if (!USE_STRINGS)
+            indexes = (Uint*)(values + numCaptured);
+        else
+        {
+            offsets = (const char **)(values + numCaptured);
+            indexes = (Uint*)(offsets + numCaptured);
+        }
+
+        for (Uint i=0; i<matcher.captureIndexNumUsedAtomicTmp; i++)
+            matcher.readCaptureAtomicTmp(i, indexes[i], values[i], USE_STRINGS ? offsets[i] : dummy);
+        matcher.captureIndexNumUsedAtomicTmp = 0;
+    }
+
     virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
     {
-        fprintf(f, "Backtrack_AtomicCapture: numCaptured=%u\n", numCaptured);
+        fputs("Backtrack_AtomicCapture: ", f);
+        if (!enable_persistent_backrefs)
+            fprintf(f, "numCaptured=%u\n", numCaptured);
+        else
+        {
+            const Uint64 *values = (Uint64*)buffer;
+            const char **offsets;
+            const Uint *indexes;
+            if (!USE_STRINGS)
+                indexes = (Uint*)(values + numCaptured);
+            else
+            {
+                offsets = (const char **)(values + numCaptured);
+                indexes = (Uint*)(offsets + numCaptured);
+            }
+
+            for (Uint i=0; i<numCaptured; i++)
+            {
+                if (i != 0)
+                    fputs(", ", f);
+                fprintf(f, "\\%u=", indexes[i]+1);
+                matcher.fprintCapture(f, values[i], USE_STRINGS ? offsets[i] : NULL);
+            }
+            fputc('\n', f);
+        }
     }
 };
+
+#pragma warning(pop)
 
 template <bool USE_STRINGS>
 class Backtrack_SkipGroup : public BacktrackNode<USE_STRINGS>
@@ -440,6 +600,10 @@ class Backtrack_SkipGroup : public BacktrackNode<USE_STRINGS>
     {
         return 0;
     }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
+    {
+        __assume(0);
+    }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
         return false;
@@ -461,7 +625,7 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
     {
         RegexGroup *group = matcher.groupStackTop->group;
 #ifdef _DEBUG
-        if (matcher.groupStackTop->numCaptured)
+        if (enable_persistent_backrefs ? matcher.groupStackTop->numCaptured != (matcher.groupStackTop->loopCount > 1) : matcher.groupStackTop->numCaptured)
             THROW_ENGINEBUG;
 #endif
         matcher.groupStackTop--;
@@ -491,6 +655,10 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
         matcher.groupStackTop--;
         return 0;
     }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
+    {
+        __assume(0);
+    }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
         return true;
@@ -518,6 +686,10 @@ class Backtrack_BeginAtomicGroup : public BacktrackNode<USE_STRINGS>
     virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
         return 0;
+    }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
+    {
+        __assume(0);
     }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -567,6 +739,10 @@ class Backtrack_LeaveMolecularLookahead : public BacktrackNode<USE_STRINGS>
         matcher.groupStackTop->group = group;
         return 0;
     }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
+    {
+        __assume(0);
+    }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
         return false;
@@ -600,9 +776,12 @@ class Backtrack_LeaveGroup : public BacktrackNode<USE_STRINGS>
 #endif
         }
     }
-
 protected:
     RegexGroup *group;
+
+    virtual void popCapture(RegexMatcher<USE_STRINGS> &matcher)
+    {
+    }
 
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -615,8 +794,13 @@ protected:
         matcher.groupStackTop->loopCount   = loopCount;
         matcher.groupStackTop->group       = group;
         matcher.groupStackTop->numCaptured = numCaptured;
-        matcher.groupStackTop[-1].numCaptured -= numCaptured;
-        popCaptureGroup(matcher);
+        if (enable_persistent_backrefs)
+            popCapture(matcher);
+        else
+        {
+            matcher.groupStackTop[-1].numCaptured -= numCaptured;
+            popCaptureGroup(matcher);
+        }
         if (group->type == RegexGroup_Atomic)
         {
             matcher.alternative = &nullAlternative;
@@ -629,13 +813,20 @@ protected:
     {
         matcher.groupStackTop++;
         matcher.groupStackTop->group = group;
-        popCaptureGroup(matcher);
+        if (enable_persistent_backrefs)
+            popCapture(matcher);
+        else
+            popCaptureGroup(matcher);
     }
     virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
         matcher.groupStackTop++;
         matcher.groupStackTop->group = group;
         return group->type == RegexGroup_Capturing ? 1 : 0;
+    }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
+    {
+        __assume(0);
     }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -672,11 +863,12 @@ class Backtrack_LeaveGroupLazily : public Backtrack_LeaveGroup<USE_STRINGS>
         {
             matcher.position = matcher.groupStackTop->position -= positionDiff;
             matcher.alternative = &nullAlternative;
+            popCapture(matcher);
             return false;
         }
 
         matcher.position = matcher.groupStackTop->position;
-        matcher.loopGroup(matcher.stack.template push< Backtrack_LoopGroup<USE_STRINGS> >(Backtrack_LoopGroup<USE_STRINGS>::get_size(matcher.groupStackTop->numCaptured)), matcher.position, matcher.position - positionDiff, (Uint)(matcher.alternative - matcher.groupStackTop->group->alternatives));
+        matcher.loopGroup(matcher.pushStack_LoopGroup(), matcher.position, matcher.position - positionDiff, (Uint)(matcher.alternative - matcher.groupStackTop->group->alternatives));
         return true;
     }
     virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
@@ -684,6 +876,142 @@ class Backtrack_LeaveGroupLazily : public Backtrack_LeaveGroup<USE_STRINGS>
         fputs("Backtrack_LeaveGroupLazily", f);
         Backtrack_LeaveGroup::fprintDebugBase(matcher, f);
         fprintf(f, ", positionDiff=%llu\n", positionDiff);
+    }
+};
+
+template <bool FORWARD_CAPTURE, bool USE_STRINGS> class Backtrack_LeaveCaptureGroup_Base;
+template <> class Backtrack_LeaveCaptureGroup_Base<false, false> {};
+template <> class Backtrack_LeaveCaptureGroup_Base<false, true > {};
+template <> class Backtrack_LeaveCaptureGroup_Base<true, false> // only used in enable_persistent_backrefs mode
+{
+    friend class RegexMatcher                     <false>;
+    friend class Backtrack_LeaveCaptureGroup      <false>;
+    friend class Backtrack_LeaveCaptureGroupLazily<false>;
+    Uint64 length;
+
+    void setCapture(RegexMatcher<false> &matcher)
+    {
+        length = matcher.captures[((RegexGroupCapturing*)matcher.groupStackTop->group)->backrefIndex];
+    }
+    void popCapture(RegexMatcher<false> &matcher)
+    {
+        Uint backrefIndex = ((RegexGroupCapturing*)matcher.groupStackTop->group)->backrefIndex;
+        matcher.captures[backrefIndex] = length;
+        if (length == NON_PARTICIPATING_CAPTURE_GROUP)
+        {
+#ifdef _DEBUG
+            if (matcher.captureStackTop[-1] != backrefIndex)
+                THROW_ENGINEBUG;
+#endif
+            matcher.captureStackTop--;
+            matcher.groupStackTop[-1].numCaptured--;
+        }
+    }
+    captureTuple popForAtomicForwardCapture(RegexMatcher<false> &matcher, Uint captureNum)
+    {
+        return captureTuple(length, NULL, ((RegexGroupCapturing*)matcher.groupStackTop->group)->backrefIndex);
+    }
+};
+template <> class Backtrack_LeaveCaptureGroup_Base<true, true> // only used in enable_persistent_backrefs mode
+{
+    friend class RegexMatcher                     <true>;
+    friend class Backtrack_LeaveCaptureGroup      <true>;
+    friend class Backtrack_LeaveCaptureGroupLazily<true>;
+    Uint64 length;
+    const char *offset;
+
+    void setCapture(RegexMatcher<true> &matcher)
+    {
+        offset = matcher.captureOffsets[((RegexGroupCapturing*)matcher.groupStackTop->group)->backrefIndex];
+        length = matcher.captures      [((RegexGroupCapturing*)matcher.groupStackTop->group)->backrefIndex];
+    }
+    void popCapture(RegexMatcher<true> &matcher)
+    {
+        Uint backrefIndex = ((RegexGroupCapturing*)matcher.groupStackTop->group)->backrefIndex;
+        matcher.captures[backrefIndex] = length;
+        if (length == NON_PARTICIPATING_CAPTURE_GROUP)
+        {
+#ifdef _DEBUG
+            if (matcher.captureStackTop[-1] != backrefIndex)
+                THROW_ENGINEBUG;
+#endif
+            matcher.captureStackTop--;
+            matcher.groupStackTop[-1].numCaptured--;
+        }
+        else
+            matcher.captureOffsets[backrefIndex] = offset;
+    }
+    captureTuple popForAtomicForwardCapture(RegexMatcher<true> &matcher, Uint captureNum)
+    {
+        return captureTuple(length, offset, ((RegexGroupCapturing*)matcher.groupStackTop->group)->backrefIndex);
+    }
+};
+
+template <>
+class Backtrack_LeaveCaptureGroup<false> : public Backtrack_LeaveGroup<false>, public Backtrack_LeaveCaptureGroup_Base<true, false> // only used in enable_persistent_backrefs mode
+{
+    virtual void popCapture(RegexMatcher<false> &matcher)
+    {
+        return Backtrack_LeaveCaptureGroup_Base::popCapture(matcher);
+    }
+    virtual size_t getSize(RegexMatcher<false> &matcher)
+    {
+        return sizeof(*this);
+    }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<false> &matcher, Uint captureNum)
+    {
+        return Backtrack_LeaveCaptureGroup_Base::popForAtomicForwardCapture(matcher, captureNum);
+    }
+};
+
+template <>
+class Backtrack_LeaveCaptureGroupLazily<false> : public Backtrack_LeaveGroupLazily<false>, public Backtrack_LeaveCaptureGroup_Base<true, false> // only used in enable_persistent_backrefs mode
+{
+    virtual void popCapture(RegexMatcher<false> &matcher)
+    {
+        return Backtrack_LeaveCaptureGroup_Base::popCapture(matcher);
+    }
+    virtual size_t getSize(RegexMatcher<false> &matcher)
+    {
+        return sizeof(*this);
+    }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<false> &matcher, Uint captureNum)
+    {
+        return Backtrack_LeaveCaptureGroup_Base::popForAtomicForwardCapture(matcher, captureNum);
+    }
+};
+
+template <>
+class Backtrack_LeaveCaptureGroup<true> : public Backtrack_LeaveGroup<true>, public Backtrack_LeaveCaptureGroup_Base<true, true> // only used in enable_persistent_backrefs mode
+{
+    virtual void popCapture(RegexMatcher<true> &matcher)
+    {
+        return Backtrack_LeaveCaptureGroup_Base::popCapture(matcher);
+    }
+    virtual size_t getSize(RegexMatcher<true> &matcher)
+    {
+        return sizeof(*this);
+    }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<true> &matcher, Uint captureNum)
+    {
+        return Backtrack_LeaveCaptureGroup_Base::popForAtomicForwardCapture(matcher, captureNum);
+    }
+};
+
+template <>
+class Backtrack_LeaveCaptureGroupLazily<true> : public Backtrack_LeaveGroupLazily<true>, public Backtrack_LeaveCaptureGroup_Base<true, true> // only used in enable_persistent_backrefs mode
+{
+    virtual void popCapture(RegexMatcher<true> &matcher)
+    {
+        return Backtrack_LeaveCaptureGroup_Base::popCapture(matcher);
+    }
+    virtual size_t getSize(RegexMatcher<true> &matcher)
+    {
+        return sizeof(*this);
+    }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<true> &matcher, Uint captureNum)
+    {
+        return Backtrack_LeaveCaptureGroup_Base::popForAtomicForwardCapture(matcher, captureNum);
     }
 };
 
@@ -705,7 +1033,9 @@ protected:
 
     static size_t get_size(Uint numCaptured)
     {
-        return (size_t)&((Backtrack_LoopGroup*)0)->buffer + (sizeof(Uint64) + (USE_STRINGS ? sizeof(const char*) : 0) + sizeof(Uint))*numCaptured;
+        return (size_t)&((Backtrack_LoopGroup*)0)->buffer +
+            (enable_persistent_backrefs ? (sizeof(Uint64) + (USE_STRINGS ? sizeof(const char*) : 0)               )*numCaptured
+                                        : (sizeof(Uint64) + (USE_STRINGS ? sizeof(const char*) : 0) + sizeof(Uint))*numCaptured);
     }
 
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
@@ -714,59 +1044,104 @@ protected:
     }
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
-        Uint64 *values = (Uint64*)buffer;
-        const char **offsets;
-        Uint *indexes;
-        if (!USE_STRINGS)
-            indexes = (Uint*)(values + numCaptured);
-        else
+        const RegexGroup *group = matcher.groupStackTop->group;
+        if (!enable_persistent_backrefs)
         {
-            offsets = (const char **)(values + numCaptured);
-            indexes = (Uint*)(offsets + numCaptured);
-        }
+            const Uint64 *values = (Uint64*)buffer;
+            const char **offsets;
+            const Uint *indexes;
+            if (!USE_STRINGS)
+                indexes = (Uint*)(values + numCaptured);
+            else
+            {
+                offsets = (const char **)(values + numCaptured);
+                indexes = (Uint*)(offsets + numCaptured);
+            }
 
 #ifdef _DEBUG
-        if (matcher.groupStackTop->numCaptured)
-            THROW_ENGINEBUG;
+            if (matcher.groupStackTop->numCaptured)
+                THROW_ENGINEBUG;
 #endif
-        matcher.groupStackTop->position    = position;
-        matcher.groupStackTop->numCaptured = numCaptured;
-        matcher.groupStackTop->loopCount--;
+            matcher.groupStackTop->numCaptured = numCaptured;
 
-        for (Uint i=0; i<numCaptured; i++)
-        {
-            *matcher.captureStackTop++ = indexes[i];
-            matcher.writeCapture(indexes[i], values[i], USE_STRINGS ? offsets[i] : NULL);
+            for (Uint i=0; i<numCaptured; i++)
+            {
+                *matcher.captureStackTop++ = indexes[i];
+                matcher.writeCapture(indexes[i], values[i], USE_STRINGS ? offsets[i] : NULL);
+            }
         }
+        else
+        if (group->type == RegexGroup_Capturing)
+        {
+            Uint backrefIndex = ((RegexGroupCapturing*)group)->backrefIndex;
+            if (numCaptured != 0)
+            {
+                const char *&dummy = (const char *&)buffer;
+                if (!USE_STRINGS)
+                    matcher.writeCapture(backrefIndex, *(Uint64*)(buffer                      ), dummy);
+                else
+                    matcher.writeCapture(backrefIndex, *(Uint64*)(buffer + sizeof(const char*)), *(const char**)buffer);
+            }
+            else
+            {
+#ifdef _DEBUG
+                if (matcher.captureStackTop[-1] != backrefIndex)
+                    THROW_ENGINEBUG;
+#endif
+                matcher.captures[backrefIndex] = NON_PARTICIPATING_CAPTURE_GROUP;
+                matcher.captureStackTop--;
+                matcher.groupStackTop->numCaptured--;
+            }
+        }
+        matcher.groupStackTop->position = position;
+        matcher.groupStackTop->loopCount--;
 
         matcher.alternative = matcher.groupStackTop->group->alternatives + alternative;
         matcher.groupStackTop->position = oldPosition;
         matcher.position = position;
         if (matcher.groupStackTop->group->lazy || matcher.groupStackTop->loopCount < matcher.groupStackTop->group->minCount)
             return false;
-        matcher.leaveGroup(matcher.stack.template push< Backtrack_LeaveGroup<USE_STRINGS> >(), matcher.groupStackTop->position);
+        matcher.leaveMaxedOutGroup();
         return true;
     }
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
     {
-        Uint64 *values = (Uint64*)buffer;
-        const char **offsets;
-        Uint *indexes;
-        if (!USE_STRINGS)
-            indexes = (Uint*)(values + numCaptured);
-        else
+        if (!enable_persistent_backrefs)
         {
-            offsets = (const char **)(values + numCaptured);
-            indexes = (Uint*)(offsets + numCaptured);
-        }
+            const Uint64 *values = (Uint64*)buffer;
+            const char **offsets;
+            const Uint *indexes;
+            if (!USE_STRINGS)
+                indexes = (Uint*)(values + numCaptured);
+            else
+            {
+                offsets = (const char **)(values + numCaptured);
+                indexes = (Uint*)(offsets + numCaptured);
+            }
 
-        for (Uint i=0; i<numCaptured; i++)
-            *matcher.captureStackTop++ = indexes[i];
+            for (Uint i=0; i<numCaptured; i++)
+                *matcher.captureStackTop++ = indexes[i];
+        }
+        else
+        if (matcher.groupStackTop->group->type == RegexGroup_Capturing)
+        {
+            if (numCaptured == 0)
+            {
+                Uint backrefIndex = ((RegexGroupCapturing*)matcher.groupStackTop->group)->backrefIndex;
+                matcher.captures[backrefIndex] = NON_PARTICIPATING_CAPTURE_GROUP;
+                matcher.captureStackTop--;
+                matcher.groupStackTop->numCaptured--;
+            }
+        }
     }
 
     virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
         return -(int)numCaptured;
+    }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
+    {
+        return captureTuple(0, NULL, 0);
     }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -776,21 +1151,33 @@ protected:
     {
         fprintf(f, "Backtrack_LoopGroup: position=%llu, numCaptured=%u, alternative=%u, oldPosition=%llu", position, numCaptured, alternative, oldPosition);
 
-        Uint64 *values = (Uint64*)buffer;
-        const char **offsets;
-        Uint *indexes;
-        if (!USE_STRINGS)
-            indexes = (Uint*)(values + numCaptured);
-        else
+        if (!enable_persistent_backrefs)
         {
-            offsets = (const char **)(values + numCaptured);
-            indexes = (Uint*)(offsets + numCaptured);
-        }
+            const Uint64 *values = (Uint64*)buffer;
+            const char **offsets;
+            const Uint *indexes;
+            if (!USE_STRINGS)
+                indexes = (Uint*)(values + numCaptured);
+            else
+            {
+                offsets = (const char **)(values + numCaptured);
+                indexes = (Uint*)(offsets + numCaptured);
+            }
 
-        for (Uint i=0; i<numCaptured; i++)
+            for (Uint i=0; i<numCaptured; i++)
+            {
+                fprintf(f, ", \\%u=", indexes[i]+1);
+                matcher.fprintCapture(f, values[i], offsets[i]);
+            }
+        }
+        else
+        if (numCaptured != 0)
         {
-            fputs(", ", f);
-            matcher.fprintCapture(f, indexes[i], values[i], offsets[i]);
+            fputs(", capture=", f);
+            if (!USE_STRINGS)
+                matcher.fprintCapture(f, *(Uint64*)(buffer                      ), NULL);
+            else
+                matcher.fprintCapture(f, *(Uint64*)(buffer + sizeof(const char*)), *(const char**)buffer);
         }
         fputc('\n', f);
     }
@@ -826,6 +1213,10 @@ class Backtrack_TryMatch : public BacktrackNode<USE_STRINGS>
     {
         return 0;
     }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
+    {
+        return captureTuple(0, NULL, 0);
+    }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
         return false;
@@ -859,6 +1250,10 @@ class Backtrack_ResetStart : public BacktrackNode<USE_STRINGS>
     {
         return 0;
     }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
+    {
+        return captureTuple(0, NULL, 0);
+    }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
         return false;
@@ -877,6 +1272,12 @@ template<> inline RegexMatcher<false>::RegexMatcher() :
 #endif
 {
     captures = NULL;
+    if (enable_persistent_backrefs)
+    {
+        captureIndexUsedAtomicTmp = NULL;
+        captureIndexesAtomicTmp = NULL;
+        capturesAtomicTmp = NULL;
+    }
 }
 template<> inline RegexMatcher<true>::RegexMatcher() :
     groupStackBase(NULL),
@@ -887,6 +1288,13 @@ template<> inline RegexMatcher<true>::RegexMatcher() :
 {
     captures = NULL;
     captureOffsets = NULL;
+    if (enable_persistent_backrefs)
+    {
+        captureIndexUsedAtomicTmp = NULL;
+        captureIndexesAtomicTmp = NULL;
+        capturesAtomicTmp = NULL;
+        captureOffsetsAtomicTmp = NULL;
+    }
 }
 
 template<> inline RegexMatcher<false>::~RegexMatcher()
@@ -894,6 +1302,12 @@ template<> inline RegexMatcher<false>::~RegexMatcher()
     delete [] groupStackBase;
     delete [] captureStackBase;
     delete [] captures;
+    if (enable_persistent_backrefs)
+    {
+        delete [] captureIndexUsedAtomicTmp;
+        delete [] captureIndexesAtomicTmp;
+        delete [] capturesAtomicTmp;
+    }
 }
 template<> inline RegexMatcher<true>::~RegexMatcher()
 {
@@ -901,6 +1315,13 @@ template<> inline RegexMatcher<true>::~RegexMatcher()
     delete [] captureStackBase;
     delete [] captures;
     delete [] captureOffsets;
+    if (enable_persistent_backrefs)
+    {
+        delete [] captureIndexUsedAtomicTmp;
+        delete [] captureIndexesAtomicTmp;
+        delete [] capturesAtomicTmp;
+        delete [] captureOffsetsAtomicTmp;
+    }
 }
 
 #pragma warning(pop)

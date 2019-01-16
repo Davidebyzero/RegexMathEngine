@@ -28,6 +28,7 @@ extern bool allow_molecular_lookahead;
 extern bool allow_atomic_groups;
 extern bool allow_conditionals;
 extern bool allow_reset_start;
+extern bool enable_persistent_backrefs;
 extern Uint optimizationLevel;
 
 enum RegexSymbolType
@@ -71,9 +72,13 @@ template<bool> class Backtrack_AtomicCapture;
 template<bool> class Backtrack_SkipGroup;
 template<bool> class Backtrack_EnterGroup;
 template<bool> class Backtrack_BeginAtomicGroup;
+template<bool> class Backtrack_SelfCapture;
 template<bool> class Backtrack_LeaveGroup;
+template<bool> class Backtrack_LeaveCaptureGroup;
 template<bool> class Backtrack_LoopGroup;
+template<bool, bool> class Backtrack_LeaveCaptureGroup_Base;
 template<bool> class Backtrack_LeaveGroupLazily;
+template<bool> class Backtrack_LeaveCaptureGroupLazily;
 template<bool> class Backtrack_LeaveMolecularLookahead;
 template<bool> class Backtrack_TryMatch;
 template<bool> class Backtrack_ResetStart;
@@ -175,6 +180,12 @@ class RegexGroupCapturing : public RegexGroup
     friend class RegexMatcher<true>;
     friend class Backtrack_LeaveGroup<false>;
     friend class Backtrack_LeaveGroup<true>;
+    friend class Backtrack_LeaveGroupLazily<false>;
+    friend class Backtrack_LeaveGroupLazily<true>;
+    friend class Backtrack_LeaveCaptureGroup_Base<true, false>;
+    friend class Backtrack_LeaveCaptureGroup_Base<true, true >;
+    friend class Backtrack_LoopGroup<false>;
+    friend class Backtrack_LoopGroup<true>;
     Uint backrefIndex; // zero-numbered; 0 corresponds to \1
 public:
     RegexGroupCapturing(Uint backrefIndex) : RegexGroup(RegexGroup_Capturing), backrefIndex(backrefIndex) {}

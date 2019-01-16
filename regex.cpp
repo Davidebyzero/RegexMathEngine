@@ -79,6 +79,7 @@ bool allow_molecular_lookahead = false;
 bool allow_atomic_groups = false;
 bool allow_conditionals = false;
 bool allow_reset_start = false;
+bool enable_persistent_backrefs = false;
 Uint optimizationLevel = 2;
 
 static void printShortUsage(const char *argv0)
@@ -122,6 +123,7 @@ Options:\n\
                       ag   Atomic Grouping: (?>...)\n\
                       cnd  Conditionals: (?(N)...|...) where N=backref number\n\
                       rs   Reset Start: \\K\n\
+                      pbr  Nested and forward backrefs\n\
                       all  Enable all of the above extensions\n\
   -o                  Show only the part of the line that matched\n\
   -O NUMBER           Specifies the optimization level, from 0 to 2. This\n\
@@ -314,6 +316,12 @@ int main(int argc, char *argv[])
                         allow_reset_start = true;
                     }
                     else
+                    if (strncmp(s, "pbr", strlength("pbr"))==0)
+                    {
+                        s += strlength("pbr");
+                        enable_persistent_backrefs = true;
+                    }
+                    else
                     if (strncmp(s, "all", strlength("all"))==0)
                     {
                         s += strlength("all");
@@ -321,6 +329,7 @@ int main(int argc, char *argv[])
                         allow_atomic_groups = true;
                         allow_conditionals = true;
                         allow_reset_start = true;
+                        enable_persistent_backrefs = true;
                     }
                     else
                     {
