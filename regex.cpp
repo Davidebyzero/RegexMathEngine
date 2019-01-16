@@ -32,6 +32,7 @@ Regex::Regex(const char *buf) : regex(RegexGroup_NonCapturing)
     regex.minCount = 1;
     regex.maxCount = 1;
     regex.lazy = 0;
+    regex.possessive = 0;
 
     RegexParser parser(regex, buf);
     numCaptureGroups = parser.backrefIndex;
@@ -77,6 +78,7 @@ bool allow_empty_character_classes = true;
 bool allow_quantifiers_on_assertions = true;
 bool allow_molecular_lookahead = false;
 bool allow_atomic_groups = false;
+bool allow_possessive_quantifiers = false;
 bool allow_conditionals = false;
 bool allow_reset_start = false;
 bool enable_persistent_backrefs = false;
@@ -121,6 +123,7 @@ Options:\n\
   -x EXT,EXT,...      Enable extensions. Currently available extensions are:\n\
                       ml   Molecular (non-atomic) lookahead: (?*...)\n\
                       ag   Atomic Grouping: (?>...)\n\
+                      pq   Possessive Quantifiers: p*+ p++ p?+ p{A,B}+\n\
                       cnd  Conditionals: (?(N)...|...) where N=backref number\n\
                       rs   Reset Start: \\K\n\
                       pbr  Nested and forward backrefs\n\
@@ -304,6 +307,12 @@ int main(int argc, char *argv[])
                         allow_atomic_groups = true;
                     }
                     else
+                    if (strncmp(s, "pq", strlength("pq"))==0)
+                    {
+                        s += strlength("pq");
+                        allow_possessive_quantifiers = true;
+                    }
+                    else
                     if (strncmp(s, "cnd", strlength("cnd"))==0)
                     {
                         s += strlength("cnd");
@@ -327,6 +336,7 @@ int main(int argc, char *argv[])
                         s += strlength("all");
                         allow_molecular_lookahead = true;
                         allow_atomic_groups = true;
+                        allow_possessive_quantifiers = true;
                         allow_conditionals = true;
                         allow_reset_start = true;
                         enable_persistent_backrefs = true;

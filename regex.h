@@ -26,6 +26,7 @@ extern bool allow_empty_character_classes;
 extern bool allow_quantifiers_on_assertions;
 extern bool allow_molecular_lookahead;
 extern bool allow_atomic_groups;
+extern bool allow_possessive_quantifiers;
 extern bool allow_conditionals;
 extern bool allow_reset_start;
 extern bool enable_persistent_backrefs;
@@ -121,6 +122,7 @@ class RegexSymbol
         struct
         {
             bool lazy;
+            bool possessive;
             bool characterAny;
             char character;
         };
@@ -129,7 +131,7 @@ class RegexSymbol
     RegexSymbolType type;
 public:
     RegexSymbol() {}
-    RegexSymbol(RegexSymbolType type) : initMatchFunction(NULL), type(type), minCount(1), maxCount(1), lazy(false) {}
+    RegexSymbol(RegexSymbolType type) : initMatchFunction(NULL), type(type), minCount(1), maxCount(1), lazy(false), possessive(false) {}
 };
 
 class RegexPattern

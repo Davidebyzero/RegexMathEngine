@@ -60,6 +60,8 @@ void RegexMatcher<USE_STRINGS>::nonMatch(bool negativeLookahead)
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::pushStack()
 {
+    if  ((*symbol)->possessive)
+        return;
     Backtrack_TryMatch<USE_STRINGS> *pushStack = stack.template push< Backtrack_TryMatch<USE_STRINGS> >();
     pushStack->position     = position;
     pushStack->currentMatch = currentMatch;
@@ -95,6 +97,9 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
     groupStackTop->loopCount   = 1;
     groupStackTop->group       = group;
     groupStackTop->numCaptured = 0;
+
+    if (group->possessive)
+        stack.template push< Backtrack_BeginAtomicGroup<USE_STRINGS> >();
 
     stack.template push< Backtrack_EnterGroup<USE_STRINGS> >();
 
@@ -165,6 +170,7 @@ template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::leaveMaxedOutGroup()
 {
     Backtrack_LeaveGroup<USE_STRINGS> *pushStack;
+    bool possessive = groupStackTop->group->possessive;
     if (enable_persistent_backrefs && groupStackTop->group->type == RegexGroup_Capturing)
     {
         Backtrack_LeaveCaptureGroup<USE_STRINGS> *pushStackCapture = stack.template push< Backtrack_LeaveCaptureGroup<USE_STRINGS> >();
@@ -174,6 +180,8 @@ void RegexMatcher<USE_STRINGS>::leaveMaxedOutGroup()
     else
         pushStack = stack.template push< Backtrack_LeaveGroup<USE_STRINGS> >();
     leaveGroup(pushStack, groupStackTop->position);
+    if (possessive)
+        popAtomicGroup();
 }
 
 template <bool USE_STRINGS>
@@ -496,7 +504,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
 {
     if (currentMatch == ULLONG_MAX)
     {
-        if (optimizationLevel)
+        if (optimizationLevel && !thisSymbol->possessive)
         {
             if (symbol[+1] && symbol[+1]->type==RegexSymbol_AnchorEnd)
             {
@@ -1241,7 +1249,7 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                                 RegexSymbol **innerSymbol;
                                 if (innerAlternative[1] && !innerAlternative[2] &&
                                     (!innerAlternative[0]->symbols[0] && (innerSymbol = innerAlternative[1]->symbols)[0] ||
-                                        !innerAlternative[1]->symbols[0] && (innerSymbol = innerAlternative[0]->symbols)[0]))
+                                     !innerAlternative[1]->symbols[0] && (innerSymbol = innerAlternative[0]->symbols)[0]))
                                 {
                                     matchZero = false;
                                 }
@@ -1249,7 +1257,7 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                                     innerSymbol = innerAlternative[0]->symbols;
                                 
                                 if (innerSymbol[0] && innerSymbol[0]->type==RegexSymbol_Character && innerSymbol[0]->minCount==1 && innerSymbol[0]->maxCount==1        && characterCanMatch(innerSymbol[0]) &&
-                                    innerSymbol[1] && innerSymbol[1]->type==RegexSymbol_Group     && innerSymbol[1]->minCount==1 && innerSymbol[1]->maxCount==UINT_MAX && !innerSymbol[2])
+                                    innerSymbol[1] && innerSymbol[1]->type==RegexSymbol_Group     && innerSymbol[1]->minCount==1 && innerSymbol[1]->maxCount==UINT_MAX && !innerSymbol[1]->possessive && !innerSymbol[2])
                                 {
                                     RegexGroup *innerGroup = (RegexGroup*)innerSymbol[1];
                                     if (innerGroup->type == RegexGroup_Capturing || innerGroup->type == RegexGroup_NonCapturing)
@@ -1355,6 +1363,38 @@ void RegexMatcher<true>::readCaptureAtomicTmp(Uint i, Uint &index, Uint64 &lengt
 }
 
 template <bool USE_STRINGS>
+void RegexMatcher<USE_STRINGS>::popAtomicGroup()
+{
+    int numCapturedDelta = 0;
+
+    RegexGroup *const group = groupStackTop->group;
+
+    for (GroupStackNode *groupStackOldTop = groupStackTop;;)
+    {
+        bool done = groupStackTop == groupStackOldTop && stack->isAtomicGroup();
+        int numCaptured = stack->popForAtomicCapture(*this);
+        numCapturedDelta += numCaptured;
+        if (enable_persistent_backrefs)
+            for (int i=0; i<numCaptured; i++)
+                writeCaptureAtomicTmp(stack->popForAtomicForwardCapture(*this, i));
+        stack.pop(*this);
+        if (done)
+            break;
+    }
+
+    // the following is needed for atomic lookahead but not for atomic groups... todo: reacquaint myself with the reason for this, and make the two more similar if it makes sense to do so
+    //groupStackTop->numCaptured += enable_persistent_backrefs ? captureIndexNumUsedAtomicTmp : numCapturedDelta;
+
+    if (numCapturedDelta)
+    {
+        Backtrack_AtomicCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_AtomicCapture<USE_STRINGS> >(Backtrack_AtomicCapture<USE_STRINGS>::get_size(enable_persistent_backrefs ? captureIndexNumUsedAtomicTmp : numCapturedDelta));
+        pushStack->numCaptured       = numCapturedDelta; // will be overridding by "transfer" call below if we're in enable_persistent_backrefs mode
+        pushStack->parentAlternative = group->parentAlternative;
+        pushStack->transfer(*this);
+    }
+}
+
+template <bool USE_STRINGS>
 bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength)
 {
     delete [] groupStackBase;
@@ -1418,36 +1458,10 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     break;
                 }
 
-                RegexGroup *group = groupStackTop->group;
+                RegexGroup *const group = groupStackTop->group;
 
                 if (group->type == RegexGroup_Atomic)
-                {
-                    int numCapturedDelta = 0;
-
-                    for (GroupStackNode *groupStackOldTop = groupStackTop;;)
-                    {
-                        bool done = groupStackTop == groupStackOldTop && stack->isAtomicGroup();
-                        int numCaptured = stack->popForAtomicCapture(*this);
-                        numCapturedDelta += numCaptured;
-                        if (enable_persistent_backrefs)
-                            for (int i=0; i<numCaptured; i++)
-                                writeCaptureAtomicTmp(stack->popForAtomicForwardCapture(*this, i));
-                        stack.pop(*this);
-                        if (done)
-                            break;
-                    }
-
-                    // the following is needed for atomic lookahead but not for atomic groups... todo: reacquaint myself with the reason for this, and make the two more similar if it makes sense to do so
-                    //groupStackTop->numCaptured += enable_persistent_backrefs ? captureIndexNumUsedAtomicTmp : numCapturedDelta;
-
-                    if (numCapturedDelta)
-                    {
-                        Backtrack_AtomicCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_AtomicCapture<USE_STRINGS> >(Backtrack_AtomicCapture<USE_STRINGS>::get_size(enable_persistent_backrefs ? captureIndexNumUsedAtomicTmp : numCapturedDelta));
-                        pushStack->numCaptured       = numCapturedDelta; // will be overridding by "transfer" call below if we're in enable_persistent_backrefs mode
-                        pushStack->parentAlternative = group->parentAlternative;
-                        pushStack->transfer(*this);
-                    }
-                }
+                    popAtomicGroup();
                 else
                 if (group->type == RegexGroup_Lookahead)
                 {
@@ -1528,7 +1542,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || group->maxCount == UINT_MAX && groupStackTop->loopCount >= group->minCount && position == groupStackTop->position)
                     leaveMaxedOutGroup();
                 else
-                    loopGroup(pushStack_LoopGroup(), position, groupStackTop->position, (Uint)(alternative - groupStackTop->group->alternatives));
+                    loopGroup(pushStack_LoopGroup(), position, groupStackTop->position, (Uint)(alternative - groupStackTop->group->alternatives)); // todo: optimize this for possessive groups by not pushing unnecessarily onto the stack
                 continue;
             }
             if (debugTrace)

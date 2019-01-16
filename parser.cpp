@@ -96,6 +96,7 @@ void RegexParser::closeAlternative(RegexSymbol **&symbols, std::queue<RegexSymbo
                     charactersSymbol->minCount = potentialStringLength;
                     charactersSymbol->maxCount = potentialStringLength;
                     charactersSymbol->lazy = false;
+                    charactersSymbol->possessive = false;
                     charactersSymbol->characterAny = firstChar < 0;
                     charactersSymbol->character = firstChar;
 
@@ -540,6 +541,14 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 break;
             }
         case '+':
+            if (symbol && symbolCountSpecified && !symbolLazinessSpecified && allow_possessive_quantifiers)
+            {
+                buf++;
+                symbol->possessive = true;
+                fixLookaheadQuantifier();
+                symbolLazinessSpecified = true;
+                break;
+            }
             if (!symbol || symbolCountSpecified || symbolLazinessSpecified)
                 throw RegexParsingError(buf, "Nothing to repeat");
             buf++;
