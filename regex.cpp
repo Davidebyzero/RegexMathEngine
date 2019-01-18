@@ -128,6 +128,8 @@ Options:\n\
                       rs   Reset Start: \\K\n\
                       pbr  Nested and forward backrefs\n\
                       all  Enable all of the above extensions\n\
+  --pcre              Emulate PCRE as closely as currently possible. This\n\
+                      is equivalent to \"-x ag,pq,cnd,rs,pbr --npcg- --ecc-\".\n\
   -o                  Show only the part of the line that matched\n\
   -O NUMBER           Specifies the optimization level, from 0 to 2. This\n\
                       controls whether optimizations are enabled which skip\n\
@@ -268,6 +270,19 @@ int main(int argc, char *argv[])
                     !argv[i][2 + strlength("qa") + 1])
                 {
                     allow_quantifiers_on_assertions = argv[i][2 + strlength("qa")] == '+';
+                }
+                else
+                if (strcmp(&argv[i][2], "pcre")==0)
+                {
+                    emulate_ECMA_NPCGs = false;
+                    allow_empty_character_classes = false;
+                    allow_quantifiers_on_assertions = true;
+                    allow_molecular_lookahead = false;
+                    allow_atomic_groups = true;
+                    allow_possessive_quantifiers = true;
+                    allow_conditionals = true;
+                    allow_reset_start = true;
+                    enable_persistent_backrefs = true;
                 }
                 else
                 if (strcmp(&argv[i][2], "trace")==0)
