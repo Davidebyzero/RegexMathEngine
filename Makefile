@@ -17,6 +17,6 @@ $(BIN):\
 	$(OBJ) 
 	$(CPP) $(CFLAGS) -o $@ $(OBJ)
 
-$(OBJ): matcher.h parser.h regex.h tools.h
+$(OBJ): matcher.h matcher-optimization.h parser.h regex.h tools.h
 
 clean:; rm -f $(OBJ) $(BIN) core

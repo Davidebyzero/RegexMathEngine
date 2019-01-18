@@ -215,12 +215,15 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void matchSymbol_IsPowerOf2           (RegexSymbol *thisSymbol);
 
     template <typename MATCH_TYPE>
+    inline bool runtimeOptimize_matchSymbol_Character_or_Backref(RegexSymbol *const thisSymbol, Uint64 const multiple, MATCH_TYPE const repetend);
+    template <typename MATCH_TYPE>
     void matchSymbol_Character_or_Backref (RegexSymbol *thisSymbol, Uint64 multiple, MATCH_TYPE pBackref);
 
     inline void (RegexMatcher<USE_STRINGS>::*&matchFunction(RegexSymbol *thisSymbol))(RegexSymbol *thisSymbol);
     inline bool characterCanMatch(RegexSymbol *thisSymbol);
     inline bool8 characterClassCanMatch(RegexCharacterClass *thisSymbol);
     inline void (RegexMatcher<USE_STRINGS>::*chooseBuiltinCharacterClassFunction(bool (*characterMatchFunction)(Uchar ch), void (RegexMatcher<USE_STRINGS>::*matchFunction)(RegexSymbol *thisSymbol)))(RegexSymbol *thisSymbol);
+    inline bool staticallyOptimizeGroup(RegexSymbol **thisSymbol);
     inline void virtualizeSymbols(RegexGroup *rootGroup);
 
     inline void fprintCapture(FILE *f, Uint i);

@@ -279,6 +279,7 @@
     <ClCompile Include="tools.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="matcher-optimization.h" />
     <ClInclude Include="matcher.h" />
     <ClInclude Include="parser.h" />
     <ClInclude Include="regex.h" />
