@@ -119,15 +119,6 @@ void RegexMatcher<USE_STRINGS>::leaveGroup(Backtrack_LeaveGroup<USE_STRINGS> *pu
     pushStack->numCaptured = groupStackTop->numCaptured;
     pushStack->alternative = (Uint)(alternative - group->alternatives);
 
-    Uint numCaptured;
-    if (enable_persistent_backrefs)
-    {
-        numCaptured = 0;
-        /*for (Uint i=1; i<=groupStackTop->numCaptured; i++)
-            if (captures[captureStackTop[-(int)i]] == NON_PARTICIPATING_CAPTURE_GROUP)
-                numCaptured++;*/
-    }
-
     if (group->type == RegexGroup_Capturing)
     {
         Uint backrefIndex = ((RegexGroupCapturing*)group)->backrefIndex;
@@ -137,17 +128,12 @@ void RegexMatcher<USE_STRINGS>::leaveGroup(Backtrack_LeaveGroup<USE_STRINGS> *pu
         {
             *captureStackTop++ = backrefIndex;
             groupStackTop->numCaptured++;
-            if (enable_persistent_backrefs)
-                numCaptured++;
         }
     }
 
-    if (!enable_persistent_backrefs)
-        numCaptured = groupStackTop->numCaptured;
-
     alternative = group->parentAlternative;
     symbol      = group->self + 1;
-    groupStackTop[-1].numCaptured += numCaptured;
+    groupStackTop[-1].numCaptured += groupStackTop->numCaptured;
     groupStackTop--;
     currentMatch = ULLONG_MAX;
 }
@@ -171,8 +157,9 @@ template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::leaveMaxedOutGroup()
 {
     Backtrack_LeaveGroup<USE_STRINGS> *pushStack;
-    bool possessive = groupStackTop->group->possessive;
-    if (enable_persistent_backrefs && groupStackTop->group->type == RegexGroup_Capturing)
+    RegexGroup *const group = groupStackTop->group;
+    bool possessive = group->possessive;
+    if (enable_persistent_backrefs && group->type == RegexGroup_Capturing)
     {
         Backtrack_LeaveCaptureGroup<USE_STRINGS> *pushStackCapture = stack.template push< Backtrack_LeaveCaptureGroup<USE_STRINGS> >();
         pushStackCapture->setCapture(*this);
@@ -182,7 +169,7 @@ void RegexMatcher<USE_STRINGS>::leaveMaxedOutGroup()
         pushStack = stack.template push< Backtrack_LeaveGroup<USE_STRINGS> >();
     leaveGroup(pushStack, groupStackTop->position);
     if (possessive)
-        popAtomicGroup();
+        popAtomicGroup(group);
 }
 
 template <bool USE_STRINGS>
@@ -916,11 +903,9 @@ void RegexMatcher<true>::readCaptureAtomicTmp(Uint i, Uint &index, Uint64 &lengt
 }
 
 template <bool USE_STRINGS>
-void RegexMatcher<USE_STRINGS>::popAtomicGroup()
+void RegexMatcher<USE_STRINGS>::popAtomicGroup(RegexGroup *const group)
 {
     int numCapturedDelta = 0;
-
-    RegexGroup *const group = groupStackTop->group;
 
     for (GroupStackNode *groupStackOldTop = groupStackTop;;)
     {
@@ -1014,7 +999,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 RegexGroup *const group = groupStackTop->group;
 
                 if (group->type == RegexGroup_Atomic)
-                    popAtomicGroup();
+                    popAtomicGroup(group);
                 else
                 if (group->type == RegexGroup_Lookahead)
                 {

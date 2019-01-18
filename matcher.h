@@ -169,7 +169,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void leaveMaxedOutGroup();
     Backtrack_LoopGroup<USE_STRINGS> *pushStack_LoopGroup();
     void *loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pushLoop, Uint64 pushPosition, Uint64 oldPosition, Uint alternativeNum);
-    void popAtomicGroup();
+    void popAtomicGroup(RegexGroup *const group);
 
     inline void initInput(Uint64 _input, Uint numCaptureGroups);
     inline void  readCapture(Uint index, Uint64 &multiple, const char *&pBackref);
