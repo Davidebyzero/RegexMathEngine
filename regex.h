@@ -94,6 +94,8 @@ class RegexSymbol
     friend class Backtrack_SkipGroup<true>;
     friend class Backtrack_EnterGroup<false>;
     friend class Backtrack_EnterGroup<true>;
+    friend class Backtrack_LeaveGroupLazily<false>;
+    friend class Backtrack_LeaveGroupLazily<true>;
     friend class Backtrack_LoopGroup<false>;
     friend class Backtrack_LoopGroup<true>;
     friend class Backtrack_TryMatch<false>;

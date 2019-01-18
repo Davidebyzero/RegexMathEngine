@@ -1,5 +1,5 @@
 template <bool USE_STRINGS>
-__forceinline bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbol **thisSymbol)
+ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbol **thisSymbol)
 // return true if the group has been rewritten into a specialized symbol
 {
     if (optimizationLevel >= 2)
@@ -70,7 +70,7 @@ __forceinline bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
 
 template <bool USE_STRINGS>
 template <typename MATCH_TYPE>
-__forceinline bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Character_or_Backref(RegexSymbol *const thisSymbol, Uint64 const multiple, MATCH_TYPE const repetend)
+ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Character_or_Backref(RegexSymbol *const thisSymbol, Uint64 const multiple, MATCH_TYPE const repetend)
 // return true if this optimizer function handled the match and the caller should do nothing further
 {
     if (optimizationLevel && !thisSymbol->possessive)

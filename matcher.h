@@ -606,7 +606,7 @@ class Backtrack_SkipGroup : public BacktrackNode<USE_STRINGS>
     }
     virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
     {
-        __assume(0);
+        UNREACHABLE_CODE;
     }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -661,7 +661,7 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
     }
     virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
     {
-        __assume(0);
+        UNREACHABLE_CODE;
     }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -693,7 +693,7 @@ class Backtrack_BeginAtomicGroup : public BacktrackNode<USE_STRINGS>
     }
     virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
     {
-        __assume(0);
+        UNREACHABLE_CODE;
     }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -745,7 +745,7 @@ class Backtrack_LeaveMolecularLookahead : public BacktrackNode<USE_STRINGS>
     }
     virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
     {
-        __assume(0);
+        UNREACHABLE_CODE;
     }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -830,7 +830,7 @@ protected:
     }
     virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
     {
-        __assume(0);
+        UNREACHABLE_CODE;
     }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -862,12 +862,12 @@ class Backtrack_LeaveGroupLazily : public Backtrack_LeaveGroup<USE_STRINGS>
     {
         Backtrack_LeaveGroup<USE_STRINGS>::popTo(matcher);
 
-        if (matcher.groupStackTop->loopCount == MAX_EXTEND(group->maxCount) ||
+        if (matcher.groupStackTop->loopCount == MAX_EXTEND(this->group->maxCount) ||
             positionDiff == 0 && matcher.groupStackTop->group->maxCount == UINT_MAX && matcher.groupStackTop->loopCount >= matcher.groupStackTop->group->minCount)
         {
             matcher.position = matcher.groupStackTop->position -= positionDiff;
             matcher.alternative = &nullAlternative;
-            popCapture(matcher);
+            this->popCapture(matcher);
             return false;
         }
 
@@ -878,7 +878,7 @@ class Backtrack_LeaveGroupLazily : public Backtrack_LeaveGroup<USE_STRINGS>
     virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
     {
         fputs("Backtrack_LeaveGroupLazily", f);
-        Backtrack_LeaveGroup::fprintDebugBase(matcher, f);
+        Backtrack_LeaveGroup<USE_STRINGS>::fprintDebugBase(matcher, f);
         fprintf(f, ", positionDiff=%llu\n", positionDiff);
     }
 };

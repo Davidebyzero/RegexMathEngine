@@ -38,6 +38,20 @@ template <size_t size>
 char (*__strlength_helper(char const (&_String)[size]))[size];
 #define strlength(_String) (sizeof(*__strlength_helper(_String))-1)
 
+#ifdef _MSC_VER
+#define UNREACHABLE_CODE __assume(0)
+#else
+#define UNREACHABLE_CODE
+#endif
+
+#ifdef _MSC_VER
+#define ALWAYS_INLINE __forceinline
+#elif __has_attribute(always_inline)
+#define ALWAYS_INLINE __attribute__((always_inline))
+#else
+#define ALWAYS_INLINE
+#endif
+
 template <typename UINT_TYPE>
 UINT_TYPE readNumericConstant(const char *&buf);
 
