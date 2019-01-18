@@ -415,7 +415,7 @@ class Backtrack_AtomicCapture : public BacktrackNode<USE_STRINGS>
     friend class RegexMatcher<USE_STRINGS>;
     RegexPattern **parentAlternative;
     Uint numCaptured;
-    Uint8 buffer[1]; // variable number of elements
+    Uint8 buffer[FLEXIBLE_SIZE_ARRAY];
 
     static size_t get_size(Uint numCaptured)
     {
@@ -1033,7 +1033,7 @@ protected:
     Uint numCaptured;
     Uint alternative;
     Uint64 oldPosition;
-    Uint8 buffer[1]; // variable number of elements
+    Uint8 buffer[FLEXIBLE_SIZE_ARRAY];
 
     static size_t get_size(Uint numCaptured)
     {

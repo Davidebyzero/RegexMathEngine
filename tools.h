@@ -52,6 +52,12 @@ char (*__strlength_helper(char const (&_String)[size]))[size];
 #define ALWAYS_INLINE
 #endif
 
+#if defined(_MSC_VER) && _MSC_VER < 1900
+#define FLEXIBLE_SIZE_ARRAY 1
+#else
+#define FLEXIBLE_SIZE_ARRAY
+#endif
+
 template <typename UINT_TYPE>
 UINT_TYPE readNumericConstant(const char *&buf);
 
