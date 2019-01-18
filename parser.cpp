@@ -189,11 +189,27 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 break;
             }
             // else fall through
+        literal_char:
         default:
             symbol = new RegexSymbol(RegexSymbol_Character);
             symbol->characterAny = false;
             symbol->character = *buf;
             addSymbol(buf++, symbol);
+            break;
+        case '#':
+            if (!free_spacing_mode)
+                goto literal_char;
+            for (;;)
+            {
+                buf++;
+                if (*buf == '\0')
+                    break;
+                if (*buf == '\n')
+                {
+                    buf++;
+                    break;
+                }
+            }
             break;
         case '^':
             addSymbol(buf++, symbol = new RegexSymbol(RegexSymbol_AnchorStart));
