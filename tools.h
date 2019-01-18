@@ -40,8 +40,8 @@ char (*__strlength_helper(char const (&_String)[size]))[size];
 
 #ifdef _MSC_VER
 #define UNREACHABLE_CODE __assume(0)
-#else
-#define UNREACHABLE_CODE
+#elif defined(__GNUC__) || __has_builtin(__builtin_unreachable)
+#define UNREACHABLE_CODE __builtin_unreachable()
 #endif
 
 #ifdef _MSC_VER
