@@ -61,6 +61,7 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
 //#define TEST_MULTIPLICATION
 //#define TEST_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED
 //#define TEST_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED
+//#define TEST_SMOOTH_NUMBERS
 
 // numerical mode
 //#define TEST_NUMBERS_FIBONACCI
@@ -176,6 +177,23 @@ static void errorMoreThanOnePattern(const char *argv0)
     fprintf(stderr, "Error: In this version, only one pattern may be specified\n");
     printShortUsage(argv0);
 }
+
+#ifdef TEST_SMOOTH_NUMBERS
+static Uint64 largestPrimeFactor(Uint64 n)
+{
+    for (Uint64 k=n/2; k>1;)
+    {
+        if (n % k == 0)
+        {
+            n = k;
+            k = n/2;
+        }
+        else
+            k--;
+    }
+    return n;
+}
+#endif
 
 int main(int argc, char *argv[])
 {
@@ -749,6 +767,44 @@ int main(int argc, char *argv[])
                         printf("%s - FALSE POSITIVE!\n", str);
                 }
 #   endif
+#elif defined(TEST_SMOOTH_NUMBERS)
+            // see https://codegolf.stackexchange.com/questions/36384/find-the-smoothest-number/
+            const Uint64 maxsize = 256; // maximum length of string to test as input
+            const char numeral = '1';
+            char *str = new char [maxsize+1];
+            memset(str, numeral, 2+1+2);
+            str[2+1+2] = '\0';
+            for (Uint64 i=2+1+2; i < maxsize;)
+            {
+                for (Uint64 j=2; j<=(i-1)/2; j++)
+                {
+                    const Uint64 k = i-1-j;
+                    str[j] = ',';
+
+                    const char *returnMatch;
+                    size_t returnMatchLength;
+                    if (!regex.MatchString(str, returnMatch, returnMatchLength))
+                        printf("%llu, %llu - NON-MATCH!\n", j, k);
+                    else
+                    {
+                        Uint64 smallestLargestPrimeFactor = k;
+                        for (Uint64 n=k; n>=j; n--)
+                        {
+                            Uint64 p = largestPrimeFactor(n);
+                            if (smallestLargestPrimeFactor > p)
+                                smallestLargestPrimeFactor = p;
+                        }
+                        Uint64 returned_largestPrimeFactor = largestPrimeFactor(returnMatchLength);
+                        if (returned_largestPrimeFactor != smallestLargestPrimeFactor)
+                            printf("%llu, %llu -> %llu (largest prime factor %llu) - INCORRECT! (should have smallest largest prime factor %llu)\n", j, k, returnMatchLength, returned_largestPrimeFactor, smallestLargestPrimeFactor);
+                    }
+
+                    str[j] = numeral;
+                }
+                str[i++] = numeral;
+                str[i  ] = '\0';
+            }
+            delete [] str;
 #else
             LineGetter lineGetter(1<<15);
             const char newline = '\n';
