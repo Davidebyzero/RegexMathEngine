@@ -1129,6 +1129,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     case RegexGroup_NonCapturing:       openSymbol=" (?:"; break;
                     case RegexGroup_Capturing:          openSymbol=" (";   break;
                     case RegexGroup_Atomic:             openSymbol=" (?>"; break;
+                    case RegexGroup_BranchReset:        openSymbol=" (?|"; break;
                     case RegexGroup_Lookahead:          openSymbol=" (?="; break;
                     case RegexGroup_LookaheadMolecular: openSymbol=" (?*"; break;
                     case RegexGroup_NegativeLookahead:  openSymbol=" (?!"; break;

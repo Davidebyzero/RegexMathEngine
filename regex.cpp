@@ -79,6 +79,7 @@ bool allow_empty_character_classes = true;
 bool allow_quantifiers_on_assertions = true;
 bool allow_molecular_lookahead = false;
 bool allow_atomic_groups = false;
+bool allow_branch_reset_groups = false;
 bool allow_possessive_quantifiers = false;
 bool allow_conditionals = false;
 bool allow_reset_start = false;
@@ -124,6 +125,7 @@ Options:\n\
   -x EXT,EXT,...      Enable extensions. Currently available extensions are:\n\
                       ml   Molecular (non-atomic) lookahead: (?*...)\n\
                       ag   Atomic Grouping: (?>...)\n\
+                      brg  Branch Reset Groups: (?|(...)|(...)|...)\n\
                       pq   Possessive Quantifiers: p*+ p++ p?+ p{A,B}+\n\
                       cnd  Conditionals: (?(N)...|...) where N=backref number\n\
                       rs   Reset Start: \\K\n\
@@ -297,6 +299,7 @@ int main(int argc, char *argv[])
                     allow_quantifiers_on_assertions = true;
                     allow_molecular_lookahead = false;
                     allow_atomic_groups = true;
+                    allow_branch_reset_groups = true;
                     allow_possessive_quantifiers = true;
                     allow_conditionals = true;
                     allow_reset_start = true;
@@ -340,6 +343,12 @@ int main(int argc, char *argv[])
                         allow_atomic_groups = true;
                     }
                     else
+                    if (strncmp(s, "brg", strlength("brg"))==0)
+                    {
+                        s += strlength("brg");
+                        allow_branch_reset_groups = true;
+                    }
+                    else
                     if (strncmp(s, "pq", strlength("pq"))==0)
                     {
                         s += strlength("pq");
@@ -369,6 +378,7 @@ int main(int argc, char *argv[])
                         s += strlength("all");
                         allow_molecular_lookahead = true;
                         allow_atomic_groups = true;
+                        allow_branch_reset_groups = true;
                         allow_possessive_quantifiers = true;
                         allow_conditionals = true;
                         allow_reset_start = true;

@@ -16,6 +16,14 @@ class ParsingStack
     std::queue<RegexPattern*> alternatives;
     std::queue<RegexSymbol*> symbols;
     RegexGroup *group;
+    union
+    {
+        struct
+        {
+            Uint backrefIndexFirst;
+            Uint backrefIndexNext; // the next backrefIndex that a capturing group will get outside of this group
+        } BranchResetGroup;
+    };
 };
 
 class RegexParser

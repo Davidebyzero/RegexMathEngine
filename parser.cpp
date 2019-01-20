@@ -399,6 +399,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                     {
                     case ':':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_NonCapturing);       break;
                     case '>': if (!allow_atomic_groups      ) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_Atomic);             break;
+                    case '|': if (!allow_branch_reset_groups) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_BranchReset);        break;
                     case '=':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_Lookahead);          break;
                     case '*': if (!allow_molecular_lookahead) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_LookaheadMolecular); break;
                     case '!':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_NegativeLookahead);  break;
@@ -453,6 +454,11 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
 
                 stack->alternatives.push(new RegexPattern);
                 stack->group = group;
+                if (group->type == RegexGroup_BranchReset)
+                {
+                    stack->BranchResetGroup.backrefIndexFirst = backrefIndex;
+                    stack->BranchResetGroup.backrefIndexNext  = backrefIndex;
+                }
                 symbol = NULL;
             not_a_group:
                 break;
@@ -471,6 +477,13 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 closeAlternative(stack->alternatives.back()->symbols, stack->symbols);
                 closeGroup(group->alternatives, stack->alternatives);
 
+                if (group->type == RegexGroup_BranchReset)
+                {
+                    if (stack->BranchResetGroup.backrefIndexNext < backrefIndex)
+                        stack->BranchResetGroup.backrefIndexNext = backrefIndex;
+                    backrefIndex = stack->BranchResetGroup.backrefIndexNext;
+                }
+
                 curGroupDepth--;
 
                 ParsingStack *stackDown = stack->below;
@@ -485,12 +498,21 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 break;
             }
         case '|':
-            if (stack->group->type == RegexGroup_Conditional && stack->alternatives.size() == 2)
-                throw RegexParsingError(buf, "Conditional group contains more than two branches");
-            buf++;
-            closeAlternative(stack->alternatives.back()->symbols, stack->symbols);
-            stack->alternatives.push(new RegexPattern);
-            break;
+            {
+                RegexGroup *group = stack->group;
+                if (group->type == RegexGroup_Conditional && stack->alternatives.size() == 2)
+                    throw RegexParsingError(buf, "Conditional group contains more than two branches");
+                buf++;
+                closeAlternative(stack->alternatives.back()->symbols, stack->symbols);
+                stack->alternatives.push(new RegexPattern);
+                if (group->type == RegexGroup_BranchReset)
+                {
+                    if (stack->BranchResetGroup.backrefIndexNext < backrefIndex)
+                        stack->BranchResetGroup.backrefIndexNext = backrefIndex;
+                    backrefIndex = stack->BranchResetGroup.backrefIndexFirst;
+                }
+                break;
+            }
         case '\\':
             {
                 const char *buf0 = buf;

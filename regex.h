@@ -26,6 +26,7 @@ extern bool allow_empty_character_classes;
 extern bool allow_quantifiers_on_assertions;
 extern bool allow_molecular_lookahead;
 extern bool allow_atomic_groups;
+extern bool allow_branch_reset_groups;
 extern bool allow_possessive_quantifiers;
 extern bool allow_conditionals;
 extern bool allow_reset_start;
@@ -60,6 +61,7 @@ enum RegexGroupType
     RegexGroup_NonCapturing,
     RegexGroup_Capturing,
     RegexGroup_Atomic,
+    RegexGroup_BranchReset,
     RegexGroup_Lookahead,
     RegexGroup_LookaheadMolecular,
     RegexGroup_NegativeLookahead,
