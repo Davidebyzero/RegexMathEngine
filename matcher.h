@@ -645,7 +645,11 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
                 matcher.symbol = (*matcher.alternative)->symbols;
             }
             else
+            {
+                if (debugTrace)
+                    fputs("\n\n""Non-match found inside negative lookahead, resulting in a match outside it", stderr);
                 matcher.symbol = group->self + 1;
+            }
             matcher.currentMatch = ULLONG_MAX;
             return true;
         }
