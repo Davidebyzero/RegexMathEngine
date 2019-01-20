@@ -29,6 +29,7 @@ extern bool allow_atomic_groups;
 extern bool allow_branch_reset_groups;
 extern bool allow_possessive_quantifiers;
 extern bool allow_conditionals;
+extern bool allow_lookaround_conditionals;
 extern bool allow_reset_start;
 extern bool enable_persistent_backrefs;
 extern Uint optimizationLevel;
@@ -66,6 +67,7 @@ enum RegexGroupType
     RegexGroup_LookaheadMolecular,
     RegexGroup_NegativeLookahead,
     RegexGroup_Conditional,
+    RegexGroup_LookaroundConditional,
 };
 
 class RegexPattern;
@@ -143,6 +145,8 @@ class RegexPattern
     friend class RegexParser;
     friend class RegexMatcher<false>;
     friend class RegexMatcher<true>;
+    friend class Backtrack_EnterGroup<false>;
+    friend class Backtrack_EnterGroup<true>;
     friend class Backtrack_LeaveGroupLazily<false>;
     friend class Backtrack_LeaveGroupLazily<true>;
     friend class Backtrack_LoopGroup<false>;
@@ -205,6 +209,16 @@ class RegexConditional : public RegexGroup
     Uint backrefIndex; // zero-numbered; 0 corresponds to \1
 public:
     RegexConditional(Uint backrefIndex) : RegexGroup(RegexGroup_Conditional), backrefIndex(backrefIndex) {}
+};
+
+class RegexLookaroundConditional : public RegexGroup
+{
+    friend class RegexParser;
+    friend class RegexMatcher<false>;
+    friend class RegexMatcher<true>;
+    RegexGroup *lookaround;
+public:
+    RegexLookaroundConditional(RegexGroup *lookaround) : RegexGroup(RegexGroup_LookaroundConditional), lookaround(lookaround) {}
 };
 
 class RegexBackref : public RegexSymbol

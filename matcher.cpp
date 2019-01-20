@@ -30,7 +30,7 @@ void RegexMatcher<USE_STRINGS>::nonMatch(bool negativeLookahead)
 
     for (;;)
     {
-        if (*alternative && (stack.empty() || stack->okayToTryAlternatives(*this)) && groupStackTop->group->type != RegexGroup_Conditional)
+        if (*alternative && (stack.empty() || stack->okayToTryAlternatives(*this)) && !inrange(groupStackTop->group->type, RegexGroup_Conditional, RegexGroup_LookaroundConditional))
         {
             alternative++;
             if (*alternative)
@@ -106,6 +106,9 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
 
     if (group->type == RegexGroup_Atomic)
         stack.template push< Backtrack_BeginAtomicGroup<USE_STRINGS> >();
+    else
+    if (group->type == RegexGroup_LookaroundConditional)
+        enterGroup(((RegexLookaroundConditional*)group)->lookaround);
 }
 
 template <bool USE_STRINGS>
@@ -829,12 +832,19 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                 if (staticallyOptimizeGroup(thisSymbol))
                     break;
                 matchFunction(*thisSymbol) = &RegexMatcher<USE_STRINGS>::matchSymbol_Group;
-                RegexGroup *const group = (RegexGroup*)(*thisSymbol);
+                RegexGroup *group = (RegexGroup*)(*thisSymbol);
                 groupStackTop->numAnchoredAlternatives = 0;
                 groupStackTop->currentAlternativeAnchored = false;
                 (*groupStackTop++).group = group;
                 thisAlternative = group->alternatives;
                 thisSymbol      = group->alternatives[0]->symbols;
+                if (group->type == RegexGroup_LookaroundConditional)
+                {
+                    group = ((RegexLookaroundConditional*)group)->lookaround;
+                    (*groupStackTop++).group = group;
+                    thisAlternative = group->alternatives;
+                    thisSymbol      = group->alternatives[0]->symbols;
+                }
                 break;
             }
         }
@@ -854,7 +864,7 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                 if (group->minCount && group->type != RegexGroup_NegativeLookahead)
                     groupStackTop[-1].currentAlternativeAnchored |= anchored;
                 thisAlternative = group->parentAlternative;
-                thisSymbol      = group->self + 1;
+                thisSymbol      = group->self ? group->self + 1 : (*thisAlternative)->symbols; // group->self will be NULL if this is the lookaround in a conditional
             }
         }
     }
@@ -1030,7 +1040,14 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     }
 
                     alternative = group->parentAlternative;
-                    symbol      = group->self + 1;
+                    if (!group->self) // group->self will be NULL if this is the lookaround in a conditional
+                    {
+                        if (debugTrace)
+                            fputs("Match found inside lookaround conditional; jumping to \"yes\" alternative\n\n", stderr);
+                        symbol = (*alternative)->symbols;
+                    }
+                    else
+                        symbol = group->self + 1;
                     continue;
                 }
                 else
@@ -1045,7 +1062,14 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
 
                     position    = groupStackTop->position;
                     alternative = group->parentAlternative;
-                    symbol      = group->self + 1;
+                    if (!group->self) // group->self will be NULL if this is the lookaround in a conditional
+                    {
+                        if (debugTrace)
+                            fputs("Match found inside lookaround conditional; jumping to \"yes\" alternative\n\n", stderr);
+                        symbol = (*alternative)->symbols;
+                    }
+                    else
+                        symbol = group->self + 1;
                     groupStackTop[-1].numCaptured += groupStackTop->numCaptured;
                     groupStackTop--;
                     currentMatch = ULLONG_MAX;
@@ -1066,7 +1090,14 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     while (groupStackTop >= groupStackOldTop);
 
                     // if we've reached here, it means a match was found inside the negative lookahead, which makes it a non-match outside
-                    nonMatch(true);
+                    if (!group->self) // group->self will be NULL if this is the lookaround in a conditional
+                    {
+                        if (debugTrace)
+                            fputs("Match found inside negative lookahead conditional, resulting in a non-match outside it; jumping to \"no\" alternative\n\n", stderr);
+                        symbol = (*++alternative)->symbols;
+                    }
+                    else
+                        nonMatch(true);
                     continue;
                 }
 
@@ -1125,7 +1156,6 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     const char *openSymbol;
                     switch (i->group->type)
                     {
-                    default:
                     case RegexGroup_NonCapturing:       openSymbol=" (?:"; break;
                     case RegexGroup_Capturing:          openSymbol=" (";   break;
                     case RegexGroup_Atomic:             openSymbol=" (?>"; break;
@@ -1140,6 +1170,17 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                             openSymbol = conditionalStr;
                             break;
                         }
+                    case RegexGroup_LookaroundConditional:
+                        switch (((RegexLookaroundConditional*)i->group)->lookaround->type)
+                        {
+                        case RegexGroup_Lookahead:          openSymbol=" (?(?=)"; break;
+                        case RegexGroup_LookaheadMolecular: openSymbol=" (?(?*)"; break;
+                        case RegexGroup_NegativeLookahead:  openSymbol=" (?(?!)"; break;
+                        default: UNREACHABLE_CODE;
+                        }
+                        break;
+                    default:
+                        UNREACHABLE_CODE;
                     }
                     if (i > groupStackBase)
                     {

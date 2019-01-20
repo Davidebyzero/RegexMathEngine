@@ -82,6 +82,7 @@ bool allow_atomic_groups = false;
 bool allow_branch_reset_groups = false;
 bool allow_possessive_quantifiers = false;
 bool allow_conditionals = false;
+bool allow_lookaround_conditionals = false;
 bool allow_reset_start = false;
 bool enable_persistent_backrefs = false;
 Uint optimizationLevel = 2;
@@ -128,6 +129,7 @@ Options:\n\
                       brg  Branch Reset Groups: (?|(...)|(...)|...)\n\
                       pq   Possessive Quantifiers: p*+ p++ p?+ p{A,B}+\n\
                       cnd  Conditionals: (?(N)...|...) where N=backref number\n\
+                      lcnd Lookaround Conditionals: (?(?=...)...|...) etc.\n\
                       rs   Reset Start: \\K\n\
                       pbr  Nested and forward backrefs\n\
                       all  Enable all of the above extensions\n\
@@ -302,6 +304,7 @@ int main(int argc, char *argv[])
                     allow_branch_reset_groups = true;
                     allow_possessive_quantifiers = true;
                     allow_conditionals = true;
+                    allow_lookaround_conditionals = true;
                     allow_reset_start = true;
                     enable_persistent_backrefs = true;
                 }
@@ -361,6 +364,12 @@ int main(int argc, char *argv[])
                         allow_conditionals = true;
                     }
                     else
+                    if (strncmp(s, "lcnd", strlength("lcnd"))==0)
+                    {
+                        s += strlength("lcnd");
+                        allow_lookaround_conditionals = true;
+                    }
+                    else
                     if (strncmp(s, "rs", strlength("rs"))==0)
                     {
                         s += strlength("rs");
@@ -381,6 +390,7 @@ int main(int argc, char *argv[])
                         allow_branch_reset_groups = true;
                         allow_possessive_quantifiers = true;
                         allow_conditionals = true;
+                        allow_lookaround_conditionals = true;
                         allow_reset_start = true;
                         enable_persistent_backrefs = true;
                     }

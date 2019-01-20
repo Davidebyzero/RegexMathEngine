@@ -638,7 +638,22 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
         if (group->type == RegexGroup_NegativeLookahead)
         {
             // if we've reached here, it means no match was found inside the negative lookahead, which makes it a match outside
-            matcher.symbol = group->self + 1;
+            if (!group->self) // group->self will be NULL if this is the lookaround in a conditional
+            {
+                if (debugTrace)
+                    fputs("\n\n""Non-match found inside negative lookahead conditional, resulting in a match outside it; jumping to \"yes\" alternative", stderr);
+                matcher.symbol = (*matcher.alternative)->symbols;
+            }
+            else
+                matcher.symbol = group->self + 1;
+            matcher.currentMatch = ULLONG_MAX;
+            return true;
+        }
+        if (matcher.groupStackTop->group->type == RegexGroup_LookaroundConditional)
+        {
+            if (debugTrace)
+                fputs("\n\n""Non-match found inside lookaround conditional; jumping to \"no\" alternative", stderr);
+            matcher.symbol = (*++matcher.alternative)->symbols;
             matcher.currentMatch = ULLONG_MAX;
             return true;
         }

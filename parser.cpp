@@ -392,6 +392,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 const char *bufGroup = buf;
                 buf++;
                 RegexGroup *group;
+                RegexGroup *lookaroundCondition = NULL;
                 switch (*buf)
                 {
                 case '?':
@@ -404,10 +405,10 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                     case '*': if (!allow_molecular_lookahead) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_LookaheadMolecular); break;
                     case '!':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_NegativeLookahead);  break;
                     case '(':
-                        if (!allow_conditionals)
+                        if (!allow_conditionals && !allow_lookaround_conditionals)
                             throw RegexParsingError(buf, "Unrecognized character after (?");
                         buf+=2;
-                        if (inrange(*buf, '0', '9'))
+                        if (allow_conditionals && inrange(*buf, '0', '9'))
                         {
                             group = new RegexConditional(readNumericConstant<Uint>(buf) - 1);
                             if (*buf != ')')
@@ -415,7 +416,25 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                             buf++;
                         }
                         else
-                            throw RegexParsingError(buf, "Backreference number expected in condition");
+                        if (allow_lookaround_conditionals && *buf == '?')
+                        {
+                            switch (buf[1])
+                            {
+                            case '=':                                                                                                   lookaroundCondition = new RegexGroup(RegexGroup_Lookahead);          break;
+                            case '*': if (!allow_molecular_lookahead) throw RegexParsingError(buf, "Unrecognized character after (?");  lookaroundCondition = new RegexGroup(RegexGroup_LookaheadMolecular); break;
+                            case '!':                                                                                                   lookaroundCondition = new RegexGroup(RegexGroup_NegativeLookahead);  break;
+                            default:
+                                goto condition_not_found;
+                            }
+                            group = new RegexLookaroundConditional(lookaroundCondition);
+                            lookaroundCondition->originalCode = buf-1;
+                            buf += 2;
+                        }
+                        else condition_not_found:
+                            throw RegexParsingError(buf,
+                                allow_conditionals ? allow_lookaround_conditionals ? "Backreference number or lookaround expected in condition"
+                                                                                   : "Backreference number expected in condition"
+                                                                                   : "Lookaround expected in condition");
                         break;
                     case '#':
                         buf+=2;
@@ -439,6 +458,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 }
                 addSymbol(bufGroup, group);
 
+            add_nested_group:
                 curGroupDepth++;
                 if (maxGroupDepth < curGroupDepth)
                     maxGroupDepth = curGroupDepth;
@@ -460,6 +480,14 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                     stack->BranchResetGroup.backrefIndexNext  = backrefIndex;
                 }
                 symbol = NULL;
+
+                if (lookaroundCondition)
+                {
+                    group = lookaroundCondition;
+                    lookaroundCondition = NULL;
+                    goto add_nested_group;
+                }
+
             not_a_group:
                 break;
             }
@@ -483,6 +511,9 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                         stack->BranchResetGroup.backrefIndexNext = backrefIndex;
                     backrefIndex = stack->BranchResetGroup.backrefIndexNext;
                 }
+                else
+                if (group->type == RegexGroup_LookaroundConditional)
+                    ((RegexLookaroundConditional*)group)->lookaround->parentAlternative = group->alternatives;
 
                 curGroupDepth--;
 
@@ -492,7 +523,10 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 if (!stack)
                     goto finished_parsing;
 
-                symbol = group;
+                if (stack->group->type == RegexGroup_LookaroundConditional)
+                    symbol = NULL; // don't allow a quantifier on a lookaround conditional's lookaround
+                else
+                    symbol = group;
                 symbolCountSpecified = false;
                 symbolLazinessSpecified = false;
                 break;
@@ -500,7 +534,7 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
         case '|':
             {
                 RegexGroup *group = stack->group;
-                if (group->type == RegexGroup_Conditional && stack->alternatives.size() == 2)
+                if (inrange(group->type, RegexGroup_Conditional, RegexGroup_LookaroundConditional) && stack->alternatives.size() == 2)
                     throw RegexParsingError(buf, "Conditional group contains more than two branches");
                 buf++;
                 closeAlternative(stack->alternatives.back()->symbols, stack->symbols);
@@ -684,6 +718,13 @@ finished_parsing:
                 *groupStackTop++ = group;
                 thisAlternative = group->alternatives;
                 thisSymbol      = group->alternatives[0]->symbols;
+                if (group->type == RegexGroup_LookaroundConditional)
+                {
+                    group = ((RegexLookaroundConditional*)group)->lookaround;
+                    *groupStackTop++ = group;
+                    thisAlternative = group->alternatives;
+                    thisSymbol      = group->alternatives[0]->symbols;
+                }
                 break;
             }
         }
@@ -698,7 +739,7 @@ finished_parsing:
                 if (groupStackTop == groupStackBase)
                     break;
                 thisAlternative = group->parentAlternative;
-                thisSymbol      = group->self + 1;
+                thisSymbol      = group->self ? group->self + 1 : (*thisAlternative)->symbols; // group->self will be NULL if this is the lookaround in a conditional
             }
         }
     }
