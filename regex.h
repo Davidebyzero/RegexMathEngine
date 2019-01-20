@@ -38,6 +38,7 @@ enum RegexSymbolType
 {
     RegexSymbol_NoOp,
     RegexSymbol_Group,
+    RegexSymbol_Verb,
     RegexSymbol_Character,
     RegexSymbol_CharacterClass,
     RegexSymbol_String,
@@ -70,9 +71,22 @@ enum RegexGroupType
     RegexGroup_LookaroundConditional,
 };
 
+enum RegexVerb
+{
+    RegexVerb_None,
+    RegexVerb_Accept,
+    RegexVerb_Fail,
+    RegexVerb_Commit,
+    RegexVerb_Prune,
+    RegexVerb_Skip,
+    RegexVerb_Then,
+};
+
 class RegexPattern;
 
 template<bool> class RegexMatcher;
+template<bool, RegexVerb, const char *> class Backtrack_Verb;
+template<bool> class Backtrack_Skip;
 template<bool> class Backtrack_AtomicCapture;
 template<bool> class Backtrack_SkipGroup;
 template<bool> class Backtrack_EnterGroup;
@@ -133,6 +147,7 @@ class RegexSymbol
             char character;
         };
         size_t strLength;
+        RegexVerb verb;
     };
     RegexSymbolType type;
 public:

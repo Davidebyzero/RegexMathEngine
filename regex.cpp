@@ -85,6 +85,7 @@ bool allow_conditionals = false;
 bool allow_lookaround_conditionals = false;
 bool allow_reset_start = false;
 bool enable_persistent_backrefs = false;
+bool enable_verbs = false;
 Uint optimizationLevel = 2;
 
 static void printShortUsage(const char *argv0)
@@ -132,6 +133,8 @@ Options:\n\
                       lcnd Lookaround Conditionals: (?(?=...)...|...) etc.\n\
                       rs   Reset Start: \\K\n\
                       pbr  Nested and forward backrefs\n\
+                      v    Verbs: (*ACCEPT), (*FAIL), (*COMMIT),\n\
+                                  (*PRUNE), (*SKIP), and (*THEN)\n\
                       all  Enable all of the above extensions\n\
   --pcre              Emulate PCRE as closely as currently possible. This\n\
                       is equivalent to \"-x ag,pq,cnd,rs,pbr --npcg- --ecc-\".\n\
@@ -307,6 +310,7 @@ int main(int argc, char *argv[])
                     allow_lookaround_conditionals = true;
                     allow_reset_start = true;
                     enable_persistent_backrefs = true;
+                    enable_verbs = true;
                 }
                 else
                 if (strcmp(&argv[i][2], "trace")==0)
@@ -382,6 +386,12 @@ int main(int argc, char *argv[])
                         enable_persistent_backrefs = true;
                     }
                     else
+                    if (strncmp(s, "v", strlength("v"))==0)
+                    {
+                        s += strlength("v");
+                        enable_verbs = true;
+                    }
+                    else
                     if (strncmp(s, "all", strlength("all"))==0)
                     {
                         s += strlength("all");
@@ -393,6 +403,7 @@ int main(int argc, char *argv[])
                         allow_lookaround_conditionals = true;
                         allow_reset_start = true;
                         enable_persistent_backrefs = true;
+                        enable_verbs = true;
                     }
                     else
                     {

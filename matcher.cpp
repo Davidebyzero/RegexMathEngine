@@ -14,6 +14,7 @@
 #include "matcher-optimization.h"
 
 RegexPattern *nullAlternative = NULL;
+RegexSymbol  *nullSymbol      = NULL;
 
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::nonMatch(bool negativeLookahead)
@@ -28,13 +29,21 @@ void RegexMatcher<USE_STRINGS>::nonMatch(bool negativeLookahead)
 
     position = groupStackTop->position;
 
+    // if any changes are made here, they may need to be duplicated in Backtrack_Commit<USE_STRINGS>::popTo()
     for (;;)
     {
+        if (verb != RegexVerb_None && verb != RegexVerb_Then)
+        {
+            if (groupStackTop->group->type == RegexGroup_NegativeLookahead && stack->okayToTryAlternatives(*this))
+                verb = RegexVerb_None;
+        }
+        else
         if (*alternative && (stack.empty() || stack->okayToTryAlternatives(*this)) && !inrange(groupStackTop->group->type, RegexGroup_Conditional, RegexGroup_LookaroundConditional))
         {
             alternative++;
             if (*alternative)
             {
+                verb = RegexVerb_None;
                 position = groupStackTop->position;
                 symbol = (*alternative)->symbols;
                 currentMatch = ULLONG_MAX;
@@ -44,7 +53,7 @@ void RegexMatcher<USE_STRINGS>::nonMatch(bool negativeLookahead)
 
         if (stack.empty())
         {
-            match = -1;
+            match = verb == RegexVerb_Commit ? -2 : -1;
             return;
         }
 
@@ -53,7 +62,7 @@ void RegexMatcher<USE_STRINGS>::nonMatch(bool negativeLookahead)
         bool stopHere = formerTop.popTo(*this);
         stack.deletePendingChunk();
         
-        if (stopHere)
+        if (stopHere && verb == RegexVerb_None)
             break;
     }
 }
@@ -567,6 +576,46 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Group(RegexSymbol *thisSymbol)
 }
 
 template <bool USE_STRINGS>
+void RegexMatcher<USE_STRINGS>::matchSymbol_Verb_Accept(RegexSymbol *thisSymbol)
+{
+    symbol++;
+    verb = RegexVerb_Accept;
+    symbol = &nullSymbol;
+}
+
+const char Backtrack_VerbName_Commit[] = "Backtrack_Commit";
+template <bool USE_STRINGS>
+void RegexMatcher<USE_STRINGS>::matchSymbol_Verb_Commit(RegexSymbol *thisSymbol)
+{
+    stack.template push< Backtrack_Commit<USE_STRINGS> >();
+    symbol++;
+}
+
+const char Backtrack_VerbName_Prune[] = "Backtrack_Prune";
+template <bool USE_STRINGS>
+void RegexMatcher<USE_STRINGS>::matchSymbol_Verb_Prune(RegexSymbol *thisSymbol)
+{
+    stack.template push< Backtrack_Prune<USE_STRINGS> >();
+    symbol++;
+}
+
+template <bool USE_STRINGS>
+void RegexMatcher<USE_STRINGS>::matchSymbol_Verb_Skip(RegexSymbol *thisSymbol)
+{
+    Backtrack_Skip<USE_STRINGS> *pushStack = stack.template push< Backtrack_Skip<USE_STRINGS> >();
+    pushStack->skipPosition = position;
+    symbol++;
+}
+
+const char Backtrack_VerbName_Then[] = "Backtrack_Then";
+template <bool USE_STRINGS>
+void RegexMatcher<USE_STRINGS>::matchSymbol_Verb_Then(RegexSymbol *thisSymbol)
+{
+    stack.template push< Backtrack_Then<USE_STRINGS> >();
+    symbol++;
+}
+
+template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::matchSymbol_ResetStart(RegexSymbol *thisSymbol)
 {
     if (startPosition < position)
@@ -828,6 +877,19 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                     *thisSymbol = originalSymbol;
                 }
                 break;
+            case RegexSymbol_Verb:
+                switch ((*thisSymbol)->verb)
+                {
+                case RegexVerb_Accept: matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_Verb_Accept; break;
+                case RegexVerb_Fail:   matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_NeverMatch ; break;
+                case RegexVerb_Commit: matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_Verb_Commit; break;
+                case RegexVerb_Prune:  matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_Verb_Prune ; break;
+                case RegexVerb_Skip:   matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_Verb_Skip  ; break;
+                case RegexVerb_Then:   matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_Verb_Then  ; break;
+                default:
+                    UNREACHABLE_CODE;
+                }
+                break;
             case RegexSymbol_Group:
                 if (staticallyOptimizeGroup(thisSymbol))
                     break;
@@ -969,6 +1031,8 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
     delete [] captureStackBase;
     captureStackBase = new Uint[numCaptureGroups];
 
+    verb = RegexVerb_None;
+
     initInput(_input, numCaptureGroups);
 
     Uint64 curPosition=0;
@@ -1013,6 +1077,9 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 else
                 if (group->type == RegexGroup_Lookahead)
                 {
+                    if (verb == RegexVerb_Accept)
+                        verb = RegexVerb_None;
+
                     position = groupStackTop->position;
 
                     int numCapturedDelta = 0;
@@ -1053,6 +1120,9 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 else
                 if (group->type == RegexGroup_LookaheadMolecular)
                 {
+                    if (verb == RegexVerb_Accept)
+                        verb = RegexVerb_None;
+
                     Backtrack_LeaveMolecularLookahead<USE_STRINGS> *pushStack = stack.template push< Backtrack_LeaveMolecularLookahead<USE_STRINGS> >();
 
                     pushStack->position    = groupStackTop->position;
@@ -1078,6 +1148,9 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 else
                 if (group->type == RegexGroup_NegativeLookahead)
                 {
+                    if (verb == RegexVerb_Accept)
+                        verb = RegexVerb_None;
+
                     position = groupStackTop->position;
                     alternative = group->parentAlternative;
 
@@ -1112,6 +1185,10 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     leaveMaxedOutGroup();
                 else
                     loopGroup(pushStack_LoopGroup(), position, groupStackTop->position, (Uint)(alternative - groupStackTop->group->alternatives)); // todo: optimize this for possessive groups by not pushing unnecessarily onto the stack
+
+                if (verb == RegexVerb_Accept)
+                    symbol = &nullSymbol;
+
                 continue;
             }
             if (debugTrace)
@@ -1210,12 +1287,28 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
         }
         while (!match); // this check is redundant with the one directly above, unless a "continue" was used inside the loop
 
+        if (verb == RegexVerb_Skip)
+        {
+            if (skipPosition == curPosition)
+                match = -2;
+            else
+                curPosition = skipPosition-1;
+        }
+        verb = RegexVerb_None;
+
         stack.flush();
 
         if (match > 0)
         {
             if (debugTrace)
                 fprintf(stderr, "Match found at {%llu}\n\n", curPosition);
+            break;
+        }
+        if (match < -1)
+        {
+            // a non-match backtracked through (*COMMIT)
+            if (debugTrace)
+                fprintf(stderr, "\n""Halting matching process due to backtracking verb\n\n");
             break;
         }
         if (debugTrace)

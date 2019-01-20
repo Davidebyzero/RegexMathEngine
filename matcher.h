@@ -88,6 +88,10 @@ public:
 #endif
 };
 
+extern const char Backtrack_VerbName_Commit[];
+extern const char Backtrack_VerbName_Prune [];
+extern const char Backtrack_VerbName_Then  [];
+
 struct captureTuple
 {
     Uint64 length;
@@ -121,6 +125,11 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
 {
     friend class Backtrack<USE_STRINGS>;
     friend class BacktrackNode<USE_STRINGS>;
+    friend class Backtrack_Verb<USE_STRINGS, RegexVerb_Commit, Backtrack_VerbName_Commit>;
+    friend class Backtrack_Verb<USE_STRINGS, RegexVerb_Prune , Backtrack_VerbName_Prune >;
+    friend class Backtrack_Verb<USE_STRINGS, RegexVerb_Skip  , NULL                     >;
+    friend class Backtrack_Verb<USE_STRINGS, RegexVerb_Then  , Backtrack_VerbName_Then  >;
+    friend class Backtrack_Skip<USE_STRINGS>;
     friend class Backtrack_AtomicCapture<USE_STRINGS>;
     friend class Backtrack_SkipGroup<USE_STRINGS>;
     friend class Backtrack_EnterGroup<USE_STRINGS>;
@@ -144,6 +153,8 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     Uint *captureIndexesAtomicTmp; // only used with enable_persistent_backrefs
     Uint64 *capturesAtomicTmp; // only used with enable_persistent_backrefs
 
+    RegexVerb verb; // can only be RegexVerb_None, RegexVerb_Commit, RegexVerb_Prune, RegexVerb_Skip, or RegexVerb_Then
+    Uint64 skipPosition; // for RegexVerb_Skip
     Backtrack<USE_STRINGS> stack;
     Uint *captureStackBase;
     Uint *captureStackTop;
@@ -201,6 +212,11 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void matchSymbol_CharacterClass       (RegexSymbol *thisSymbol);
     void matchSymbol_Backref              (RegexSymbol *thisSymbol);
     void matchSymbol_Group                (RegexSymbol *thisSymbol);
+    void matchSymbol_Verb_Accept          (RegexSymbol *thisSymbol);
+    void matchSymbol_Verb_Commit          (RegexSymbol *thisSymbol);
+    void matchSymbol_Verb_Prune           (RegexSymbol *thisSymbol);
+    void matchSymbol_Verb_Skip            (RegexSymbol *thisSymbol);
+    void matchSymbol_Verb_Then            (RegexSymbol *thisSymbol);
     void matchSymbol_ResetStart           (RegexSymbol *thisSymbol);
     void matchSymbol_AnchorStart          (RegexSymbol *thisSymbol);
     void matchSymbol_AnchorEnd            (RegexSymbol *thisSymbol);
@@ -405,6 +421,76 @@ void Backtrack<USE_STRINGS>::fprint(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
             nextPop = (BacktrackNode<USE_STRINGS>*)next;
     }
 }
+
+template <bool USE_STRINGS, RegexVerb verb, const char *name>
+class Backtrack_Verb : public BacktrackNode<USE_STRINGS>
+{
+protected:
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return sizeof(*this);
+    }
+    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        if (matcher.verb == RegexVerb_None)
+            matcher.verb = verb;
+        return false;
+    }
+    virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    {
+    }
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return 0;
+    }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
+    {
+        UNREACHABLE_CODE;
+    }
+    virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return false;
+    }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fputs(name, f);
+        fputc('\n', f);
+    }
+};
+
+template <bool USE_STRINGS>
+class Backtrack_Commit : public Backtrack_Verb<USE_STRINGS, RegexVerb_Commit, Backtrack_VerbName_Commit> {};
+
+template <bool USE_STRINGS>
+class Backtrack_Prune : public Backtrack_Verb<USE_STRINGS, RegexVerb_Prune, Backtrack_VerbName_Prune> {};
+
+template <bool USE_STRINGS>
+class Backtrack_Skip : public Backtrack_Verb<USE_STRINGS, RegexVerb_Skip, NULL>
+{
+    friend class RegexMatcher<USE_STRINGS>;
+    Uint64 skipPosition;
+
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return sizeof(*this);
+    }
+    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        if (matcher.verb == RegexVerb_None)
+        {
+            matcher.verb = RegexVerb_Skip;
+            matcher.skipPosition = skipPosition;
+        }
+        return false;
+    }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fprintf(f, "Backtrack_Skip: position=%llu\n", skipPosition);
+    }
+};
+
+template <bool USE_STRINGS>
+class Backtrack_Then : public Backtrack_Verb<USE_STRINGS, RegexVerb_Then, Backtrack_VerbName_Then> {};
 
 #pragma warning(push)
 #pragma warning(disable : 4700) // for passing "offsets" to fprintCapture() with USE_STRINGS=false
@@ -627,7 +713,7 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
     }
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
-        RegexGroup *group = matcher.groupStackTop->group;
+        RegexGroup *const group = matcher.groupStackTop->group;
 #ifdef _DEBUG
         if (enable_persistent_backrefs ? matcher.groupStackTop->numCaptured != (matcher.groupStackTop->loopCount > 1) : matcher.groupStackTop->numCaptured)
             THROW_ENGINEBUG;

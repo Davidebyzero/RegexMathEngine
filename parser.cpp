@@ -452,6 +452,22 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                         throw RegexParsingError(buf, "Unrecognized character after (?");
                     }
                     break;
+                case '*':
+                    symbol = new RegexSymbol(RegexSymbol_Verb);
+                    addSymbol(buf-1, symbol);
+                    buf++;
+                    {{}} if (strncmp(buf, "ACCEPT)", strlength("ACCEPT)"))==0 ) { buf += strlength("ACCEPT)"); symbol->verb = RegexVerb_Accept; }
+                    else if (strncmp(buf, "FAIL)"  , strlength("FAIL)"  ))==0 ) { buf += strlength("FAIL)"  ); symbol->verb = RegexVerb_Fail  ; }
+                    else if (strncmp(buf, "F)"     , strlength("F)"     ))==0 ) { buf += strlength("F)"     ); symbol->verb = RegexVerb_Fail  ; }
+                    else if (strncmp(buf, "COMMIT)", strlength("COMMIT)"))==0 ) { buf += strlength("COMMIT)"); symbol->verb = RegexVerb_Commit; }
+                    else if (strncmp(buf, "PRUNE)" , strlength("PRUNE)" ))==0 ) { buf += strlength("PRUNE)" ); symbol->verb = RegexVerb_Prune ; }
+                    else if (strncmp(buf, "SKIP)"  , strlength("SKIP)"  ))==0 ) { buf += strlength("SKIP)"  ); symbol->verb = RegexVerb_Skip  ; }
+                    else if (strncmp(buf, "THEN)"  , strlength("THEN)"  ))==0 ) { buf += strlength("THEN)"  ); symbol->verb = RegexVerb_Then  ; }
+                    else
+                        throw RegexParsingError(buf, "(*VERB) not recognized or malformed");
+                    symbol = NULL; // don't allow a quantifer on a verb
+                    goto not_a_group;
+                    break;
                 default:
                     group = new RegexGroupCapturing(backrefIndex++);
                     break;
