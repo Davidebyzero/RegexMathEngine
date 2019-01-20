@@ -761,6 +761,10 @@ template <bool USE_STRINGS>
 class Backtrack_LeaveGroup : public BacktrackNode<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
+    friend class Backtrack_LeaveCaptureGroup<false>;
+    friend class Backtrack_LeaveCaptureGroup<true>;
+    friend class Backtrack_LeaveCaptureGroupLazily<false>;
+    friend class Backtrack_LeaveCaptureGroupLazily<true>;
     Uint64 position;
     Uint64 loopCount;
     Uint numCaptured;
@@ -852,6 +856,8 @@ template <bool USE_STRINGS>
 class Backtrack_LeaveGroupLazily : public Backtrack_LeaveGroup<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
+
+protected:
     Uint64 positionDiff; // could be a boolean, but would that mess with alignment?
 
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
@@ -915,6 +921,12 @@ template <> class Backtrack_LeaveCaptureGroup_Base<true, false> // only used in 
     {
         return captureTuple(length, NULL, ((RegexGroupCapturing*)matcher.groupStackTop->group)->backrefIndex);
     }
+    void fprintCapture(RegexMatcher<false> &matcher, FILE *f)
+    {
+        fputs(", precapture=", f);
+        matcher.fprintCapture(f, length, NULL);
+        fputc('\n', f);
+    }
 };
 template <> class Backtrack_LeaveCaptureGroup_Base<true, true> // only used in enable_persistent_backrefs mode
 {
@@ -949,6 +961,12 @@ template <> class Backtrack_LeaveCaptureGroup_Base<true, true> // only used in e
     {
         return captureTuple(length, offset, ((RegexGroupCapturing*)matcher.groupStackTop->group)->backrefIndex);
     }
+    void fprintCapture(RegexMatcher<true> &matcher, FILE *f)
+    {
+        fputs(", precapture=", f);
+        matcher.fprintCapture(f, length, offset);
+        fputc('\n', f);
+    }
 };
 
 template <>
@@ -965,6 +983,12 @@ class Backtrack_LeaveCaptureGroup<false> : public Backtrack_LeaveGroup<false>, p
     virtual captureTuple popForAtomicForwardCapture(RegexMatcher<false> &matcher, Uint captureNum)
     {
         return Backtrack_LeaveCaptureGroup_Base::popForAtomicForwardCapture(matcher, captureNum);
+    }
+    virtual void fprintDebug(RegexMatcher<false> &matcher, FILE *f)
+    {
+        fputs("Backtrack_LeaveCaptureGroup", f);
+        Backtrack_LeaveGroup<false>::fprintDebugBase(matcher, f);
+        fprintCapture(matcher, f);
     }
 };
 
@@ -983,6 +1007,13 @@ class Backtrack_LeaveCaptureGroupLazily<false> : public Backtrack_LeaveGroupLazi
     {
         return Backtrack_LeaveCaptureGroup_Base::popForAtomicForwardCapture(matcher, captureNum);
     }
+    virtual void fprintDebug(RegexMatcher<false> &matcher, FILE *f)
+    {
+        fputs("Backtrack_LeaveCaptureGroupLazily", f);
+        Backtrack_LeaveGroup<false>::fprintDebugBase(matcher, f);
+        fprintf(f, ", positionDiff=%llu\n", positionDiff);
+        fprintCapture(matcher, f);
+    }
 };
 
 template <>
@@ -1000,6 +1031,12 @@ class Backtrack_LeaveCaptureGroup<true> : public Backtrack_LeaveGroup<true>, pub
     {
         return Backtrack_LeaveCaptureGroup_Base::popForAtomicForwardCapture(matcher, captureNum);
     }
+    virtual void fprintDebug(RegexMatcher<true> &matcher, FILE *f)
+    {
+        fputs("Backtrack_LeaveCaptureGroup", f);
+        Backtrack_LeaveGroup<true>::fprintDebugBase(matcher, f);
+        fprintCapture(matcher, f);
+    }
 };
 
 template <>
@@ -1016,6 +1053,13 @@ class Backtrack_LeaveCaptureGroupLazily<true> : public Backtrack_LeaveGroupLazil
     virtual captureTuple popForAtomicForwardCapture(RegexMatcher<true> &matcher, Uint captureNum)
     {
         return Backtrack_LeaveCaptureGroup_Base::popForAtomicForwardCapture(matcher, captureNum);
+    }
+    virtual void fprintDebug(RegexMatcher<true> &matcher, FILE *f)
+    {
+        fputs("Backtrack_LeaveCaptureGroupLazily", f);
+        Backtrack_LeaveGroup<true>::fprintDebugBase(matcher, f);
+        fprintf(f, ", positionDiff=%llu\n", positionDiff);
+        fprintCapture(matcher, f);
     }
 };
 
