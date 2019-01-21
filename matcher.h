@@ -802,7 +802,7 @@ class Backtrack_BeginAtomicGroup : public BacktrackNode<USE_STRINGS>
     }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
-        return false;
+        return true;
     }
     virtual bool isAtomicGroup()
     {
