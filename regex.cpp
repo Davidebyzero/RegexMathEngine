@@ -600,6 +600,15 @@ int main(int argc, char *argv[])
                     printf("%llu -> %llu\n", a, returnMatch);
                 else
                     printf("%llu -> no match (FALSE NEGATIVE)\n", a);
+                if (a == 12200160415121876738)
+                {
+#   if defined(TEST_FOR_FALSE_POSITIVES)
+                    for (Uint64 i=a+1; i!=0; i++)
+                        if (regex.MatchNumber(i, mathMode, returnMatch))
+                            printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+#   endif
+                    break;
+                }
 #   if defined(TEST_FOR_FALSE_POSITIVES)
                 for (Uint64 i=a+1; i<b; i++)
                     if (regex.MatchNumber(i, mathMode, returnMatch))
