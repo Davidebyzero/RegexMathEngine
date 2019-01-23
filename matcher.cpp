@@ -599,6 +599,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Verb_Prune(RegexSymbol *thisSymbol)
     symbol++;
 }
 
+const char Backtrack_VerbName_Skip[] = ""; // dummy string, not actually used; just here to make g++ happy
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::matchSymbol_Verb_Skip(RegexSymbol *thisSymbol)
 {

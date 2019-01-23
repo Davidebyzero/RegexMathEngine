@@ -90,6 +90,7 @@ public:
 
 extern const char Backtrack_VerbName_Commit[];
 extern const char Backtrack_VerbName_Prune [];
+extern const char Backtrack_VerbName_Skip  [];
 extern const char Backtrack_VerbName_Then  [];
 
 struct captureTuple
@@ -127,7 +128,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     friend class BacktrackNode<USE_STRINGS>;
     friend class Backtrack_Verb<USE_STRINGS, RegexVerb_Commit, Backtrack_VerbName_Commit>;
     friend class Backtrack_Verb<USE_STRINGS, RegexVerb_Prune , Backtrack_VerbName_Prune >;
-    friend class Backtrack_Verb<USE_STRINGS, RegexVerb_Skip  , NULL                     >;
+    friend class Backtrack_Verb<USE_STRINGS, RegexVerb_Skip  , Backtrack_VerbName_Skip  >;
     friend class Backtrack_Verb<USE_STRINGS, RegexVerb_Then  , Backtrack_VerbName_Then  >;
     friend class Backtrack_Skip<USE_STRINGS>;
     friend class Backtrack_AtomicCapture<USE_STRINGS>;
@@ -250,6 +251,11 @@ public:
     inline ~RegexMatcher();
     bool Match(RegexGroup &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
 };
+
+template <> void RegexMatcher<false>::fprintCapture(FILE *f, Uint64 length, const char *offset);
+template <> void RegexMatcher<false>::fprintCapture(FILE *f, Uint i);
+template <> void RegexMatcher<true>::fprintCapture(FILE *f, Uint64 length, const char *offset);
+template <> void RegexMatcher<true>::fprintCapture(FILE *f, Uint i);
 
 template<> inline void RegexMatcher<false>::readCapture(Uint index, Uint64 &multiple, const char *&pBackref)
 {
@@ -465,7 +471,7 @@ template <bool USE_STRINGS>
 class Backtrack_Prune : public Backtrack_Verb<USE_STRINGS, RegexVerb_Prune, Backtrack_VerbName_Prune> {};
 
 template <bool USE_STRINGS>
-class Backtrack_Skip : public Backtrack_Verb<USE_STRINGS, RegexVerb_Skip, NULL>
+class Backtrack_Skip : public Backtrack_Verb<USE_STRINGS, RegexVerb_Skip, Backtrack_VerbName_Skip>
 {
     friend class RegexMatcher<USE_STRINGS>;
     Uint64 skipPosition;
