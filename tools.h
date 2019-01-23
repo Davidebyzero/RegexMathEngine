@@ -38,10 +38,17 @@ template <size_t size>
 char (*__strlength_helper(char const (&_String)[size]))[size];
 #define strlength(_String) (sizeof(*__strlength_helper(_String))-1)
 
+#ifdef __has_builtin
+#define HAS_BUILTIN(x) __has_builtin(x)
+#else
+#define HAS_BUILTIN(x) 0
+#endif
+
 #ifdef _MSC_VER
 #define UNREACHABLE_CODE __assume(0)
-#elif defined(__GNUC__) || __has_builtin(__builtin_unreachable)
+#elif defined(__GNUC__) || HAS_BUILTIN(__builtin_unreachable)
 #define UNREACHABLE_CODE __builtin_unreachable()
+#else
 #endif
 
 #ifdef _MSC_VER
