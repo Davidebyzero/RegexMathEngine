@@ -636,7 +636,17 @@ int main(int argc, char *argv[])
                     printf("%llu -> %llu\n", a, returnMatch);
                 else
                     printf("%llu -> no match (FALSE NEGATIVE)\n", a);
-                a += a;
+                Uint64 a2 = a + a;
+                if (a2 == 0)
+                {
+#   if defined(TEST_FOR_FALSE_POSITIVES)
+                    for (Uint64 i=a+1; i!=0; i++)
+                        if (regex.MatchNumber(i, mathMode, returnMatch))
+                            printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+#   endif
+                    break;
+                }
+                a = a2;
             }
 #elif defined(TEST_NUMBERS_TRIANGULAR)
             Uint n=0, m=1, z=0;
