@@ -749,7 +749,8 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
         {
             if (debugTrace)
                 fputs("\n\n""Non-match found inside lookaround conditional; jumping to \"no\" alternative", stderr);
-            matcher.symbol = (*++matcher.alternative)->symbols;
+            matcher.alternative++;
+            matcher.symbol = *matcher.alternative ? (*matcher.alternative)->symbols : &nullSymbol;
             matcher.currentMatch = ULLONG_MAX;
             return true;
         }

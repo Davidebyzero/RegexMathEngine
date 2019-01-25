@@ -1168,7 +1168,8 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                     {
                         if (debugTrace)
                             fputs("Match found inside negative lookahead conditional, resulting in a non-match outside it; jumping to \"no\" alternative\n\n", stderr);
-                        symbol = (*++alternative)->symbols;
+                        alternative++;
+                        symbol = *alternative ? (*alternative)->symbols : &nullSymbol;
                     }
                     else
                         nonMatch(true);
