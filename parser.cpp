@@ -691,6 +691,8 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
             try
             {
                 symbol->minCount = readNumericConstant<Uint>(buf);
+                if (symbol->minCount == UINT_MAX) // this value is reserved to mean "unlimited"
+                    throw ParsingError();
             }
             catch (ParsingError)
             {
@@ -715,6 +717,8 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                     try
                     {
                         symbol->maxCount = readNumericConstant<Uint>(buf);
+                        if (symbol->maxCount == UINT_MAX) // this value is reserved to mean "unlimited"
+                            throw ParsingError();
                     }
                     catch (ParsingError)
                     {
