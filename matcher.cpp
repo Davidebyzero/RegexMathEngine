@@ -506,6 +506,59 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
     {
         if (runtimeOptimize_matchSymbol_Character_or_Backref(thisSymbol, multiple, repetend))
             return;
+        if (thisSymbol->lazy)
+        {
+            currentMatch = thisSymbol->minCount;
+            if (!doesRepetendMatch(repetend, multiple, currentMatch))
+            {
+                nonMatch();
+                return;
+            }
+        }
+        else
+        {
+            if (thisSymbol->maxCount == UINT_MAX)
+            {
+                Uint64 spaceLeft = input - position;
+                currentMatch = spaceLeft / multiple;
+                if (currentMatch < thisSymbol->minCount)
+                {
+                    nonMatch();
+                    return;
+                }
+                if (USE_STRINGS && repetend)
+                {
+                    countRepetendMatches(repetend, multiple);
+                    if (currentMatch < thisSymbol->minCount)
+                    {
+                        nonMatch();
+                        return;
+                    }
+                }
+                if (currentMatch > thisSymbol->minCount)
+                    pushStack();
+                if (USE_STRINGS)
+                    position += currentMatch * multiple;
+                else
+                    position = input - spaceLeft % multiple;
+                currentMatch = ULLONG_MAX;
+                symbol++;
+                return;
+            }
+            else
+            {
+                currentMatch = thisSymbol->maxCount;
+                if (USE_STRINGS && repetend)
+                {
+                    countRepetendMatches(repetend, multiple);
+                    if (currentMatch < thisSymbol->minCount)
+                    {
+                        nonMatch();
+                        return;
+                    }
+                }
+            }
+        }
     }
     else
         goto try_next_match;

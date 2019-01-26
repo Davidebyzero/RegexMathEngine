@@ -411,58 +411,5 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
             }
         }
     }
-    if (thisSymbol->lazy)
-    {
-        currentMatch = thisSymbol->minCount;
-        if (!doesRepetendMatch(repetend, multiple, currentMatch))
-        {
-            nonMatch();
-            return true;
-        }
-    }
-    else
-    {
-        if (thisSymbol->maxCount == UINT_MAX)
-        {
-            Uint64 spaceLeft = input - position;
-            currentMatch = spaceLeft / multiple;
-            if (currentMatch < thisSymbol->minCount)
-            {
-                nonMatch();
-                return true;
-            }
-            if (USE_STRINGS && repetend)
-            {
-                countRepetendMatches(repetend, multiple);
-                if (currentMatch < thisSymbol->minCount)
-                {
-                    nonMatch();
-                    return true;
-                }
-            }
-            if (currentMatch > thisSymbol->minCount)
-                pushStack();
-            if (USE_STRINGS)
-                position += currentMatch * multiple;
-            else
-                position = input - spaceLeft % multiple;
-            currentMatch = ULLONG_MAX;
-            symbol++;
-            return true;
-        }
-        else
-        {
-            currentMatch = thisSymbol->maxCount;
-            if (USE_STRINGS && repetend)
-            {
-                countRepetendMatches(repetend, multiple);
-                if (currentMatch < thisSymbol->minCount)
-                {
-                    nonMatch();
-                    return true;
-                }
-            }
-        }
-    }
     return false;
 }
