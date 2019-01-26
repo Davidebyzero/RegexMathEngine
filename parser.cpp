@@ -410,7 +410,14 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                         buf+=2;
                         if (allow_conditionals && inrange(*buf, '0', '9'))
                         {
-                            group = new RegexConditional(readNumericConstant<Uint>(buf) - 1);
+                            try
+                            {
+                                group = new RegexConditional(readNumericConstant<Uint>(buf) - 1);
+                            }
+                            catch (ParsingError)
+                            {
+                                throw RegexParsingError(buf, "Group number is too big");
+                            }
                             if (*buf != ')')
                                 throw RegexParsingError(buf, "Missing closing parenthesis for condition");
                             buf++;
@@ -571,7 +578,14 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 {
                     RegexBackref *backref = new RegexBackref;
                     addSymbol(buf0, symbol = backref);
-                    backref->index = readNumericConstant<Uint>(buf) - 1;
+                    try
+                    {
+                        backref->index = readNumericConstant<Uint>(buf) - 1;
+                    }
+                    catch (ParsingError)
+                    {
+                        throw RegexParsingError(buf, "Group number is too big");
+                    }
                 }
                 else
                 {
@@ -674,7 +688,14 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
             buf++;
             if (!inrange(*buf, '0', '9'))
                 throw RegexParsingError(buf, "Non-numeric character after {");
-            symbol->minCount = readNumericConstant<Uint>(buf);
+            try
+            {
+                symbol->minCount = readNumericConstant<Uint>(buf);
+            }
+            catch (ParsingError)
+            {
+                throw RegexParsingError(buf, "Number too big in {} quantifier");
+            }
             if (*buf == '}')
             {
                 buf++;
@@ -691,7 +712,14 @@ RegexParser::RegexParser(RegexGroup &regex, const char *buf)
                 }
                 else
                 {
-                    symbol->maxCount = readNumericConstant<Uint>(buf);
+                    try
+                    {
+                        symbol->maxCount = readNumericConstant<Uint>(buf);
+                    }
+                    catch (ParsingError)
+                    {
+                        throw RegexParsingError(buf, "Number too big in {} quantifier");
+                    }
                     if (symbol->maxCount < symbol->minCount)
                         throw RegexParsingError(buf, "Numbers out of order in {} quantifier");
                     if (*buf != '}')
