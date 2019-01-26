@@ -158,6 +158,7 @@ void RegexMatcher<USE_STRINGS>::leaveLazyGroup()
     {
         Backtrack_LeaveCaptureGroupLazily<USE_STRINGS> *pushStackCapture = stack.template push< Backtrack_LeaveCaptureGroupLazily<USE_STRINGS> >();
         pushStackCapture->setCapture(*this);
+        pushStack = pushStackCapture;
     }
     else
         pushStack = stack.template push< Backtrack_LeaveGroupLazily<USE_STRINGS> >();
