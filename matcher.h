@@ -1123,7 +1123,7 @@ class Backtrack_LeaveCaptureGroupLazily<false> : public Backtrack_LeaveGroupLazi
     {
         fputs("Backtrack_LeaveCaptureGroupLazily", f);
         Backtrack_LeaveGroup<false>::fprintDebugBase(matcher, f);
-        fprintf(f, ", positionDiff=%llu\n", positionDiff);
+        fprintf(f, ", positionDiff=%llu", positionDiff);
         fprintCapture(matcher, f);
     }
 };
