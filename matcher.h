@@ -745,7 +745,7 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
             matcher.currentMatch = ULLONG_MAX;
             return true;
         }
-        if (matcher.groupStackTop->group->type == RegexGroup_LookaroundConditional)
+        if (matcher.groupStackTop->group->type == RegexGroup_LookaroundConditional && group == ((RegexLookaroundConditional*)matcher.groupStackTop->group)->lookaround)
         {
             if (debugTrace)
                 fputs("\n\n""Non-match found inside lookaround conditional; jumping to \"no\" alternative", stderr);
