@@ -231,6 +231,8 @@ class RegexLookaroundConditional : public RegexGroup
     friend class RegexParser;
     friend class RegexMatcher<false>;
     friend class RegexMatcher<true>;
+    friend class Backtrack_EnterGroup<false>;
+    friend class Backtrack_EnterGroup<true>;
     RegexGroup *lookaround;
 public:
     RegexLookaroundConditional(RegexGroup *lookaround) : RegexGroup(RegexGroup_LookaroundConditional), lookaround(lookaround) {}

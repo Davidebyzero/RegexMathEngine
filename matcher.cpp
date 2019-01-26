@@ -267,6 +267,9 @@ void *RegexMatcher<USE_STRINGS>::loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pus
 
     if (group->type == RegexGroup_Atomic)
         stack.template push< Backtrack_BeginAtomicGroup<USE_STRINGS> >();
+    else
+    if (group->type == RegexGroup_LookaroundConditional)
+        enterGroup(((RegexLookaroundConditional*)group)->lookaround);
 
     return (void*)pushLoop->buffer;
 }
