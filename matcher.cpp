@@ -934,6 +934,7 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                     delete *thisSymbol;
                     *thisSymbol = originalSymbol;
                 }
+                thisSymbol++;
                 break;
             case RegexSymbol_Verb:
                 switch ((*thisSymbol)->verb)
