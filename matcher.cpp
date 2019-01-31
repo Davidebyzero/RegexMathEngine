@@ -1241,6 +1241,13 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 if (group->lazy && groupStackTop->loopCount >= group->minCount)
                     leaveLazyGroup();
                 else
+                if (no_empty_after_minimum && position == groupStackTop->position && group->minCount != group->maxCount && inrange(groupStackTop->loopCount, group->minCount+1, group->maxCount))
+                {
+                    if (debugTrace)
+                        fputs("Empty match found in group with maximum quantifer unsatisfied; treating this as a non-match\n\n", stderr);
+                    nonMatch();
+                }
+                else
                 if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || group->maxCount == UINT_MAX && groupStackTop->loopCount >= group->minCount && position == groupStackTop->position)
                     leaveMaxedOutGroup();
                 else

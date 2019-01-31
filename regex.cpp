@@ -76,6 +76,7 @@ Uint debugTrace = 0;
 bool free_spacing_mode = false;
 bool emulate_ECMA_NPCGs = true;
 bool allow_empty_character_classes = true;
+bool no_empty_after_minimum = true;
 bool allow_quantifiers_on_assertions = true;
 bool allow_molecular_lookahead = false;
 bool allow_atomic_groups = false;
@@ -118,6 +119,13 @@ Options:\n\
                       or \"[^]\", is permitted. \"-\" makes it an error to attempt\n\
                       to use them (as in most regex engines), and \"+\" allows\n\
                       them (as in ECMAScript). The default is \"+\".\n\
+  --neam{-|+}         Specifies what to do when an empty match occurs in a group\n\
+                      that has a minimum and maximum quantifier different from\n\
+                      each other (e.g. \"?\", \"+\", \"{3,5}\"). \"-\" makes the engine\n\
+                      exit the group and not attempt to fulfill the maximum.\n\
+                      \"+\" makes it backtrack in an attempt to find a non-empty\n\
+                      match. The default is \"+\" (standard ECMAScript behavior).\n\
+                      Stands for \"no empty after minimum\".\n\
   --qa{-|+}           Specifies whether to allow quantifiers on assertions:\n\
                       lookaheads, anchors, and word boundaries/nonboundaries.\n\
                       \"-\" disallows them, and \"+\" allows them (the default).\n\
@@ -137,7 +145,8 @@ Options:\n\
                                   (*PRUNE), (*SKIP), and (*THEN)\n\
                       all  Enable all of the above extensions\n\
   --pcre              Emulate PCRE as closely as currently possible. This\n\
-                      is equivalent to \"-x ag,pq,cnd,rs,pbr --npcg- --ecc-\".\n\
+                      is equivalent to:\n\
+                      --npcg- --ecc- --neam- -x ag,pq,cnd,rs,pbr\n\
   -o                  Show only the part of the line that matched\n\
   -O NUMBER           Specifies the optimization level, from 0 to 2. This\n\
                       controls whether optimizations are enabled which skip\n\
@@ -289,6 +298,14 @@ int main(int argc, char *argv[])
                     allow_empty_character_classes = argv[i][2 + strlength("ecc")] == '+';
                 }
                 else
+                if (strncmp(&argv[i][2], "neam", strlength("neam"))==0 &&
+                    (argv[i][2 + strlength("neam")] == '-' ||
+                     argv[i][2 + strlength("neam")] == '+' ) &&
+                    !argv[i][2 + strlength("neam") + 1])
+                {
+                    no_empty_after_minimum = argv[i][2 + strlength("neam")] == '+';
+                }
+                else
                 if (strncmp(&argv[i][2], "qa", strlength("qa"))==0 &&
                     (argv[i][2 + strlength("qa")] == '-' ||
                      argv[i][2 + strlength("qa")] == '+' ) &&
@@ -301,6 +318,7 @@ int main(int argc, char *argv[])
                 {
                     emulate_ECMA_NPCGs = false;
                     allow_empty_character_classes = false;
+                    no_empty_after_minimum = false;
                     allow_quantifiers_on_assertions = true;
                     allow_molecular_lookahead = false;
                     allow_atomic_groups = true;
