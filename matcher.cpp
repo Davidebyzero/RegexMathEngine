@@ -787,18 +787,6 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_WordCharacter(RegexSymbol *thisSymbo
         matchSymbol_Character_or_Backref(thisSymbol, 1, (const char *)NULL);
 }
 
-template <bool USE_STRINGS>
-void RegexMatcher<USE_STRINGS>::matchSymbol_IsPowerOf2(RegexSymbol *thisSymbol)
-{
-    Uint64 spaceLeft = input - position;
-    if ((spaceLeft != 0 || thisSymbol->lazy) && !(spaceLeft & (spaceLeft - 1)))
-    {
-        symbol++;
-        return;
-    }
-    nonMatch();
-}
-
 template<> bool RegexMatcher<false>::characterCanMatch(RegexSymbol *thisSymbol)
 {
     if (thisSymbol->characterAny)

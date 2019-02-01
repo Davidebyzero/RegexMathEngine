@@ -1,4 +1,16 @@
 template <bool USE_STRINGS>
+void RegexMatcher<USE_STRINGS>::matchSymbol_IsPowerOf2(RegexSymbol *thisSymbol)
+{
+    Uint64 spaceLeft = input - position;
+    if ((spaceLeft != 0 || thisSymbol->lazy) && !(spaceLeft & (spaceLeft - 1)))
+    {
+        symbol++;
+        return;
+    }
+    nonMatch();
+}
+
+template <bool USE_STRINGS>
 ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbol **thisSymbol)
 // return true if the group has been rewritten into a specialized symbol
 {
