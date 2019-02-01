@@ -854,10 +854,10 @@ int main(int argc, char *argv[])
                     if (!regex.MatchString(str, returnMatch, returnMatchLength))
                         printf("%llu, %llu - NON-MATCH!\n", j, k);
                     else
-                    if (inrangex(j, returnMatch-str, returnMatch-str + returnMatchLength))
+                    if (inrangex64(j, returnMatch-str, returnMatch-str + returnMatchLength))
                         printf("%llu, %llu -> %llu,%llu - INCORRECT! (delimiter included in match)\n", j, k, j - (returnMatch-str), returnMatch-str + returnMatchLength - (j+1));
                     else
-                    if (!inrange(returnMatchLength, j, k))
+                    if (!inrange64(returnMatchLength, j, k))
                         printf("%llu, %llu -> %llu - INCORRECT! (outside range)\n", j, k, returnMatchLength);
                     else
                     {
