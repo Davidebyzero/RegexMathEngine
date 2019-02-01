@@ -56,6 +56,7 @@ enum RegexSymbolType
     RegexSymbol_WordCharacterNot,
     RegexSymbol_WordCharacter,
 
+    RegexSymbol_IsPrime,
     RegexSymbol_IsPowerOf2,
 };
 

@@ -1,3 +1,17 @@
+#include "math-optimization.h"
+
+template <bool USE_STRINGS>
+void RegexMatcher<USE_STRINGS>::matchSymbol_IsPrime(RegexSymbol *thisSymbol)
+{
+    Uint64 spaceLeft = input - position;
+    if (inrange64(spaceLeft, thisSymbol->lazy, 1) || isPrime(spaceLeft))
+    {
+        symbol++;
+        return;
+    }
+    nonMatch();
+}
+
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::matchSymbol_IsPowerOf2(RegexSymbol *thisSymbol)
 {
@@ -17,11 +31,55 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
     if (optimizationLevel >= 2)
     {
         RegexGroup *const group = (RegexGroup*)(*thisSymbol);
-        // (?!(x(xx)+|)\1*$)
         if (!USE_STRINGS && group->type == RegexGroup_NegativeLookahead && group->minCount)
         {
             RegexPattern **insideAlternative = group->alternatives;
             RegexSymbol **insideSymbol = insideAlternative[0]->symbols;
+
+            // (?!(xx+|)\1+$)
+            if (!insideAlternative[+1] &&
+                insideSymbol[0] && insideSymbol[0]->type==RegexSymbol_Group &&
+                insideSymbol[1] && insideSymbol[1]->type==RegexSymbol_Backref && insideSymbol[1]->minCount==1 && insideSymbol[1]->maxCount==UINT_MAX &&
+                insideSymbol[2] && insideSymbol[2]->type==RegexSymbol_AnchorEnd && insideSymbol[2]->minCount && !insideSymbol[3])
+            {
+                RegexGroup *insideGroup = (RegexGroup*)insideSymbol[0];
+                if (insideGroup->type == RegexGroup_Capturing && insideGroup->minCount==1 && insideGroup->maxCount==1 &&
+                    ((RegexBackref*)insideSymbol[1])->index == ((RegexGroupCapturing*)insideGroup)->backrefIndex)
+                {
+                    bool matchZero = true;
+                    RegexPattern **innerAlternative = insideGroup->alternatives;
+                    RegexSymbol **innerSymbol;
+                    if (innerAlternative[1] && !innerAlternative[2] &&
+                        (!innerAlternative[0]->symbols[0] && (innerSymbol = innerAlternative[1]->symbols)[0] ||
+                            !innerAlternative[1]->symbols[0] && (innerSymbol = innerAlternative[0]->symbols)[0]))
+                    {
+                        matchZero = false;
+                    }
+                    else
+                        innerSymbol = innerAlternative[0]->symbols;
+
+                    if (innerSymbol[0] && innerSymbol[0]->type==RegexSymbol_Character && innerSymbol[0]->minCount==1 && innerSymbol[0]->maxCount==1        && characterCanMatch(innerSymbol[0]) &&
+                        innerSymbol[1] && innerSymbol[1]->type==RegexSymbol_Character && innerSymbol[1]->minCount==1 && innerSymbol[1]->maxCount==UINT_MAX && characterCanMatch(innerSymbol[1]) && !innerSymbol[2])
+                    {
+                        RegexSymbol   *originalSymbol    = (*thisSymbol);
+                        const char    *originalCode      = (*thisSymbol)->originalCode;
+                        RegexPattern **parentAlternative = (*thisSymbol)->parentAlternative;
+
+                        *thisSymbol = new RegexSymbol(RegexSymbol_IsPrime);
+                        (*thisSymbol)->lazy              = matchZero ? 0 : 1;
+                        (*thisSymbol)->parentAlternative = parentAlternative;
+                        (*thisSymbol)->self              = thisSymbol;
+                        (*thisSymbol)->originalCode      = originalCode;
+                        (*thisSymbol)->originalSymbol    = originalSymbol;
+                        matchFunction(*thisSymbol) = &RegexMatcher<USE_STRINGS>::matchSymbol_IsPrime;
+                        thisSymbol++;
+                        init_isPrime();
+                        return true;
+                    }
+                }
+            }
+
+            // (?!(x(xx)+|)\1*$)
             if (!insideAlternative[+1] &&
                 insideSymbol[0] && insideSymbol[0]->type==RegexSymbol_Group &&
                 insideSymbol[1] && insideSymbol[1]->type==RegexSymbol_Backref && insideSymbol[1]->minCount==0 && insideSymbol[1]->maxCount==UINT_MAX &&

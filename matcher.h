@@ -230,6 +230,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void matchSymbol_Space                (RegexSymbol *thisSymbol);
     void matchSymbol_WordCharacterNot     (RegexSymbol *thisSymbol);
     void matchSymbol_WordCharacter        (RegexSymbol *thisSymbol);
+    void matchSymbol_IsPrime              (RegexSymbol *thisSymbol);
     void matchSymbol_IsPowerOf2           (RegexSymbol *thisSymbol);
 
     template <typename MATCH_TYPE>
