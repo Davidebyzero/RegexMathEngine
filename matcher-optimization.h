@@ -25,7 +25,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
             if (!insideAlternative[+1] &&
                 insideSymbol[0] && insideSymbol[0]->type==RegexSymbol_Group &&
                 insideSymbol[1] && insideSymbol[1]->type==RegexSymbol_Backref && insideSymbol[1]->minCount==0 && insideSymbol[1]->maxCount==UINT_MAX &&
-                insideSymbol[2] && insideSymbol[2]->type==RegexSymbol_AnchorEnd && insideSymbol[2]->maxCount && !insideSymbol[3])
+                insideSymbol[2] && insideSymbol[2]->type==RegexSymbol_AnchorEnd && insideSymbol[2]->minCount && !insideSymbol[3])
             {
                 RegexGroup *insideGroup = (RegexGroup*)insideSymbol[0];
                 if (insideGroup->type == RegexGroup_Capturing && insideGroup->minCount==1 && insideGroup->maxCount==1 &&
