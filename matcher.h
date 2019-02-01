@@ -15,6 +15,7 @@
 #pragma warning(disable : 4355)
 
 extern RegexPattern *nullAlternative;
+extern RegexSymbol  *nullSymbol;
 
 template <bool> class BacktrackNode;
 template <bool> class RegexMatcher;
