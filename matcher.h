@@ -173,7 +173,13 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     char match; // zero = looking for match, negative = match failed, positive = match found
     bool anchored; // indicates whether we can optimize the search by only trying a match at the start
 
-    void nonMatch(bool negativeLookahead = false);
+    enum NonMatchType
+    {
+        NonMatch_Default,
+        NonMatch_NegativeLookahead,
+        NonMatch_NEAM,
+    };
+    void nonMatch(NonMatchType type = NonMatch_Default);
     void yesMatch(Uint64 newPosition, bool haveChoice);
     void pushStack();
     void enterGroup(RegexGroup *group);
