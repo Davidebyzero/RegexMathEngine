@@ -59,6 +59,8 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
 // strings mode
 //#define TEST_TRIPLES
 //#define TEST_MULTIPLICATION
+//#define TEST_BINARY_SUM
+//#define TEST_DECIMAL_SUM
 //#define TEST_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED
 //#define TEST_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED
 //#define TEST_SMOOTH_NUMBERS
@@ -70,6 +72,12 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
 
 #define TEST_FOR_FALSE_POSITIVES  // combines with all other tests
 
+
+// George Marsaglia's multiply with carry PRNG; very fast, but much more random than linear congruential
+#define znew  ((z=36969*(z&65535)+(z>>16))<<16)
+#define wnew  ((w=18000*(w&65535)+(w>>16))&65535)
+#define IUNI  (znew+wnew)
+static Uint32 z=362436069, w=521288629;
 
 // todo: implement these as class members rather than global variables?
 Uint debugTrace = 0;
@@ -801,6 +809,119 @@ int main(int argc, char *argv[])
                         }
                     }
                 }
+            }
+#elif defined(TEST_BINARY_SUM)
+            const Uint bits = 16;
+            const Uint size = 1 << bits;
+            char str[bits + strlength(" + ") + bits + strlength(" = ") + bits + 1];
+            str[bits    ] = ' ';
+            str[bits  +1] = '+';
+            str[bits  +2] = ' ';
+            str[bits*2+3] = ' ';
+            str[bits*2+4] = '=';
+            str[bits*2+5] = ' ';
+            str[bits*3+6] = '\0';
+            bool useNoZeroesInAllButFirstNumber = true;
+            for (;;)
+            {
+                Uint a = IUNI  & (size-1);
+                Uint b = IUNI  & (size-1);
+                Uint c = (a+b) & (size-1);
+
+#   ifdef TEST_FOR_FALSE_POSITIVES
+                Uint corruptedBits = IUNI % 4;
+                for (Uint i=0; i<corruptedBits; i++)
+                    c ^= 1 << (IUNI % bits);
+#   endif
+
+                if (useNoZeroesInAllButFirstNumber)
+                {
+                    a = 0;
+                    b = size-1;
+                    c = a + b;
+                    useNoZeroesInAllButFirstNumber = false;
+                }
+
+#   ifdef TEST_FOR_FALSE_POSITIVES
+                bool wrong = ((a + b) & (size-1)) != c;
+#   else
+                const bool wrong = false;
+#   endif
+
+                for (Uint i=0; i<bits; i++)
+                    str[i] = (a & (1<<(bits-1-i))) ? '1' : '0';
+                for (Uint i=0; i<bits; i++)
+                    str[bits + 3 + i] = (b & (1<<(bits-1-i))) ? '1' : '0';
+                for (Uint i=0; i<bits; i++)
+                    str[bits*2 + 6 + i] = (c & (1<<(bits-1-i))) ? '1' : '0';
+
+                const char *returnMatch;
+                size_t returnMatchLength;
+                if (!regex.MatchString(str, returnMatch, returnMatchLength))
+                {
+                    if (!wrong)
+                        printf("%04X+%04X=%04X: %s - FALSE NEGATIVE!\n", a, b, c, str);
+                    /*else
+                        printf("%04X+%04X=%04X: %s - correct\n", a, b, c, str);*/
+                }
+                else
+                {
+                    if (wrong)
+                        printf("%04X+%04X=%04X: %s - FALSE POSITIVE!\n", a, b, c, str);
+                    /*else
+                        printf("%04X+%04X=%04X: %s - incorrect\n", a, b, c, str);*/
+                }
+            }
+#elif defined(TEST_DECIMAL_SUM)
+            const Uint digits = 10;
+            const Uint64 size = 10000000000;
+            char str[digits + strlength(" + ") + digits + strlength(" = ") + digits + 1];
+            bool useNoZeroesInAllButFirstNumber = true;
+            for (Uint64 ii=0;; ii++)
+            {
+                Uint64 a = IUNI  % size;
+                Uint64 b = IUNI  % size;
+                Uint64 c = (a+b) % size;
+
+#   ifdef TEST_FOR_FALSE_POSITIVES
+                Uint corruptedDigits = IUNI % 4;
+                for (Uint i=0; i<corruptedDigits; i++)
+                {
+                    Uint digit = IUNI % digits;
+                    int64 div = 1;
+                    for (Uint j=0; j<digit; j++)
+                        div *= 10;
+                    c -= (((int64)c / div) % 10 - (int64)(IUNI % 10)) * div;
+                }
+#   endif
+
+                sprintf(str, "%0*llu + %0*llu = %0*llu", digits, a, digits, b, digits, c);
+
+#   ifdef TEST_FOR_FALSE_POSITIVES
+                bool wrong = (a + b) % size != c;
+#   else
+                const bool wrong = false;
+#   endif
+
+                const char *returnMatch;
+                size_t returnMatchLength;
+                if (!regex.MatchString(str, returnMatch, returnMatchLength))
+                {
+                    if (!wrong)
+                        printf("%s - FALSE NEGATIVE!\n", str);
+                    /*else
+                        printf("%s - correct\n", str);*/
+                }
+                else
+                {
+                    if (wrong)
+                        printf("%s - FALSE POSITIVE!\n", str);
+                    /*else
+                        printf("%s - incorrect\n", str);*/
+                }
+
+                if (ii%0x10000==0)
+                    printf("%llu\n", ii);
             }
 #elif defined(TEST_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED) || defined(TEST_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED)
             const char *returnMatch;
