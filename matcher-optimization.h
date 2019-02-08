@@ -135,6 +135,45 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                     }
                 }
             }
+
+            // (?!(x*)(\1\1)+$)
+            if (!insideAlternative[+1] &&
+                insideSymbol[0] && insideSymbol[0]->type==RegexSymbol_Group &&
+                insideSymbol[1] && insideSymbol[1]->type==RegexSymbol_Group &&
+                insideSymbol[2] && insideSymbol[2]->type==RegexSymbol_AnchorEnd && insideSymbol[2]->minCount && !insideSymbol[3])
+            {
+                RegexGroup *insideGroup1 = (RegexGroup*)insideSymbol[0];
+                RegexGroup *insideGroup2 = (RegexGroup*)insideSymbol[1];
+                if (        insideGroup1->type == RegexGroup_Capturing                           && insideGroup1->minCount==1 && insideGroup1->maxCount==1 && !insideGroup1->possessive && !insideGroup1->alternatives[1] &&
+                    inrange(insideGroup2->type, RegexGroup_NonCapturing, RegexGroup_BranchReset) && insideGroup2->minCount==1 && insideGroup2->maxCount==UINT_MAX                       && !insideGroup2->alternatives[1])
+                {
+                    RegexSymbol **innerSymbol1 = insideGroup1->alternatives[0]->symbols;
+                    RegexSymbol **innerSymbol2 = insideGroup2->alternatives[0]->symbols;
+                    if (innerSymbol1[0] && innerSymbol1[0]->type==RegexSymbol_Character && innerSymbol1[0]->minCount<=1 && innerSymbol1[0]->maxCount==UINT_MAX && characterCanMatch(innerSymbol1[0]) && !innerSymbol1[1] &&
+                        innerSymbol2[0] && innerSymbol2[0]->type==RegexSymbol_Backref   && innerSymbol2[0]->minCount==1 && innerSymbol2[0]->maxCount==1 &&
+                        innerSymbol2[1] && innerSymbol2[1]->type==RegexSymbol_Backref   && innerSymbol2[1]->minCount==1 && innerSymbol2[1]->maxCount==1 && !innerSymbol2[2])
+                    {
+                        Uint backrefIndex = ((RegexGroupCapturing*)insideGroup1)->backrefIndex;
+                        if (((RegexBackref*)innerSymbol2[0])->index == backrefIndex &&
+                            ((RegexBackref*)innerSymbol2[1])->index == backrefIndex)
+                        {
+                            RegexSymbol   *originalSymbol    = (*thisSymbol);
+                            const char    *originalCode      = (*thisSymbol)->originalCode;
+                            RegexPattern **parentAlternative = (*thisSymbol)->parentAlternative;
+
+                            *thisSymbol = new RegexSymbol(RegexSymbol_IsPowerOf2);
+                            (*thisSymbol)->lazy              = (bool&)innerSymbol1[0]->minCount; // can be cast by reinterpretation since the value has already been narrowed down to being 0 or 1
+                            (*thisSymbol)->parentAlternative = parentAlternative;
+                            (*thisSymbol)->self              = thisSymbol;
+                            (*thisSymbol)->originalCode      = originalCode;
+                            (*thisSymbol)->originalSymbol    = originalSymbol;
+                            matchFunction(*thisSymbol) = &RegexMatcher<USE_STRINGS>::matchSymbol_IsPowerOf2;
+                            thisSymbol++;
+                            return true;
+                        }
+                    }
+                }
+            }
         }
     }
     return false;
