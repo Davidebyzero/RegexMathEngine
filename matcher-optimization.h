@@ -92,14 +92,16 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                     bool matchZero = true;
                     RegexPattern **innerAlternative = insideGroup->alternatives;
                     RegexSymbol **innerSymbol;
-                    if (innerAlternative[1] && !innerAlternative[2] &&
-                        (!innerAlternative[0]->symbols[0] && (innerSymbol = innerAlternative[1]->symbols)[0] ||
-                            !innerAlternative[1]->symbols[0] && (innerSymbol = innerAlternative[0]->symbols)[0]))
-                    {
-                        matchZero = false;
-                    }
-                    else
+                    if (!innerAlternative[1])
                         innerSymbol = innerAlternative[0]->symbols;
+                    else
+                    {
+                        if (innerAlternative[2])
+                            return false;
+                        if (!innerAlternative[0]->symbols[0] && (innerSymbol = innerAlternative[1]->symbols)[0] ||
+                            !innerAlternative[1]->symbols[0] && (innerSymbol = innerAlternative[0]->symbols)[0])
+                            matchZero = false;
+                    }
 
                     if (innerSymbol[0] && innerSymbol[0]->type==RegexSymbol_Character && innerSymbol[0]->minCount==1 && innerSymbol[0]->maxCount==1        && characterCanMatch(innerSymbol[0]) &&
                         innerSymbol[1] && innerSymbol[1]->type==RegexSymbol_Group     && innerSymbol[1]->minCount==1 && innerSymbol[1]->maxCount==UINT_MAX && !innerSymbol[1]->possessive && !innerSymbol[2])
