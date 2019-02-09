@@ -177,7 +177,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     {
         NonMatch_Default,
         NonMatch_NegativeLookahead,
-        NonMatch_NEAM,
+        NonMatch_EmptyOptional,
     };
     void nonMatch(NonMatchType type = NonMatch_Default);
     void yesMatch(Uint64 newPosition, bool haveChoice);

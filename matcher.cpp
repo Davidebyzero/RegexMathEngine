@@ -29,7 +29,7 @@ void RegexMatcher<USE_STRINGS>::nonMatch(NonMatchType type)
         case NonMatch_NegativeLookahead:
             fputs("Match found inside negative lookahead, resulting in a non-match outside it\n\n", stderr);
             break;
-        case NonMatch_NEAM:
+        case NonMatch_EmptyOptional:
             fputs("Empty match found in group with maximum quantifer unsatisfied; treating this as a non-match\n\n", stderr);
             break;
         default:
@@ -1240,8 +1240,8 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
                 if (group->lazy && groupStackTop->loopCount >= group->minCount)
                     leaveLazyGroup();
                 else
-                if (no_empty_after_minimum && position == groupStackTop->position && group->minCount != group->maxCount && inrange(groupStackTop->loopCount, group->minCount+1, group->maxCount))
-                    nonMatch(NonMatch_NEAM);
+                if (no_empty_optional && position == groupStackTop->position && group->minCount != group->maxCount && inrange(groupStackTop->loopCount, group->minCount+1, group->maxCount))
+                    nonMatch(NonMatch_EmptyOptional);
                 else
                 if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || group->maxCount == UINT_MAX && groupStackTop->loopCount >= group->minCount && position == groupStackTop->position)
                     leaveMaxedOutGroup();
