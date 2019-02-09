@@ -103,32 +103,41 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                             matchZero = false;
                     }
 
-                    if (innerSymbol[0] && innerSymbol[0]->type==RegexSymbol_Character && innerSymbol[0]->minCount==1 && innerSymbol[0]->maxCount==1        && characterCanMatch(innerSymbol[0]) &&
-                        innerSymbol[1] && innerSymbol[1]->type==RegexSymbol_Group     && innerSymbol[1]->minCount==1 && innerSymbol[1]->maxCount==UINT_MAX && !innerSymbol[1]->possessive && !innerSymbol[2])
+                    RegexSymbol *innerSymbol1, *innerSymbol2;
+                    if ((innerSymbol1 = innerSymbol[0]) && (innerSymbol2 = innerSymbol[1]) && !innerSymbol[2])
                     {
-                        RegexGroup *innerGroup = (RegexGroup*)innerSymbol[1];
-                        if (innerGroup->type == RegexGroup_Capturing || innerGroup->type == RegexGroup_NonCapturing)
+                        if (innerSymbol[0]->type == RegexSymbol_Group)
                         {
-                            RegexPattern **innermostAlternative = innerGroup->alternatives;
-                            RegexSymbol **innermostSymbol;
-                            if (!innermostAlternative[1])
+                            innerSymbol1 = innerSymbol[1];
+                            innerSymbol2 = innerSymbol[0];
+                        }
+                        if (innerSymbol1->type==RegexSymbol_Character && innerSymbol1->minCount==1 && innerSymbol1->maxCount==1        && characterCanMatch(innerSymbol1) &&
+                            innerSymbol2->type==RegexSymbol_Group     && innerSymbol2->minCount==1 && innerSymbol2->maxCount==UINT_MAX && !innerSymbol2->possessive)
+                        {
+                            RegexGroup *innerGroup = (RegexGroup*)innerSymbol2;
+                            if (innerGroup->type == RegexGroup_Capturing || innerGroup->type == RegexGroup_NonCapturing)
                             {
-                                innermostSymbol = innermostAlternative[0]->symbols;
-                                if (innermostSymbol[0] && innermostSymbol[0]->type==RegexSymbol_Character && innermostSymbol[0]->minCount==2 && innermostSymbol[0]->maxCount==2 && characterCanMatch(innermostSymbol[0]) && !innermostSymbol[1])
+                                RegexPattern **innermostAlternative = innerGroup->alternatives;
+                                RegexSymbol **innermostSymbol;
+                                if (!innermostAlternative[1])
                                 {
-                                    RegexSymbol   *originalSymbol    = (*thisSymbol);
-                                    const char    *originalCode      = (*thisSymbol)->originalCode;
-                                    RegexPattern **parentAlternative = (*thisSymbol)->parentAlternative;
+                                    innermostSymbol = innermostAlternative[0]->symbols;
+                                    if (innermostSymbol[0] && innermostSymbol[0]->type==RegexSymbol_Character && innermostSymbol[0]->minCount==2 && innermostSymbol[0]->maxCount==2 && characterCanMatch(innermostSymbol[0]) && !innermostSymbol[1])
+                                    {
+                                        RegexSymbol   *originalSymbol    = (*thisSymbol);
+                                        const char    *originalCode      = (*thisSymbol)->originalCode;
+                                        RegexPattern **parentAlternative = (*thisSymbol)->parentAlternative;
 
-                                    *thisSymbol = new RegexSymbol(RegexSymbol_IsPowerOf2);
-                                    (*thisSymbol)->lazy              = matchZero;
-                                    (*thisSymbol)->parentAlternative = parentAlternative;
-                                    (*thisSymbol)->self              = thisSymbol;
-                                    (*thisSymbol)->originalCode      = originalCode;
-                                    (*thisSymbol)->originalSymbol    = originalSymbol;
-                                    matchFunction(*thisSymbol) = &RegexMatcher<USE_STRINGS>::matchSymbol_IsPowerOf2;
-                                    thisSymbol++;
-                                    return true;
+                                        *thisSymbol = new RegexSymbol(RegexSymbol_IsPowerOf2);
+                                        (*thisSymbol)->lazy              = matchZero;
+                                        (*thisSymbol)->parentAlternative = parentAlternative;
+                                        (*thisSymbol)->self              = thisSymbol;
+                                        (*thisSymbol)->originalCode      = originalCode;
+                                        (*thisSymbol)->originalSymbol    = originalSymbol;
+                                        matchFunction(*thisSymbol) = &RegexMatcher<USE_STRINGS>::matchSymbol_IsPowerOf2;
+                                        thisSymbol++;
+                                        return true;
+                                    }
                                 }
                             }
                         }
