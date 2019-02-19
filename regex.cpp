@@ -10,6 +10,7 @@
  */
 
 #include <stdio.h>
+#include <math.h>
 
 #include "regex.h"
 #include "parser.h"
@@ -69,6 +70,7 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
 //#define TEST_NUMBERS_FIBONACCI
 //#define TEST_NUMBERS_POWER_OF_2
 //#define TEST_NUMBERS_TRIANGULAR
+//#define TEST_DIV_SQRT2
 
 #define TEST_FOR_FALSE_POSITIVES  // combines with all other tests
 
@@ -693,6 +695,34 @@ int main(int argc, char *argv[])
                     printf("%llu -> no match (FALSE NEGATIVE)\n", n);
                 n += m;
                 m++;
+            }
+#elif defined(TEST_DIV_SQRT2)
+            const double sqrt2 = sqrt(2.);
+            for (Uint64 i=0;; i++)
+            {
+                Uint64 answer = (Uint64)floor(i / sqrt2);
+                Uint64 returnMatch;
+                bool matched = regex.MatchNumber(i, mathMode, returnMatch);
+                if (!matched)
+                {
+                    printf("%9llu -> NOT MATCHED!\n", i);
+                    if (lineBuffered)
+                        fflush(stdout);
+                }
+                else
+                if (returnMatch != answer)
+                {
+                    printf("%9llu -> %9llu (off by %2lld, should be %9llu)\n", i, returnMatch, returnMatch-answer, answer);
+                    if (lineBuffered)
+                        fflush(stdout);
+                }
+                else
+                if (i <= 10 || i % (1<<4) == 0 || i >= 940)
+                {
+                    printf("%9llu -> %9llu\n", i, returnMatch);
+                    if (lineBuffered)
+                        fflush(stdout);
+                }
             }
 #else
             if (testNumInc)
