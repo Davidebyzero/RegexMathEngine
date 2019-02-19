@@ -60,6 +60,7 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
 // strings mode
 //#define TEST_TRIPLES
 //#define TEST_MULTIPLICATION
+//#define TEST_MULTIPLICATION_INCLUDING_ZERO
 //#define TEST_BINARY_SUM
 //#define TEST_DECIMAL_SUM
 //#define TEST_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED
@@ -799,21 +800,26 @@ int main(int argc, char *argv[])
                 if (++n == 0)
                     break;
             }
-#elif defined(TEST_MULTIPLICATION)
+#elif defined(TEST_MULTIPLICATION) || defined(TEST_MULTIPLICATION_INCLUDING_ZERO)
+#   ifdef TEST_MULTIPLICATION_INCLUDING_ZERO
+            const Uint start = 0;
+#   else
+            const Uint start = 1;
+#   endif
             const Uint range = 25;
             char str[range + strlength("*") + range + strlength("=") + range*range + 1];
-            for (Uint a=1; a<=range; a++)
+            for (Uint a=start; a<=range; a++)
             {
                 for (Uint i=0; i<a; i++)
                     str[i] = 'x';
                 str[a] = '*';
-                for (Uint b=1; b<=range; b++)
+                for (Uint b=start; b<=range; b++)
                 {
                     for (Uint i=0; i<b; i++)
                         str[a+1+i] = 'x';
                     str[a+1+b] = '=';
 #   ifdef TEST_FOR_FALSE_POSITIVES
-                    for (Uint c=1; c<=range*range; c++)
+                    for (Uint c=start; c<=range*range; c++)
 #   else
                     Uint c = a * b;
 #   endif
