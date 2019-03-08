@@ -301,7 +301,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                                     break;
                                 if (lookaheadSymbol == group->alternatives[0]->symbols && optimizationLevel >= 2)
                                 {
-                                    if (!lookaheadSymbol[+1] && !thisSymbol->lazy || lookaheadSymbol[+1]->type == RegexSymbol_AnchorEnd)
+                                    if (lookaheadSymbol[+1] ? (lookaheadSymbol[+1]->type == RegexSymbol_AnchorEnd) : !thisSymbol->lazy)
                                     {
                                         if (totalLength > input || cannotMatch)
                                         {
