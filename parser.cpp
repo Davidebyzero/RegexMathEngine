@@ -11,6 +11,14 @@
 
 #include "regex.h"
 #include "parser.h"
+#include <stack>
+
+struct anchorStackNode
+{
+    bool allAlternativesAreAnchored;
+    bool currentAlternativeAnchored;
+    anchorStackNode(int) : allAlternativesAreAnchored(true), currentAlternativeAnchored(false) {}
+};
 
 RegexSymbolType RegexParser::symbolWithLowercaseOpposite(RegexSymbolType neg, RegexSymbolType pos, char ch, char chNeg)
 {
@@ -158,7 +166,7 @@ void RegexParser::closeGroup(RegexPattern **&alternatives, std::queue<RegexPatte
     alternatives[i] = NULL;
 }
 
-RegexParser::RegexParser(RegexGroup &regex, const char *buf)
+RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
 {
     regex.originalCode = buf;
     regex.parentAlternative = NULL;
@@ -746,12 +754,17 @@ finished_parsing:
     RegexGroup *rootGroup = &regex;
     RegexPattern **thisAlternative;
     RegexSymbol  **thisSymbol = &(RegexSymbol*&)rootGroup;
+    std::stack<anchorStackNode> anchorStack;
     for (;;)
     {
         if (*thisSymbol)
         {
             switch ((*thisSymbol)->type)
             {
+            case RegexSymbol_AnchorStart:
+                anchorStack.top().currentAlternativeAnchored = true;
+                thisSymbol++;
+                break;
             case RegexSymbol_Backref:
                 if (((RegexBackref*)(*thisSymbol))->index >= backrefIndex)
                     throw RegexParsingError((*thisSymbol)->originalCode, "reference to non-existent capture group");
@@ -766,18 +779,22 @@ finished_parsing:
                 *groupStackTop++ = group;
                 thisAlternative = group->alternatives;
                 thisSymbol      = group->alternatives[0]->symbols;
+                anchorStack.push(0);
                 if (group->type == RegexGroup_LookaroundConditional)
                 {
                     group = ((RegexLookaroundConditional*)group)->lookaround;
                     *groupStackTop++ = group;
                     thisAlternative = group->alternatives;
                     thisSymbol      = group->alternatives[0]->symbols;
+                    anchorStack.push(0);
                 }
                 break;
             }
         }
         else
         {
+            anchorStack.top().allAlternativesAreAnchored &= anchorStack.top().currentAlternativeAnchored;
+            anchorStack.top().currentAlternativeAnchored = false;
             thisAlternative++;
             if (*thisAlternative)
                 thisSymbol = (*thisAlternative)->symbols;
@@ -788,8 +805,19 @@ finished_parsing:
                     break;
                 thisAlternative = group->parentAlternative;
                 thisSymbol      = group->self ? group->self + 1 : (*thisAlternative)->symbols; // group->self will be NULL if this is the lookaround in a conditional
+
+                bool anchored = anchorStack.top().allAlternativesAreAnchored;
+                anchorStack.pop();
+                if (group->self && group->minCount && group->type != RegexGroup_NegativeLookahead)
+                    anchorStack.top().currentAlternativeAnchored |= anchored;
             }
         }
     }
     delete [] groupStackBase;
+
+#ifdef _DEBUG
+    if (anchorStack.size() != 1)
+        throw "Anchor stack error";
+#endif
+    regex.anchored = anchorStack.top().allAlternativesAreAnchored;
 }

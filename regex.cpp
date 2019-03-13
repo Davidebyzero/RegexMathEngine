@@ -18,7 +18,7 @@
 
 class Regex
 {
-    RegexGroup regex;
+    RegexGroupRoot regex;
     Uint numCaptureGroups;
     Uint maxGroupDepth;
 public:
@@ -27,7 +27,7 @@ public:
     bool MatchString(const char *stringToMatchAgainst, const char *&returnMatch, size_t &returnMatchLength);
 };
 
-Regex::Regex(const char *buf) : regex(RegexGroup_NonCapturing)
+Regex::Regex(const char *buf)
 {
     regex.type = RegexGroup_NonCapturing;
     regex.minCount = 1;

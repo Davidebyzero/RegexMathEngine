@@ -875,10 +875,7 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_AlwaysMatch;
                 }
                 else
-                {
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_AnchorStart;
-                    groupStackTop[-1].currentAlternativeAnchored = true;
-                }
                 break;
             case RegexSymbol_AnchorEnd:
                 if ((*thisSymbol)->minCount == 0)
@@ -953,8 +950,6 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                     break;
                 matchFunction(*thisSymbol) = &RegexMatcher<USE_STRINGS>::matchSymbol_Group;
                 RegexGroup *group = (RegexGroup*)(*thisSymbol);
-                groupStackTop->numAnchoredAlternatives = 0;
-                groupStackTop->currentAlternativeAnchored = false;
                 (*groupStackTop++).group = group;
                 thisAlternative = group->alternatives;
                 thisSymbol      = group->alternatives[0]->symbols;
@@ -970,19 +965,14 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
         }
         else
         {
-            groupStackTop[-1].numAnchoredAlternatives += groupStackTop[-1].currentAlternativeAnchored;
-            groupStackTop[-1].currentAlternativeAnchored = false;
             thisAlternative++;
             if (*thisAlternative)
                 thisSymbol = (*thisAlternative)->symbols;
             else
             {
                 RegexGroup *group = (*--groupStackTop).group;
-                anchored = groupStackTop->numAnchoredAlternatives == thisAlternative - group->alternatives;
                 if (groupStackTop == groupStackBase)
                     return;
-                if (group->minCount && group->type != RegexGroup_NegativeLookahead)
-                    groupStackTop[-1].currentAlternativeAnchored |= anchored;
                 thisAlternative = group->parentAlternative;
                 thisSymbol      = group->self ? group->self + 1 : (*thisAlternative)->symbols; // group->self will be NULL if this is the lookaround in a conditional
             }
@@ -1063,7 +1053,7 @@ void RegexMatcher<USE_STRINGS>::popAtomicGroup(RegexGroup *const group)
 }
 
 template <bool USE_STRINGS>
-bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength)
+bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength)
 {
     delete [] groupStackBase;
     groupStackBase = new GroupStackNode [maxGroupDepth];
@@ -1376,11 +1366,11 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroup &regex, Uint numCaptureGroups, 
         if (debugTrace)
         {
             fputs("No match found", stderr);
-            if (curPosition+1 <= input && !anchored)
+            if (curPosition+1 <= input && !regex.anchored)
                 fprintf(stderr, "; trying at {%llu}", curPosition+1);
             fputs("\n\n", stderr);
         }
-        if (anchored)
+        if (regex.anchored)
             break;
     }
 
@@ -1446,5 +1436,5 @@ void RegexMatcher<true>::fprintCapture(FILE *f, Uint i)
     fprintCapture(f, captures[i], captureOffsets[i]);
 }
 
-template bool RegexMatcher<false>::Match(RegexGroup &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
-template bool RegexMatcher<true >::Match(RegexGroup &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
+template bool RegexMatcher<false>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
+template bool RegexMatcher<true >::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);

@@ -171,7 +171,6 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     Uint64 numSteps;
 
     char match; // zero = looking for match, negative = match failed, positive = match found
-    bool anchored; // indicates whether we can optimize the search by only trying a match at the start
 
     enum NonMatchType
     {
@@ -257,7 +256,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
 public:
     inline RegexMatcher();
     inline ~RegexMatcher();
-    bool Match(RegexGroup &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
+    bool Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
 };
 
 template <> void RegexMatcher<false>::fprintCapture(FILE *f, Uint64 length, const char *offset);
@@ -325,19 +324,9 @@ class GroupStackNode
     friend class Backtrack_TryMatch<false>;
     friend class Backtrack_TryMatch<true>;
 
-    union
-    {
-        struct // for the matcher parsing stage
-        {
-            size_t numAnchoredAlternatives;
-            bool currentAlternativeAnchored;
-        };
-        struct // for the matching stage
-        {
-            Uint64 position;
-            Uint64 loopCount; // how many times "group" has been matched
-        };
-    };
+    Uint64 position;
+    Uint64 loopCount; // how many times "group" has been matched
+
     RegexGroup *group;
     Uint numCaptured; // how many capture groups inside this group (including nested groups) have been pushed onto the capture stack
 };

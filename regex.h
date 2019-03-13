@@ -201,6 +201,16 @@ public:
     }
 };
 
+class RegexGroupRoot : public RegexGroup
+{
+    friend class RegexParser;
+    friend class RegexMatcher<false>;
+    friend class RegexMatcher<true>;
+    bool anchored; // indicates whether we can optimize the search by only trying a match at the start
+public:
+    RegexGroupRoot() : RegexGroup(RegexGroup_NonCapturing) {}
+};
+
 class RegexGroupCapturing : public RegexGroup
 {
     friend class RegexMatcher<false>;

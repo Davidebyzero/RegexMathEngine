@@ -46,5 +46,5 @@ class RegexParser
     void closeAlternative(RegexSymbol **&symbols, std::queue<RegexSymbol*> &symbolQueue);
     void closeGroup(RegexPattern **&alternatives, std::queue<RegexPattern*> &patternQueue);
 public:
-    RegexParser(RegexGroup &regex, const char *buf);
+    RegexParser(RegexGroupRoot &regex, const char *buf);
 };
