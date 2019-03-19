@@ -338,9 +338,8 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
                         }
                     }
                     else
-                    if (*buf == '-')
                     {
-                        if (buf[+1] != ']')
+                        if (*buf == '-' && buf[+1] != ']')
                         {
                             if (inRange == 1)
                             {
@@ -353,11 +352,6 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
                             if (inRange < 0)
                                 throw RegexParsingError(buf, "Invalid range in character class");
                         }
-                        goto process_buf_char_for_charClass;
-                    }
-                    else
-                    {
-                    process_buf_char_for_charClass:
                         ch = *buf;
                     process_char_for_charClass:
                         if (inRange == 2)
