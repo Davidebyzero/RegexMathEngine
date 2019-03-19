@@ -347,16 +347,17 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
                                 inRange = 2;
                                 firstCharInRange = ch;
                                 buf++;
+                                continue;
                             }
                             else
                             if (inRange < 0)
                                 throw RegexParsingError(buf, "Invalid range in character class");
                         }
-                        else
-                            goto process_char_for_charClass;
+                        goto process_buf_char_for_charClass;
                     }
                     else
                     {
+                    process_buf_char_for_charClass:
                         ch = *buf;
                     process_char_for_charClass:
                         if (inRange == 2)
