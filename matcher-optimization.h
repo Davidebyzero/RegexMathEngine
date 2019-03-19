@@ -245,8 +245,15 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                         }
                     }
 
+                    Uint64 alreadyCaptured = position - groupStackTop->position;
                     Uint64 spaceLeft = input - position;
-                    currentMatch = spaceLeft / (multiple * divisor);
+                    currentMatch = (alreadyCaptured + spaceLeft) / (multiple * divisor);
+                    if (currentMatch < alreadyCaptured)
+                    {
+                        nonMatch();
+                        return true;
+                    }
+                    currentMatch -= alreadyCaptured;
                     if (currentMatch < thisSymbol->minCount)
                     {
                         nonMatch();
