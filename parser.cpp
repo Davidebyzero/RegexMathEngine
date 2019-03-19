@@ -798,10 +798,15 @@ finished_parsing:
                 RegexGroup *group = *--groupStackTop;
                 if (groupStackTop == groupStackBase)
                     break;
+
+                bool anchored = anchorStack.top().allAlternativesAreAnchored;
+                // conditionals with only 1 alternative have an implied empty second alternative (which is not anchored)
+                if ((group->type==RegexGroup_Conditional || group->type==RegexGroup_LookaroundConditional) && (thisAlternative - group->alternatives)==1)
+                    anchored = false;
+
                 thisAlternative = group->parentAlternative;
                 thisSymbol      = group->self ? group->self + 1 : (*thisAlternative)->symbols; // group->self will be NULL if this is the lookaround in a conditional
 
-                bool anchored = anchorStack.top().allAlternativesAreAnchored;
                 anchorStack.pop();
                 if (group->self && group->minCount && group->type != RegexGroup_NegativeLookahead)
                     anchorStack.top().currentAlternativeAnchored |= anchored;
