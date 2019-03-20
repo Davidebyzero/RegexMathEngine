@@ -514,19 +514,17 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                             symbol++;
                             if (multiplicationGroup && remainder == 0)
                             {
-                                if (afterEndOfGroup)
-                                    thisGroup->lazy ? leaveLazyGroup() : leaveMaxedOutGroup();
-
                                 spaceLeft = input - position;
                                 // todo: check for overflow
                                 Uint64 product = (totalLengthSmallerFactor ? totalLengthSmallerFactor : multiplication-1) * multiplication;
+                                position = input - product;
+                                if (afterEndOfGroup)
+                                    thisGroup->lazy ? leaveLazyGroup() : leaveMaxedOutGroup();
                                 if (spaceLeft < product)
                                 {
                                     nonMatch();
                                     return true;
                                 }
-
-                                position = input - product;
                                 enterGroup(multiplicationGroup);
                                 symbol = multiplicationAnchor;
                                 position = input;
