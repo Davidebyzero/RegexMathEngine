@@ -1183,7 +1183,7 @@ class Backtrack_LoopGroup : public BacktrackNode<USE_STRINGS>
 
 protected:
     Uint64 position;
-    Uint numCaptured;
+    Uint numCaptured; // this member is not really needed in enable_persistent_backrefs mode (as its value is 1 or 0 based entirely on whether it's a capture group or not), but 64-bit alignment would waste this space anyway if it were not used
     Uint alternative;
     Uint64 oldPosition;
     Uint8 buffer[FLEXIBLE_SIZE_ARRAY];

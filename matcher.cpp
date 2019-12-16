@@ -205,7 +205,7 @@ Backtrack_LoopGroup<USE_STRINGS> *RegexMatcher<USE_STRINGS>::pushStack_LoopGroup
     else
     {
         Uint backrefIndex = ((RegexGroupCapturing*)groupStackTop->group)->backrefIndex;
-        set_numCaptured = (groupStackTop->group->type == RegexGroup_Capturing && captures[backrefIndex] != NON_PARTICIPATING_CAPTURE_GROUP) ? 1 : 0;
+        set_numCaptured = (groupStackTop->group->type == RegexGroup_Capturing) ? 1 : 0;
         size = Backtrack_LoopGroup<USE_STRINGS>::get_size(set_numCaptured);
     }
     Backtrack_LoopGroup<USE_STRINGS> *pushStack = stack.template push< Backtrack_LoopGroup<USE_STRINGS> >(size);
@@ -253,15 +253,15 @@ void *RegexMatcher<USE_STRINGS>::loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pus
     if (group->type == RegexGroup_Capturing)
     {
         Uint backrefIndex = ((RegexGroupCapturing*)group)->backrefIndex;
-        if (pushLoop->numCaptured = captures[backrefIndex] != NON_PARTICIPATING_CAPTURE_GROUP)
-        {
-            const char *&dummy = (const char *&)pushLoop->buffer;
-            if (!USE_STRINGS)
-                readCapture(backrefIndex, *(Uint64*)(pushLoop->buffer                      ), dummy);
-            else
-                readCapture(backrefIndex, *(Uint64*)(pushLoop->buffer + sizeof(const char*)), *(const char**)pushLoop->buffer);
-        }
-        if (writeCaptureRelative(backrefIndex, groupStackTop->position, position) && pushLoop->numCaptured == 0)
+        pushLoop->numCaptured = 1;
+
+        const char *&dummy = (const char *&)pushLoop->buffer;
+        if (!USE_STRINGS)
+            readCapture(backrefIndex, *(Uint64*)(pushLoop->buffer                      ), dummy);
+        else
+            readCapture(backrefIndex, *(Uint64*)(pushLoop->buffer + sizeof(const char*)), *(const char**)pushLoop->buffer);
+
+        if (writeCaptureRelative(backrefIndex, groupStackTop->position, position) && captures[backrefIndex] == NON_PARTICIPATING_CAPTURE_GROUP)
         {
             *captureStackTop++ = backrefIndex;
             groupStackTop->numCaptured++;
