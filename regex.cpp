@@ -57,23 +57,26 @@ bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMat
 }
 
 
-// strings mode
-//#define TEST_TRIPLES
-//#define TEST_MULTIPLICATION
-//#define TEST_MULTIPLICATION_INCLUDING_ZERO
-//#define TEST_BINARY_SUM
-//#define TEST_DECIMAL_SUM
-//#define TEST_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED
-//#define TEST_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED
-//#define TEST_SMOOTH_NUMBERS
-
-// numerical mode
-//#define TEST_NUMBERS_FIBONACCI
-//#define TEST_NUMBERS_POWER_OF_2
-//#define TEST_NUMBERS_TRIANGULAR
-//#define TEST_DIV_SQRT2
-
-#define TEST_FOR_FALSE_POSITIVES  // combines with all other tests
+enum StringModeTest
+{
+    StringModeTest_NONE,
+    StringModeTest_TRIPLES,
+    StringModeTest_MULTIPLICATION,
+    StringModeTest_MULTIPLICATION_INCLUDING_ZERO,
+    StringModeTest_BINARY_SUM,
+    StringModeTest_DECIMAL_SUM,
+    StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED,
+    StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED,
+    StringModeTest_SMOOTH_NUMBERS,
+};
+enum NumericalModeTest
+{
+    NumericalModeTest_NONE,
+    NumericalModeTest_NUMBERS_FIBONACCI,
+    NumericalModeTest_NUMBERS_POWER_OF_2,
+    NumericalModeTest_NUMBERS_TRIANGULAR,
+    NumericalModeTest_DIV_SQRT2,
+};
 
 
 // George Marsaglia's multiply with carry PRNG; very fast, but much more random than linear congruential
@@ -169,6 +172,11 @@ Options:\n\
   -t NUM0[..NUM1]     (In numerical mode only) Test the range of numbers from\n\
                       NUM0 to NUM1, inclusive. If NUM1 is not specified, only\n\
                       one number, NUM0, shall be tested.\n\
+  --test=TEST         Execute one of the built-in tests aimed at specific\n\
+                      challenges. Use --test alone to show a list of available\n\
+					  tests.\n\
+  --test-false+       Enable testing false positives for whichever built-in test\n\
+                      is selected. Must be combined with \"--test=\".\n\
   --trace             Enable printout of debug trace. Use this parameter twice\n\
                       to include a dump of the backtracking stack at every step\n\
                       (which is extremely verbose).\n\
@@ -176,6 +184,53 @@ Options:\n\
                       number. Currently works only in numerical mode when\n\
                       taking input from standard input.\n\
 ", argv0);
+}
+
+static void printTestList()
+{
+    fprintf(stderr, "\
+String mode tests:\n\
+  triples                  Match multiples of 3 in decimal notation.\n\
+\n\
+  multiplication           Match correct multiplication in unary. Example:\n\
+     xxx*xxxx=xxxxxxxxxxxxxxxx\n\
+\n\
+  multiplication-0         Match correct multiplication in unary, where\n\
+                           factors can be equal to zero. Examples:\n\
+     *xxxx=\n\
+     xxx*=\n\
+     xxx*xxxx=xxxxxxxxxxxxxxxx\n\
+\n\
+  binary-sum               Match correct addition in 16-digit binary, where the\n\
+                           carry bit is discarded. Examples:\n\
+     1100100101100000 + 0000000011011100 = 1100101000111100\n\
+     1111011011101110 + 0110001010000100 = 0101100101110010\n\
+\n\
+  decimal-sum              Match correct addition in 10-digit decimal, where the\n\
+                           carry is discarded. Examples:\n\
+     1293972669 + 6684886271 = 7978858940\n\
+     2107255058 + 8170104067 = 0277359125\n\
+\n\
+  decimal-byte             Match decimal numbers in the range 0-255, with no\n\
+                           leading zeroes allowed.\n\
+\n\
+  decimal-byte-0           Match decimal numbers in the range 0-255, with\n\
+                           leading zeroes allowed.\n\
+\n\
+  smoothest-numbers        Test solutions to CCGC question #36384 - take two\n\
+                           unary numbers as input, delimited by a comma, and\n\
+                           return as a match the number within that inclusive\n\
+                           range which has the smallest prime factor. If there\n\
+                           are more than one with the same smallest prime\n\
+                           factor, any one of them will be accepted.\n\
+\n\
+Numerical mode (unary) tests:\n\
+  Fibonacci                Match only Fibonacci numbers.\n\
+  power-of-2               Match only powers of 2.\n\
+  triangular               Match only triangular numbers.\n\
+  div-sqrt2                Take any number as input, and output that number\n\
+                           divided by the square root of 2, rounded down.\n\
+");
 }
 
 static int loadPatternFile(char *&buf, const char *filename)
@@ -207,7 +262,6 @@ static void errorMoreThanOnePattern(const char *argv0)
     printShortUsage(argv0);
 }
 
-#ifdef TEST_SMOOTH_NUMBERS
 static Uint64 largestPrimeFactor(Uint64 n)
 {
     for (Uint64 k=n/2; k>1;)
@@ -222,13 +276,15 @@ static Uint64 largestPrimeFactor(Uint64 n)
     }
     return n;
 }
-#endif
 
 int main(int argc, char *argv[])
 {
     // crudely implemented getopt-command-line interface; probably replace it with getopt later
     char *buf = NULL;
     char mathMode = '\0'; // if nonzero, enables math mode and specifies what character to use
+    StringModeTest stringModeTest = StringModeTest_NONE;
+    NumericalModeTest numericalModeTest = NumericalModeTest_NONE;
+    bool testForFalsePositives = false;
     bool verbose = false;
     bool lineBuffered = false;
     bool showMatch = false;
@@ -347,6 +403,43 @@ int main(int argc, char *argv[])
                 if (strcmp(&argv[i][2], "trace")==0)
                 {
                     debugTrace++;
+                }
+                else
+                if (strcmp(&argv[i][2], "test")==0)
+                {
+                    printTestList();
+                    return 0;
+                }
+                else
+                if (strncmp(&argv[i][2], "test=", strlength("test="))==0)
+                {
+                    if (stringModeTest != StringModeTest_NONE || numericalModeTest != NumericalModeTest_NONE)
+                    {
+                        fprintf(stderr, "Error: Cannot do more than one test in a single run\n");
+                        return -1;
+                    }
+                    {{}} if (strcmp(&argv[i][2+strlength("test=")], "triples"          )==0) stringModeTest = StringModeTest_TRIPLES;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "multiplication"   )==0) stringModeTest = StringModeTest_MULTIPLICATION;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "multiplication-0" )==0) stringModeTest = StringModeTest_MULTIPLICATION_INCLUDING_ZERO;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "binary-sum"       )==0) stringModeTest = StringModeTest_BINARY_SUM;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "decimal-sum"      )==0) stringModeTest = StringModeTest_DECIMAL_SUM;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "decimal-byte"     )==0) stringModeTest = StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "decimal-byte-0"   )==0) stringModeTest = StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "smoothest-numbers")==0) stringModeTest = StringModeTest_SMOOTH_NUMBERS;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "Fibonacci"        )==0) numericalModeTest = NumericalModeTest_NUMBERS_FIBONACCI;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "power-of-2"       )==0) numericalModeTest = NumericalModeTest_NUMBERS_POWER_OF_2;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "triangular"       )==0) numericalModeTest = NumericalModeTest_NUMBERS_TRIANGULAR;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "div-sqrt2"        )==0) numericalModeTest = NumericalModeTest_DIV_SQRT2;
+                    else
+                    {
+                        fprintf(stderr, "Error: Unrecognized test \"%s\"\n", &argv[i][2+strlength("test=")]);
+                        return -1;
+                    }
+                }
+                else
+                if (strcmp(&argv[i][2], "test-false+")==0)
+                {
+                    testForFalsePositives = true;
                 }
                 else
                 {
@@ -622,443 +715,487 @@ int main(int argc, char *argv[])
 
         if (mathMode)
         {
-#if defined(TEST_NUMBERS_FIBONACCI)
-            Uint64 a=0, b=1;
-            for(;;)
+            if (stringModeTest != StringModeTest_NONE)
             {
-                Uint64 returnMatch;
-                if (regex.MatchNumber(a, mathMode, returnMatch))
-                    printf("%llu -> %llu\n", a, returnMatch);
-                else
-                    printf("%llu -> no match (FALSE NEGATIVE)\n", a);
-                if (a == 12200160415121876738)
-                {
-#   if defined(TEST_FOR_FALSE_POSITIVES)
-                    for (Uint64 i=a+1; i!=0; i++)
-                        if (regex.MatchNumber(i, mathMode, returnMatch))
-                            printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
-#   endif
-                    break;
-                }
-#   if defined(TEST_FOR_FALSE_POSITIVES)
-                for (Uint64 i=a+1; i<b; i++)
-                    if (regex.MatchNumber(i, mathMode, returnMatch))
-                        printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
-#   endif
-                Uint64 c = a + b;
-                a = b;
-                b = c;
+                fprintf(stderr, "Error: String Mode test specified in Numerical Mode\n");
+                return -1;
             }
-#elif defined(TEST_NUMBERS_POWER_OF_2)
-#   if defined(TEST_FOR_FALSE_POSITIVES)
-            Uint64 z=0;
-#   endif
-            Uint64 a=1;
-            for(;;)
+            switch (numericalModeTest)
             {
-                Uint64 returnMatch;
-#   if defined(TEST_FOR_FALSE_POSITIVES)
-                for (Uint64 i=z; i<a; i++)
-                    if (regex.MatchNumber(i, mathMode, returnMatch))
-                        printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
-                z = a+1;
-#   endif
-                if (regex.MatchNumber(a, mathMode, returnMatch))
-                    printf("%llu -> %llu\n", a, returnMatch);
-                else
-                    printf("%llu -> no match (FALSE NEGATIVE)\n", a);
-                Uint64 a2 = a + a;
-                if (a2 == 0)
+                case NumericalModeTest_NUMBERS_FIBONACCI:
                 {
-#   if defined(TEST_FOR_FALSE_POSITIVES)
-                    for (Uint64 i=a+1; i!=0; i++)
-                        if (regex.MatchNumber(i, mathMode, returnMatch))
-                            printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
-#   endif
-                    break;
-                }
-                a = a2;
-            }
-#elif defined(TEST_NUMBERS_TRIANGULAR)
-            Uint n=0, m=1, z=0;
-            for (;;)
-            {
-                Uint64 returnMatch;
-#   if defined(TEST_FOR_FALSE_POSITIVES)
-                for (Uint64 i=z; i<n; i++)
-                    if (regex.MatchNumber(i, mathMode, returnMatch))
-                        printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
-                z = n+1;
-#   endif
-                if (regex.MatchNumber(n, mathMode, returnMatch))
-                    printf("%llu -> %llu\n", n, returnMatch);
-                else
-                    printf("%llu -> no match (FALSE NEGATIVE)\n", n);
-                n += m;
-                m++;
-            }
-#elif defined(TEST_DIV_SQRT2)
-            const double sqrt2 = sqrt(2.);
-            for (Uint64 i=0;; i++)
-            {
-                Uint64 answer = (Uint64)floor(i / sqrt2);
-                Uint64 returnMatch;
-                bool matched = regex.MatchNumber(i, mathMode, returnMatch);
-                if (!matched)
-                {
-                    printf("%9llu -> NOT MATCHED!\n", i);
-                    if (lineBuffered)
-                        fflush(stdout);
-                }
-                else
-                if (returnMatch != answer)
-                {
-                    printf("%9llu -> %9llu (off by %2lld, should be %9llu)\n", i, returnMatch, returnMatch-answer, answer);
-                    if (lineBuffered)
-                        fflush(stdout);
-                }
-                else
-                if (i <= 10 || i % (1<<4) == 0 || i >= 940)
-                {
-                    printf("%9llu -> %9llu\n", i, returnMatch);
-                    if (lineBuffered)
-                        fflush(stdout);
-                }
-            }
-#else
-            if (testNumInc)
-                for (Uint64 i=testNum0;; i+=testNumInc)
-                {
-                    Uint64 returnMatch;
-                    if (regex.MatchNumber(i, mathMode, returnMatch))
+                    Uint64 a=0, b=1;
+                    for(;;)
                     {
-                        printf("%*llu -> %*llu\n", testNum_digits, i, testNum_digits, returnMatch);
-                        if (lineBuffered)
-                            fflush(stdout);
-                    }
-                    if (i==testNum1)
-                        break;
-                }
-            else
-            {
-                LineGetter lineGetter(1<<5);
-                for (;;)
-                {
-                    const char *line = lineGetter.fgets(stdin);
-                    if (!line)
-                        break;
-                    if (inrange(*line, '0', '9'))
-                    {
-                        Uint64 input = readNumericConstant<Uint64>(line);
                         Uint64 returnMatch;
-                        bool matched = regex.MatchNumber(input, mathMode, returnMatch);
-                        if (verbose)
+                        if (regex.MatchNumber(a, mathMode, returnMatch))
+                            printf("%llu -> %llu\n", a, returnMatch);
+                        else
+                            printf("%llu -> no match (FALSE NEGATIVE)\n", a);
+                        if (a == 12200160415121876738)
                         {
-                            if (matched)
-                                printf("%llu -> %llu\n", input, returnMatch);
-                            else
-                                printf("%llu -> no match\n", input);
+                            if (testForFalsePositives)
+                                for (Uint64 i=a+1; i!=0; i++)
+                                    if (regex.MatchNumber(i, mathMode, returnMatch))
+                                        printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+                            break;
+                        }
+                        if (testForFalsePositives)
+                            for (Uint64 i=a+1; i<b; i++)
+                                if (regex.MatchNumber(i, mathMode, returnMatch))
+                                    printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+                        Uint64 c = a + b;
+                        a = b;
+                        b = c;
+                    }
+                    break;
+                }
+                case NumericalModeTest_NUMBERS_POWER_OF_2:
+                {
+                    Uint64 z=0;
+                    Uint64 a=1;
+                    for(;;)
+                    {
+                        Uint64 returnMatch;
+                        if (testForFalsePositives)
+                        {
+                            for (Uint64 i=z; i<a; i++)
+                                if (regex.MatchNumber(i, mathMode, returnMatch))
+                                    printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+                            z = a+1;
+                        }
+                        if (regex.MatchNumber(a, mathMode, returnMatch))
+                            printf("%llu -> %llu\n", a, returnMatch);
+                        else
+                            printf("%llu -> no match (FALSE NEGATIVE)\n", a);
+                        Uint64 a2 = a + a;
+                        if (a2 == 0)
+                        {
+                            if (testForFalsePositives)
+                                for (Uint64 i=a+1; i!=0; i++)
+                                    if (regex.MatchNumber(i, mathMode, returnMatch))
+                                        printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+                            break;
+                        }
+                        a = a2;
+                    }
+                    break;
+                }
+                case NumericalModeTest_NUMBERS_TRIANGULAR:
+                {
+                    Uint n=0, m=1, z=0;
+                    for (;;)
+                    {
+                        Uint64 returnMatch;
+                        if (testForFalsePositives)
+                        {
+                            for (Uint64 i=z; i<n; i++)
+                                if (regex.MatchNumber(i, mathMode, returnMatch))
+                                    printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+                            z = n+1;
+                        }
+                        if (regex.MatchNumber(n, mathMode, returnMatch))
+                            printf("%llu -> %llu\n", n, returnMatch);
+                        else
+                            printf("%llu -> no match (FALSE NEGATIVE)\n", n);
+                        n += m;
+                        m++;
+                    }
+                    break;
+                }
+                case NumericalModeTest_DIV_SQRT2:
+                {
+                    const double sqrt2 = sqrt(2.);
+                    for (Uint64 i=0;; i++)
+                    {
+                        Uint64 answer = (Uint64)floor(i / sqrt2);
+                        Uint64 returnMatch;
+                        bool matched = regex.MatchNumber(i, mathMode, returnMatch);
+                        if (!matched)
+                        {
+                            printf("%9llu -> NOT MATCHED!\n", i);
+                            if (lineBuffered)
+                                fflush(stdout);
                         }
                         else
-                        if (matched)
-                            printf("%llu\n", returnMatch);
+                        if (returnMatch != answer)
+                        {
+                            printf("%9llu -> %9llu (off by %2lld, should be %9llu)\n", i, returnMatch, returnMatch-answer, answer);
+                            if (lineBuffered)
+                                fflush(stdout);
+                        }
+                        else
+                        if (i <= 10 || i % (1<<4) == 0 || i >= 940)
+                        {
+                            printf("%9llu -> %9llu\n", i, returnMatch);
+                            if (lineBuffered)
+                                fflush(stdout);
+                        }
                     }
+                    break;
+                }
+                default:
+                {
+                    if (testNumInc)
+                        for (Uint64 i=testNum0;; i+=testNumInc)
+                        {
+                            Uint64 returnMatch;
+                            if (regex.MatchNumber(i, mathMode, returnMatch))
+                            {
+                                printf("%*llu -> %*llu\n", testNum_digits, i, testNum_digits, returnMatch);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
+                            if (i==testNum1)
+                                break;
+                        }
                     else
-                        puts(line);
+                    {
+                        LineGetter lineGetter(1<<5);
+                        for (;;)
+                        {
+                            const char *line = lineGetter.fgets(stdin);
+                            if (!line)
+                                break;
+                            if (inrange(*line, '0', '9'))
+                            {
+                                Uint64 input = readNumericConstant<Uint64>(line);
+                                Uint64 returnMatch;
+                                bool matched = regex.MatchNumber(input, mathMode, returnMatch);
+                                if (verbose)
+                                {
+                                    if (matched)
+                                        printf("%llu -> %llu\n", input, returnMatch);
+                                    else
+                                        printf("%llu -> no match\n", input);
+                                }
+                                else
+                                if (matched)
+                                    printf("%llu\n", returnMatch);
+                            }
+                            else
+                                puts(line);
+                        }
+                    }
+                    break;
                 }
             }
-#endif
         }
         else
         {
-#if defined(TEST_TRIPLES)
-            for (Uint64 n=0;;)
+            if (numericalModeTest != NumericalModeTest_NONE)
             {
-                bool positive = n % 3 == 0;
-#   ifndef TEST_FOR_FALSE_POSITIVES
-                if (positive)
-#   endif
-                {
-                    char str[strlength("18446744073709551615")+1];
-                    sprintf(str, "%llu", n);
-
-                    const char *returnMatch;
-                    size_t returnMatchLength;
-                    if (regex.MatchString(str, returnMatch, returnMatchLength))
-                    {
-                        if (!positive)
-                            printf("%s - FALSE POSITIVE!\n", str);
-                    }
-                    else
-                    {
-                        if (positive)
-                            printf("%s - FALSE NEGATIVE!\n", str);
-                    }
-                    if (n % 0x10000 == 0)
-                        printf("%s\n", str);
-                }
-                if (++n == 0)
-                    break;
+                fprintf(stderr, "Error: String Mode test specified in Numerical Mode\n");
+                return -1;
             }
-#elif defined(TEST_MULTIPLICATION) || defined(TEST_MULTIPLICATION_INCLUDING_ZERO)
-#   ifdef TEST_MULTIPLICATION_INCLUDING_ZERO
-            const Uint start = 0;
-#   else
-            const Uint start = 1;
-#   endif
-            const Uint range = 25;
-            char str[range + strlength("*") + range + strlength("=") + range*range + 1];
-            for (Uint a=start; a<=range; a++)
+            switch (stringModeTest)
             {
-                for (Uint i=0; i<a; i++)
-                    str[i] = 'x';
-                str[a] = '*';
-                for (Uint b=start; b<=range; b++)
+                case StringModeTest_TRIPLES:
                 {
-                    for (Uint i=0; i<b; i++)
-                        str[a+1+i] = 'x';
-                    str[a+1+b] = '=';
-#   ifdef TEST_FOR_FALSE_POSITIVES
-                    for (Uint c=start; c<=range*range; c++)
-#   else
-                    Uint c = a * b;
-#   endif
+                    for (Uint64 n=0;;)
                     {
-                        for (Uint i=0; i<c; i++)
-                            str[a+1+b+1+i] = 'x';
-                        str[a+1+b+1+c] = '\0';
+                        bool positive = n % 3 == 0;
+                        if (testForFalsePositives || positive)
+                        {
+                            char str[strlength("18446744073709551615")+1];
+                            sprintf(str, "%llu", n);
 
-                        bool positive = a * b == c;
+                            const char *returnMatch;
+                            size_t returnMatchLength;
+                            if (regex.MatchString(str, returnMatch, returnMatchLength))
+                            {
+                                if (!positive)
+                                    printf("%s - FALSE POSITIVE!\n", str);
+                            }
+                            else
+                            {
+                                if (positive)
+                                    printf("%s - FALSE NEGATIVE!\n", str);
+                            }
+                            if (n % 0x10000 == 0)
+                                printf("%s\n", str);
+                        }
+                        if (++n == 0)
+                            break;
+                    }
+                    break;
+                }
+                case StringModeTest_MULTIPLICATION:
+                case StringModeTest_MULTIPLICATION_INCLUDING_ZERO:
+                {
+                    Uint start = stringModeTest==StringModeTest_MULTIPLICATION_INCLUDING_ZERO ? 0 : 1;
+                    const Uint range = 25;
+                    char str[range + strlength("*") + range + strlength("=") + range*range + 1];
+                    for (Uint a=start; a<=range; a++)
+                    {
+                        for (Uint i=0; i<a; i++)
+                            str[i] = 'x';
+                        str[a] = '*';
+                        for (Uint b=start; b<=range; b++)
+                        {
+                            for (Uint i=0; i<b; i++)
+                                str[a+1+i] = 'x';
+                            str[a+1+b] = '=';
+                            Uint c;
+                            if (!testForFalsePositives)
+                            {
+                                c = a * b;
+                                goto skip_for;
+                            }
+                            for (c=start; c<=range*range; c++)
+                            {
+                            skip_for:
+                                for (Uint i=0; i<c; i++)
+                                    str[a+1+b+1+i] = 'x';
+                                str[a+1+b+1+c] = '\0';
+
+                                bool positive = a * b == c;
+
+                                const char *returnMatch;
+                                size_t returnMatchLength;
+                                if (regex.MatchString(str, returnMatch, returnMatchLength))
+                                {
+                                    printf("%u * %u = %u", a, b, c);
+                                    if (!positive)
+                                        fputs(" - FALSE POSITIVE!\n", stdout);
+                                    else
+                                        fputc('\n', stdout);
+                                }
+                                else
+                                {
+                                    if (positive)
+                                        printf("%u * %u = %u - FALSE NEGATIVE!\n", a, b, c);
+                                }
+                                if (!testForFalsePositives)
+                                    break;
+                            }
+                        }
+                    }
+                    break;
+                }
+                case StringModeTest_BINARY_SUM:
+                {
+                    const Uint bits = 16;
+                    const Uint size = 1 << bits;
+                    char str[bits + strlength(" + ") + bits + strlength(" = ") + bits + 1];
+                    str[bits    ] = ' ';
+                    str[bits  +1] = '+';
+                    str[bits  +2] = ' ';
+                    str[bits*2+3] = ' ';
+                    str[bits*2+4] = '=';
+                    str[bits*2+5] = ' ';
+                    str[bits*3+6] = '\0';
+                    bool useNoZeroesInAllButFirstNumber = true;
+                    for (;;)
+                    {
+                        Uint a = IUNI  & (size-1);
+                        Uint b = IUNI  & (size-1);
+                        Uint c = (a+b) & (size-1);
+
+                        Uint corruptedBits;
+                        if (testForFalsePositives)
+                        {
+                            corruptedBits = IUNI % 4;
+                            for (Uint i=0; i<corruptedBits; i++)
+                                c ^= 1 << (IUNI % bits);
+                        }
+
+                        if (useNoZeroesInAllButFirstNumber)
+                        {
+                            a = 0;
+                            b = size-1;
+                            c = a + b;
+                            useNoZeroesInAllButFirstNumber = false;
+                        }
+
+                        bool wrong;
+                        if (testForFalsePositives)
+                            wrong = ((a + b) & (size-1)) != c;
+                        else
+                            wrong = false;
+
+                        for (Uint i=0; i<bits; i++)
+                            str[i] = (a & (1<<(bits-1-i))) ? '1' : '0';
+                        for (Uint i=0; i<bits; i++)
+                            str[bits + 3 + i] = (b & (1<<(bits-1-i))) ? '1' : '0';
+                        for (Uint i=0; i<bits; i++)
+                            str[bits*2 + 6 + i] = (c & (1<<(bits-1-i))) ? '1' : '0';
 
                         const char *returnMatch;
                         size_t returnMatchLength;
-                        if (regex.MatchString(str, returnMatch, returnMatchLength))
+                        if (!regex.MatchString(str, returnMatch, returnMatchLength))
                         {
-                            printf("%u * %u = %u", a, b, c);
-                            if (!positive)
-                                fputs(" - FALSE POSITIVE!\n", stdout);
-                            else
-                                fputc('\n', stdout);
+                            if (!wrong)
+                                printf("%04X+%04X=%04X: %s - FALSE NEGATIVE!\n", a, b, c, str);
+                            /*else
+                                printf("%04X+%04X=%04X: %s - correct\n", a, b, c, str);*/
                         }
                         else
                         {
-                            if (positive)
-                                printf("%u * %u = %u - FALSE NEGATIVE!\n", a, b, c);
+                            if (wrong)
+                                printf("%04X+%04X=%04X: %s - FALSE POSITIVE!\n", a, b, c, str);
+                            /*else
+                                printf("%04X+%04X=%04X: %s - incorrect\n", a, b, c, str);*/
                         }
                     }
+                    break;
                 }
-            }
-#elif defined(TEST_BINARY_SUM)
-            const Uint bits = 16;
-            const Uint size = 1 << bits;
-            char str[bits + strlength(" + ") + bits + strlength(" = ") + bits + 1];
-            str[bits    ] = ' ';
-            str[bits  +1] = '+';
-            str[bits  +2] = ' ';
-            str[bits*2+3] = ' ';
-            str[bits*2+4] = '=';
-            str[bits*2+5] = ' ';
-            str[bits*3+6] = '\0';
-            bool useNoZeroesInAllButFirstNumber = true;
-            for (;;)
-            {
-                Uint a = IUNI  & (size-1);
-                Uint b = IUNI  & (size-1);
-                Uint c = (a+b) & (size-1);
-
-#   ifdef TEST_FOR_FALSE_POSITIVES
-                Uint corruptedBits = IUNI % 4;
-                for (Uint i=0; i<corruptedBits; i++)
-                    c ^= 1 << (IUNI % bits);
-#   endif
-
-                if (useNoZeroesInAllButFirstNumber)
+                case StringModeTest_DECIMAL_SUM:
                 {
-                    a = 0;
-                    b = size-1;
-                    c = a + b;
-                    useNoZeroesInAllButFirstNumber = false;
+                    const Uint digits = 10;
+                    const Uint64 size = 10000000000;
+                    char str[digits + strlength(" + ") + digits + strlength(" = ") + digits + 1];
+                    bool useNoZeroesInAllButFirstNumber = true;
+                    for (Uint64 ii=0;; ii++)
+                    {
+                        Uint64 a = IUNI  % size;
+                        Uint64 b = IUNI  % size;
+                        Uint64 c = (a+b) % size;
+
+                        Uint corruptedDigits;
+                        if (testForFalsePositives)
+                        {
+                            corruptedDigits = IUNI % 4;
+                            for (Uint i=0; i<corruptedDigits; i++)
+                            {
+                                Uint digit = IUNI % digits;
+                                int64 div = 1;
+                                for (Uint j=0; j<digit; j++)
+                                    div *= 10;
+                                c -= (((int64)c / div) % 10 - (int64)(IUNI % 10)) * div;
+                            }
+                        }
+
+                        sprintf(str, "%0*llu + %0*llu = %0*llu", digits, a, digits, b, digits, c);
+
+                        bool wrong;
+                        if (testForFalsePositives)
+                            wrong = (a + b) % size != c;
+                        else
+                            wrong = false;
+
+                        const char *returnMatch;
+                        size_t returnMatchLength;
+                        if (!regex.MatchString(str, returnMatch, returnMatchLength))
+                        {
+                            if (!wrong)
+                                printf("%s - FALSE NEGATIVE!\n", str);
+                            /*else
+                                printf("%s - correct\n", str);*/
+                        }
+                        else
+                        {
+                            if (wrong)
+                                printf("%s - FALSE POSITIVE!\n", str);
+                            /*else
+                                printf("%s - incorrect\n", str);*/
+                        }
+
+                        if (ii%0x10000==0)
+                            printf("%llu\n", ii);
+                    }
+                    break;
                 }
-
-#   ifdef TEST_FOR_FALSE_POSITIVES
-                bool wrong = ((a + b) & (size-1)) != c;
-#   else
-                const bool wrong = false;
-#   endif
-
-                for (Uint i=0; i<bits; i++)
-                    str[i] = (a & (1<<(bits-1-i))) ? '1' : '0';
-                for (Uint i=0; i<bits; i++)
-                    str[bits + 3 + i] = (b & (1<<(bits-1-i))) ? '1' : '0';
-                for (Uint i=0; i<bits; i++)
-                    str[bits*2 + 6 + i] = (c & (1<<(bits-1-i))) ? '1' : '0';
-
-                const char *returnMatch;
-                size_t returnMatchLength;
-                if (!regex.MatchString(str, returnMatch, returnMatchLength))
+                case StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED:
+                case StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED:
                 {
-                    if (!wrong)
-                        printf("%04X+%04X=%04X: %s - FALSE NEGATIVE!\n", a, b, c, str);
-                    /*else
-                        printf("%04X+%04X=%04X: %s - correct\n", a, b, c, str);*/
-                }
-                else
-                {
-                    if (wrong)
-                        printf("%04X+%04X=%04X: %s - FALSE POSITIVE!\n", a, b, c, str);
-                    /*else
-                        printf("%04X+%04X=%04X: %s - incorrect\n", a, b, c, str);*/
-                }
-            }
-#elif defined(TEST_DECIMAL_SUM)
-            const Uint digits = 10;
-            const Uint64 size = 10000000000;
-            char str[digits + strlength(" + ") + digits + strlength(" = ") + digits + 1];
-            bool useNoZeroesInAllButFirstNumber = true;
-            for (Uint64 ii=0;; ii++)
-            {
-                Uint64 a = IUNI  % size;
-                Uint64 b = IUNI  % size;
-                Uint64 c = (a+b) % size;
-
-#   ifdef TEST_FOR_FALSE_POSITIVES
-                Uint corruptedDigits = IUNI % 4;
-                for (Uint i=0; i<corruptedDigits; i++)
-                {
-                    Uint digit = IUNI % digits;
-                    int64 div = 1;
-                    for (Uint j=0; j<digit; j++)
-                        div *= 10;
-                    c -= (((int64)c / div) % 10 - (int64)(IUNI % 10)) * div;
-                }
-#   endif
-
-                sprintf(str, "%0*llu + %0*llu = %0*llu", digits, a, digits, b, digits, c);
-
-#   ifdef TEST_FOR_FALSE_POSITIVES
-                bool wrong = (a + b) % size != c;
-#   else
-                const bool wrong = false;
-#   endif
-
-                const char *returnMatch;
-                size_t returnMatchLength;
-                if (!regex.MatchString(str, returnMatch, returnMatchLength))
-                {
-                    if (!wrong)
-                        printf("%s - FALSE NEGATIVE!\n", str);
-                    /*else
-                        printf("%s - correct\n", str);*/
-                }
-                else
-                {
-                    if (wrong)
-                        printf("%s - FALSE POSITIVE!\n", str);
-                    /*else
-                        printf("%s - incorrect\n", str);*/
-                }
-
-                if (ii%0x10000==0)
-                    printf("%llu\n", ii);
-            }
-#elif defined(TEST_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED) || defined(TEST_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED)
-            const char *returnMatch;
-            size_t returnMatchLength;
-            Uint i;
-            const Uint maxZeroPadding = 4;
-            char str[maxZeroPadding + strlength("4294967295") + 1];
-            for (i=0; i<256; i++)
-                for (Uint j=0; j<=maxZeroPadding; j++)
-                {
-                    memset(str, '0', maxZeroPadding);
-                    sprintf(str+j, "%u", i);
-#   ifdef TEST_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED
-                    const bool shouldMatch = true;
-#   else
-                    const bool shouldMatch = j == 0;
-#   endif
-#   ifndef TEST_FOR_FALSE_POSITIVES
-                    if (!shouldMatch)
-                        continue;
-#   endif
-                    if (regex.MatchString(str, returnMatch, returnMatchLength) != shouldMatch)
-                        printf("%s - FALSE %s!\n", str, shouldMatch ? "NEGATIVE" : "POSITIVE");
-                }
-#   ifdef TEST_FOR_FALSE_POSITIVES
-            for (;; i++)
-                for (Uint j=0; j<=maxZeroPadding; j++)
-                {
-                    memset(str, '0', maxZeroPadding);
-                    sprintf(str+j, "%u", i);
-                    if (regex.MatchString(str, returnMatch, returnMatchLength))
-                        printf("%s - FALSE POSITIVE!\n", str);
-                }
-#   endif
-#elif defined(TEST_SMOOTH_NUMBERS)
-            // see https://codegolf.stackexchange.com/questions/36384/find-the-smoothest-number/
-            const Uint64 maxsize = 256; // maximum length of string to test as input
-            const char numeral = '1';
-            char *str = new char [maxsize+1];
-            memset(str, numeral, 2+1+2);
-            str[2+1+2] = '\0';
-            for (Uint64 i=2+1+2; i < maxsize;)
-            {
-                for (Uint64 j=2; j<=(i-1)/2; j++)
-                {
-                    const Uint64 k = i-1-j;
-                    str[j] = ',';
-
                     const char *returnMatch;
                     size_t returnMatchLength;
-                    if (!regex.MatchString(str, returnMatch, returnMatchLength))
-                        printf("%llu, %llu - NON-MATCH!\n", j, k);
-                    else
-                    if (inrangex64(j, returnMatch-str, returnMatch-str + returnMatchLength))
-                        printf("%llu, %llu -> %llu,%llu - INCORRECT! (delimiter included in match)\n", j, k, j - (returnMatch-str), returnMatch-str + returnMatchLength - (j+1));
-                    else
-                    if (!inrange64(returnMatchLength, j, k))
-                        printf("%llu, %llu -> %llu - INCORRECT! (outside range)\n", j, k, returnMatchLength);
-                    else
-                    {
-                        Uint64 smallestLargestPrimeFactor = k;
-                        for (Uint64 n=k; n>=j; n--)
+                    Uint i;
+                    const Uint maxZeroPadding = 4;
+                    char str[maxZeroPadding + strlength("4294967295") + 1];
+                    for (i=0; i<256; i++)
+                        for (Uint j=0; j<=maxZeroPadding; j++)
                         {
-                            Uint64 p = largestPrimeFactor(n);
-                            if (smallestLargestPrimeFactor > p)
-                                smallestLargestPrimeFactor = p;
+                            memset(str, '0', maxZeroPadding);
+                            sprintf(str+j, "%u", i);
+                            const bool shouldMatch = stringModeTest==StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED ? true : j == 0;
+                            if (!testForFalsePositives && !shouldMatch)
+                                continue;
+                            if (regex.MatchString(str, returnMatch, returnMatchLength) != shouldMatch)
+                                printf("%s - FALSE %s!\n", str, shouldMatch ? "NEGATIVE" : "POSITIVE");
                         }
-                        Uint64 returned_largestPrimeFactor = largestPrimeFactor(returnMatchLength);
-                        if (returned_largestPrimeFactor != smallestLargestPrimeFactor)
-                            printf("%llu, %llu -> %llu (largest prime factor %llu) - INCORRECT! (should have smallest largest prime factor %llu)\n", j, k, returnMatchLength, returned_largestPrimeFactor, smallestLargestPrimeFactor);
-                    }
-
-                    str[j] = numeral;
-                }
-                str[i++] = numeral;
-                str[i  ] = '\0';
-            }
-            delete [] str;
-#else
-            LineGetter lineGetter(1<<15);
-            const char newline = '\n';
-            for (;;)
-            {
-                char *line = lineGetter.fgets(stdin);
-                if (!line)
+                        if (testForFalsePositives)
+                            for (;; i++)
+                                for (Uint j=0; j<=maxZeroPadding; j++)
+                                {
+                                    memset(str, '0', maxZeroPadding);
+                                    sprintf(str+j, "%u", i);
+                                    if (regex.MatchString(str, returnMatch, returnMatchLength))
+                                        printf("%s - FALSE POSITIVE!\n", str);
+                                }
                     break;
-                const char *returnMatch;
-                size_t returnMatchLength;
-                if (regex.MatchString(line, returnMatch, returnMatchLength))
+                }
+                case StringModeTest_SMOOTH_NUMBERS:
                 {
-                    if (showMatch)
-                        printf("%.*s\n", returnMatchLength, returnMatch);
-                    else
-                        puts(line);
-                    if (lineBuffered)
-                        fflush(stdout);
+                    // see https://codegolf.stackexchange.com/questions/36384/find-the-smoothest-number/
+                    const Uint64 maxsize = 256; // maximum length of string to test as input
+                    const char numeral = '1';
+                    char *str = new char [maxsize+1];
+                    memset(str, numeral, 2+1+2);
+                    str[2+1+2] = '\0';
+                    for (Uint64 i=2+1+2; i < maxsize;)
+                    {
+                        for (Uint64 j=2; j<=(i-1)/2; j++)
+                        {
+                            const Uint64 k = i-1-j;
+                            str[j] = ',';
+
+                            const char *returnMatch;
+                            size_t returnMatchLength;
+                            if (!regex.MatchString(str, returnMatch, returnMatchLength))
+                                printf("%llu, %llu - NON-MATCH!\n", j, k);
+                            else
+                            if (inrangex64(j, returnMatch-str, returnMatch-str + returnMatchLength))
+                                printf("%llu, %llu -> %llu,%llu - INCORRECT! (delimiter included in match)\n", j, k, j - (returnMatch-str), returnMatch-str + returnMatchLength - (j+1));
+                            else
+                            if (!inrange64(returnMatchLength, j, k))
+                                printf("%llu, %llu -> %llu - INCORRECT! (outside range)\n", j, k, returnMatchLength);
+                            else
+                            {
+                                Uint64 smallestLargestPrimeFactor = k;
+                                for (Uint64 n=k; n>=j; n--)
+                                {
+                                    Uint64 p = largestPrimeFactor(n);
+                                    if (smallestLargestPrimeFactor > p)
+                                        smallestLargestPrimeFactor = p;
+                                }
+                                Uint64 returned_largestPrimeFactor = largestPrimeFactor(returnMatchLength);
+                                if (returned_largestPrimeFactor != smallestLargestPrimeFactor)
+                                    printf("%llu, %llu -> %llu (largest prime factor %llu) - INCORRECT! (should have smallest largest prime factor %llu)\n", j, k, returnMatchLength, returned_largestPrimeFactor, smallestLargestPrimeFactor);
+                            }
+
+                            str[j] = numeral;
+                        }
+                        str[i++] = numeral;
+                        str[i  ] = '\0';
+                    }
+                    delete [] str;
+                    break;
+                }
+                default:
+                {
+                    LineGetter lineGetter(1<<15);
+                    const char newline = '\n';
+                    for (;;)
+                    {
+                        char *line = lineGetter.fgets(stdin);
+                        if (!line)
+                            break;
+                        const char *returnMatch;
+                        size_t returnMatchLength;
+                        if (regex.MatchString(line, returnMatch, returnMatchLength))
+                        {
+                            if (showMatch)
+                                printf("%.*s\n", returnMatchLength, returnMatch);
+                            else
+                                puts(line);
+                            if (lineBuffered)
+                                fflush(stdout);
+                        }
+                    }
                 }
             }
-#endif
         }
 
         return 0;
