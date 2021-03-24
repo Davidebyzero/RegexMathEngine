@@ -1227,11 +1227,11 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                 if (groupStackTop->loopCount > MAX_EXTEND(group->maxCount))
                     THROW_ENGINEBUG;
 #endif
-                if (group->lazy && groupStackTop->loopCount >= group->minCount)
-                    leaveLazyGroup();
-                else
                 if (no_empty_optional && position == groupStackTop->position && group->minCount != group->maxCount && inrange(groupStackTop->loopCount, group->minCount+1, group->maxCount))
                     nonMatch(NonMatch_EmptyOptional);
+                else
+                if (group->lazy && groupStackTop->loopCount >= group->minCount)
+                    leaveLazyGroup();
                 else
                 if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || group->maxCount == UINT_MAX && groupStackTop->loopCount >= group->minCount && position == groupStackTop->position)
                     leaveMaxedOutGroup();
