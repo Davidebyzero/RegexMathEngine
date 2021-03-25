@@ -247,13 +247,14 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
 
                     Uint64 alreadyCaptured = position - groupStackTop->position;
                     Uint64 spaceLeft = input - position;
-                    currentMatch = (alreadyCaptured + spaceLeft) / (multiple * divisor);
+                    currentMatch = (alreadyCaptured + spaceLeft) / divisor;
                     if (currentMatch < alreadyCaptured)
                     {
                         nonMatch();
                         return true;
                     }
                     currentMatch -= alreadyCaptured;
+                    currentMatch /= multiple;
                     if (currentMatch < thisSymbol->minCount)
                     {
                         nonMatch();
