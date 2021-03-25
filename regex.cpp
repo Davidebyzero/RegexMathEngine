@@ -732,7 +732,7 @@ int main(int argc, char *argv[])
                             printf("%llu -> %llu\n", a, returnMatch);
                         else
                             printf("%llu -> no match (FALSE NEGATIVE)\n", a);
-                        if (a == 12200160415121876738)
+                        if (a == 12200160415121876738uLL)
                         {
                             if (testForFalsePositives)
                                 for (Uint64 i=a+1; i!=0; i++)
