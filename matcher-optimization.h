@@ -323,13 +323,14 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                                             return true;
                                         }
                                         Uint64 spaceLeft = target - groupStackTop->position;
-                                        currentMatch = spaceLeft / (multiple * (1 + currentSymbol->minCount));
+                                        currentMatch = spaceLeft / (1 + currentSymbol->minCount);
                                         if (currentMatch < position - groupStackTop->position)
                                         {
                                             nonMatch();
                                             return true;
                                         }
                                         currentMatch -= position - groupStackTop->position;
+                                        currentMatch /= multiple;
                                         if (currentMatch < thisSymbol->minCount)
                                         {
                                             nonMatch();
