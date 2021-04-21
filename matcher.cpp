@@ -1053,7 +1053,7 @@ void RegexMatcher<USE_STRINGS>::popAtomicGroup(RegexGroup *const group)
 }
 
 template <bool USE_STRINGS>
-bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength)
+bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength)
 {
     delete [] groupStackBase;
     groupStackBase = new GroupStackNode [maxGroupDepth];
@@ -1381,8 +1381,23 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
         startPosition = curPosition;
     }
 
-    returnMatchOffset = startPosition;
-    returnMatchLength = (size_t)(position - startPosition);
+    if (returnMatch_backrefIndex == 0)
+    {
+        returnMatchOffset = startPosition;
+        returnMatchLength = (size_t)(position - startPosition);
+    }
+    else
+    {
+        returnMatchOffset = startPosition;  // fake
+        if (returnMatch_backrefIndex > numCaptureGroups)
+            returnMatchLength = 0;
+        else
+        {
+            returnMatchLength = captures[returnMatch_backrefIndex - 1];
+            if (returnMatchLength == NON_PARTICIPATING_CAPTURE_GROUP)
+                returnMatchLength = 0;
+        }
+    }
     
     return match > 0;
 }
@@ -1436,5 +1451,5 @@ void RegexMatcher<true>::fprintCapture(FILE *f, Uint i)
     fprintCapture(f, captures[i], captureOffsets[i]);
 }
 
-template bool RegexMatcher<false>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
-template bool RegexMatcher<true >::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
+template bool RegexMatcher<false>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
+template bool RegexMatcher<true >::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);

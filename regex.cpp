@@ -23,8 +23,8 @@ class Regex
     Uint maxGroupDepth;
 public:
     Regex(const char *buf);
-    bool MatchNumber(Uint64 input, char basicChar, Uint64 &returnMatch);
-    bool MatchString(const char *stringToMatchAgainst, const char *&returnMatch, size_t &returnMatchLength);
+    bool MatchNumber(Uint64 input, char basicChar, Uint returnMatch_backrefIndex, Uint64 &returnMatch);
+    bool MatchString(const char *stringToMatchAgainst, Uint returnMatch_backrefIndex, const char *&returnMatch, size_t &returnMatchLength);
 };
 
 Regex::Regex(const char *buf)
@@ -40,18 +40,18 @@ Regex::Regex(const char *buf)
     maxGroupDepth    = parser.maxGroupDepth;
 }
 
-bool Regex::MatchNumber(Uint64 input, char basicChar, Uint64 &returnMatch)
+bool Regex::MatchNumber(Uint64 input, char basicChar, Uint returnMatch_backrefIndex, Uint64 &returnMatch)
 {
     RegexMatcher<false> match;
     match.basicChar = basicChar;
     Uint64 returnMatchOffset;
-    return match.Match(regex, numCaptureGroups, maxGroupDepth, input, returnMatchOffset, returnMatch);
+    return match.Match(regex, numCaptureGroups, maxGroupDepth, input, returnMatch_backrefIndex, returnMatchOffset, returnMatch);
 }
 
-bool Regex::MatchString(const char *stringToMatchAgainst, const char *&returnMatch, size_t &returnMatchLength)
+bool Regex::MatchString(const char *stringToMatchAgainst, Uint returnMatch_backrefIndex, const char *&returnMatch, size_t &returnMatchLength)
 {
     RegexMatcher<true> match;
-    bool result = match.Match(regex, numCaptureGroups, maxGroupDepth, (Uint64)stringToMatchAgainst, (Uint64 &)returnMatch, (Uint64 &)returnMatchLength);
+    bool result = match.Match(regex, numCaptureGroups, maxGroupDepth, (Uint64)stringToMatchAgainst, returnMatch_backrefIndex, (Uint64 &)returnMatch, (Uint64 &)returnMatchLength);
     (const char *&)returnMatch = stringToMatchAgainst + (size_t)(Uint64 &)returnMatch;
     return result;
 }
@@ -289,6 +289,7 @@ int main(int argc, char *argv[])
     bool lineBuffered = false;
     bool showMatch = false;
     bool optionsDone = false;
+    Uint showMatch_backrefIndex = 0;
     Uint64 testNum0, testNum1;
     Uint testNum_digits;
     int64 testNumInc = 0;
@@ -604,8 +605,30 @@ int main(int argc, char *argv[])
                 }
             }
             else
-            if (argv[i][1]=='o' && !argv[i][2])
+            if (argv[i][1]=='o')
+            {
                 showMatch = true;
+                const char *optStr = &argv[i][2];
+                if (*optStr)
+                {
+                    try
+                    {
+                        if (!inrange(*optStr, '0', '9'))
+                            throw ParsingError();
+                        showMatch_backrefIndex = readNumericConstant<Uint>(optStr);
+                        if (*optStr)
+                            throw ParsingError();
+                    }
+                    catch (ParsingError)
+                    {
+                        fprintf(stderr, "Error: \"-o\" must be followed by a capture group number\n");
+                        printShortUsage(argv[0]);
+                        return -1;
+                    }
+                }
+                else
+                    showMatch_backrefIndex = 0;
+            }
             else
             if (argv[i][1]=='O')
             {
@@ -621,7 +644,7 @@ int main(int argc, char *argv[])
                     if (!inrange(*optStr, '0', '9'))
                         throw ParsingError();
                     optimizationLevel = readNumericConstant<Uint>(optStr);
-                    if (!inrange(optimizationLevel, 0, 2))
+                    if (!inrange(optimizationLevel, 0, 2) || *optStr)
                         throw ParsingError();
                 }
                 catch (ParsingError)
@@ -728,7 +751,7 @@ int main(int argc, char *argv[])
                     for(;;)
                     {
                         Uint64 returnMatch;
-                        if (regex.MatchNumber(a, mathMode, returnMatch))
+                        if (regex.MatchNumber(a, mathMode, showMatch_backrefIndex, returnMatch))
                             printf("%llu -> %llu\n", a, returnMatch);
                         else
                             printf("%llu -> no match (FALSE NEGATIVE)\n", a);
@@ -736,13 +759,13 @@ int main(int argc, char *argv[])
                         {
                             if (testForFalsePositives)
                                 for (Uint64 i=a+1; i!=0; i++)
-                                    if (regex.MatchNumber(i, mathMode, returnMatch))
+                                    if (regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch))
                                         printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
                             break;
                         }
                         if (testForFalsePositives)
                             for (Uint64 i=a+1; i<b; i++)
-                                if (regex.MatchNumber(i, mathMode, returnMatch))
+                                if (regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch))
                                     printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
                         Uint64 c = a + b;
                         a = b;
@@ -760,11 +783,11 @@ int main(int argc, char *argv[])
                         if (testForFalsePositives)
                         {
                             for (Uint64 i=z; i<a; i++)
-                                if (regex.MatchNumber(i, mathMode, returnMatch))
+                                if (regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch))
                                     printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
                             z = a+1;
                         }
-                        if (regex.MatchNumber(a, mathMode, returnMatch))
+                        if (regex.MatchNumber(a, mathMode, showMatch_backrefIndex, returnMatch))
                             printf("%llu -> %llu\n", a, returnMatch);
                         else
                             printf("%llu -> no match (FALSE NEGATIVE)\n", a);
@@ -773,7 +796,7 @@ int main(int argc, char *argv[])
                         {
                             if (testForFalsePositives)
                                 for (Uint64 i=a+1; i!=0; i++)
-                                    if (regex.MatchNumber(i, mathMode, returnMatch))
+                                    if (regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch))
                                         printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
                             break;
                         }
@@ -790,11 +813,11 @@ int main(int argc, char *argv[])
                         if (testForFalsePositives)
                         {
                             for (Uint64 i=z; i<n; i++)
-                                if (regex.MatchNumber(i, mathMode, returnMatch))
+                                if (regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch))
                                     printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
                             z = n+1;
                         }
-                        if (regex.MatchNumber(n, mathMode, returnMatch))
+                        if (regex.MatchNumber(n, mathMode, showMatch_backrefIndex, returnMatch))
                             printf("%llu -> %llu\n", n, returnMatch);
                         else
                             printf("%llu -> no match (FALSE NEGATIVE)\n", n);
@@ -810,7 +833,7 @@ int main(int argc, char *argv[])
                     {
                         Uint64 answer = (Uint64)floor(i / sqrt2);
                         Uint64 returnMatch;
-                        bool matched = regex.MatchNumber(i, mathMode, returnMatch);
+                        bool matched = regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch);
                         if (!matched)
                         {
                             printf("%9llu -> NOT MATCHED!\n", i);
@@ -840,9 +863,12 @@ int main(int argc, char *argv[])
                         for (Uint64 i=testNum0;; i+=testNumInc)
                         {
                             Uint64 returnMatch;
-                            if (regex.MatchNumber(i, mathMode, returnMatch))
+                            if (regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch))
                             {
-                                printf("%*llu -> %*llu\n", testNum_digits, i, testNum_digits, returnMatch);
+                                printf("%*llu", testNum_digits, i);
+                                if (showMatch)
+                                    printf(" -> %*llu", testNum_digits, returnMatch);
+                                putchar('\n');
                                 if (lineBuffered)
                                     fflush(stdout);
                             }
@@ -861,7 +887,7 @@ int main(int argc, char *argv[])
                             {
                                 Uint64 input = readNumericConstant<Uint64>(line);
                                 Uint64 returnMatch;
-                                bool matched = regex.MatchNumber(input, mathMode, returnMatch);
+                                bool matched = regex.MatchNumber(input, mathMode, showMatch_backrefIndex, returnMatch);
                                 if (verbose)
                                 {
                                     if (matched)
@@ -902,7 +928,7 @@ int main(int argc, char *argv[])
 
                             const char *returnMatch;
                             size_t returnMatchLength;
-                            if (regex.MatchString(str, returnMatch, returnMatchLength))
+                            if (regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength))
                             {
                                 if (!positive)
                                     printf("%s - FALSE POSITIVE!\n", str);
@@ -953,7 +979,7 @@ int main(int argc, char *argv[])
 
                                 const char *returnMatch;
                                 size_t returnMatchLength;
-                                if (regex.MatchString(str, returnMatch, returnMatchLength))
+                                if (regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength))
                                 {
                                     printf("%u * %u = %u", a, b, c);
                                     if (!positive)
@@ -1023,7 +1049,7 @@ int main(int argc, char *argv[])
 
                         const char *returnMatch;
                         size_t returnMatchLength;
-                        if (!regex.MatchString(str, returnMatch, returnMatchLength))
+                        if (!regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength))
                         {
                             if (!wrong)
                                 printf("%04X+%04X=%04X: %s - FALSE NEGATIVE!\n", a, b, c, str);
@@ -1076,7 +1102,7 @@ int main(int argc, char *argv[])
 
                         const char *returnMatch;
                         size_t returnMatchLength;
-                        if (!regex.MatchString(str, returnMatch, returnMatchLength))
+                        if (!regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength))
                         {
                             if (!wrong)
                                 printf("%s - FALSE NEGATIVE!\n", str);
@@ -1112,7 +1138,7 @@ int main(int argc, char *argv[])
                             const bool shouldMatch = stringModeTest==StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED ? true : j == 0;
                             if (!testForFalsePositives && !shouldMatch)
                                 continue;
-                            if (regex.MatchString(str, returnMatch, returnMatchLength) != shouldMatch)
+                            if (regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength) != shouldMatch)
                                 printf("%s - FALSE %s!\n", str, shouldMatch ? "NEGATIVE" : "POSITIVE");
                         }
                         if (testForFalsePositives)
@@ -1121,7 +1147,7 @@ int main(int argc, char *argv[])
                                 {
                                     memset(str, '0', maxZeroPadding);
                                     sprintf(str+j, "%u", i);
-                                    if (regex.MatchString(str, returnMatch, returnMatchLength))
+                                    if (regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength))
                                         printf("%s - FALSE POSITIVE!\n", str);
                                 }
                     break;
@@ -1143,7 +1169,7 @@ int main(int argc, char *argv[])
 
                             const char *returnMatch;
                             size_t returnMatchLength;
-                            if (!regex.MatchString(str, returnMatch, returnMatchLength))
+                            if (!regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength))
                                 printf("%llu, %llu - NON-MATCH!\n", j, k);
                             else
                             if (inrangex64(j, returnMatch-str, returnMatch-str + returnMatchLength))
@@ -1184,7 +1210,7 @@ int main(int argc, char *argv[])
                             break;
                         const char *returnMatch;
                         size_t returnMatchLength;
-                        if (regex.MatchString(line, returnMatch, returnMatchLength))
+                        if (regex.MatchString(line, showMatch_backrefIndex, returnMatch, returnMatchLength))
                         {
                             if (showMatch)
                                 printf("%.*s\n", returnMatchLength, returnMatch);

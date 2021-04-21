@@ -256,7 +256,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
 public:
     inline RegexMatcher();
     inline ~RegexMatcher();
-    bool Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
+    bool Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
 };
 
 template <> void RegexMatcher<false>::fprintCapture(FILE *f, Uint64 length, const char *offset);
