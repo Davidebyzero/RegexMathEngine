@@ -1324,7 +1324,10 @@ protected:
             for (Uint i=0; i<numCaptured; i++)
             {
                 fprintf(f, ", \\%u=", indexes[i]+1);
-                matcher.fprintCapture(f, values[i], offsets[i]);
+                if (!USE_STRINGS)
+                    matcher.fprintCapture(f, values[i], NULL);
+                else
+                    matcher.fprintCapture(f, values[i], offsets[i]);
             }
         }
         else
