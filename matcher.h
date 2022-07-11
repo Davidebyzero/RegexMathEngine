@@ -14,6 +14,8 @@
 #pragma warning(push)
 #pragma warning(disable : 4355)
 
+#pragma pack( push, 1 )
+
 extern RegexPattern *nullAlternative;
 extern RegexSymbol  *nullSymbol;
 
@@ -1483,5 +1485,7 @@ template<> inline RegexMatcher<true>::~RegexMatcher()
         delete [] captureOffsetsAtomicTmp;
     }
 }
+
+#pragma pack( pop )
 
 #pragma warning(pop)
