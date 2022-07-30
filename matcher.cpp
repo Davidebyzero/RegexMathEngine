@@ -32,6 +32,9 @@ void RegexMatcher<USE_STRINGS>::nonMatch(NonMatchType type)
         case NonMatch_EmptyOptional:
             fputs("Empty match found in group with maximum quantifer unsatisfied; treating this as a non-match\n\n", stderr);
             break;
+        case NonMatch_CountingPossibleMatches:
+            fputs("Turning successful full match into a non-match to count possible matches\n\n", stderr);
+            break;
         default:
             UNREACHABLE_CODE;
         }
@@ -1053,7 +1056,7 @@ void RegexMatcher<USE_STRINGS>::popAtomicGroup(RegexGroup *const group)
 }
 
 template <bool USE_STRINGS>
-bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength)
+bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr)
 {
     delete [] groupStackBase;
     groupStackBase = new GroupStackNode [maxGroupDepth];
@@ -1082,6 +1085,9 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
     verb = RegexVerb_None;
 
     initInput(_input, numCaptureGroups);
+
+    if (possibleMatchesCount_ptr)
+        *possibleMatchesCount_ptr = 0;
 
     Uint64 curPosition=0;
     for (; curPosition<=input; curPosition++)
@@ -1114,6 +1120,12 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
             {
                 if (groupStackTop == groupStackBase)
                 {
+                    if (possibleMatchesCount_ptr)
+                    {
+                        ++*possibleMatchesCount_ptr;
+                        nonMatch(NonMatch_CountingPossibleMatches);
+                        continue;
+                    }
                     match = +1;
                     break;
                 }
@@ -1451,5 +1463,5 @@ void RegexMatcher<true>::fprintCapture(FILE *f, Uint i)
     fprintCapture(f, captures[i], captureOffsets[i]);
 }
 
-template bool RegexMatcher<false>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
-template bool RegexMatcher<true >::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength);
+template bool RegexMatcher<false>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr);
+template bool RegexMatcher<true >::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr);

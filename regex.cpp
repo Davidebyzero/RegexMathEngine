@@ -23,8 +23,8 @@ class Regex
     Uint maxGroupDepth;
 public:
     Regex(const char *buf);
-    bool MatchNumber(Uint64 input, char basicChar, Uint returnMatch_backrefIndex, Uint64 &returnMatch);
-    bool MatchString(const char *stringToMatchAgainst, Uint returnMatch_backrefIndex, const char *&returnMatch, size_t &returnMatchLength);
+    bool MatchNumber(Uint64 input, char basicChar, Uint returnMatch_backrefIndex, Uint64 &returnMatch, Uint64 *possibleMatchesCount_ptr);
+    bool MatchString(const char *stringToMatchAgainst, Uint returnMatch_backrefIndex, const char *&returnMatch, size_t &returnMatchLength, Uint64 *possibleMatchesCount_ptr);
 };
 
 Regex::Regex(const char *buf)
@@ -40,18 +40,18 @@ Regex::Regex(const char *buf)
     maxGroupDepth    = parser.maxGroupDepth;
 }
 
-bool Regex::MatchNumber(Uint64 input, char basicChar, Uint returnMatch_backrefIndex, Uint64 &returnMatch)
+bool Regex::MatchNumber(Uint64 input, char basicChar, Uint returnMatch_backrefIndex, Uint64 &returnMatch, Uint64 *possibleMatchesCount_ptr=NULL)
 {
     RegexMatcher<false> match;
     match.basicChar = basicChar;
     Uint64 returnMatchOffset;
-    return match.Match(regex, numCaptureGroups, maxGroupDepth, input, returnMatch_backrefIndex, returnMatchOffset, returnMatch);
+    return match.Match(regex, numCaptureGroups, maxGroupDepth, input, returnMatch_backrefIndex, returnMatchOffset, returnMatch, possibleMatchesCount_ptr);
 }
 
-bool Regex::MatchString(const char *stringToMatchAgainst, Uint returnMatch_backrefIndex, const char *&returnMatch, size_t &returnMatchLength)
+bool Regex::MatchString(const char *stringToMatchAgainst, Uint returnMatch_backrefIndex, const char *&returnMatch, size_t &returnMatchLength, Uint64 *possibleMatchesCount_ptr=NULL)
 {
     RegexMatcher<true> match;
-    bool result = match.Match(regex, numCaptureGroups, maxGroupDepth, (Uint64)stringToMatchAgainst, returnMatch_backrefIndex, (Uint64 &)returnMatch, (Uint64 &)returnMatchLength);
+    bool result = match.Match(regex, numCaptureGroups, maxGroupDepth, (Uint64)stringToMatchAgainst, returnMatch_backrefIndex, (Uint64 &)returnMatch, (Uint64 &)returnMatchLength, possibleMatchesCount_ptr);
     (const char *&)returnMatch = stringToMatchAgainst + (size_t)(Uint64 &)returnMatch;
     return result;
 }
@@ -164,6 +164,8 @@ Options:\n\
                       is equivalent to:\n\
                       --npcg- --ecc- --neo- -x ag,pq,cnd,rs,pbr\n\
   -o                  Show only the part of the line that matched\n\
+  -X                  Exhaustive mode; counts the number of possible matches,\n\
+                      without reporting what the actual matches are.\n\
   -O NUMBER           Specifies the optimization level, from 0 to 2. This\n\
                       controls whether optimizations are enabled which skip\n\
                       unnecessary backtracking. The default is the maximum, 2.\n\
@@ -288,6 +290,7 @@ int main(int argc, char *argv[])
     bool verbose = false;
     bool lineBuffered = false;
     bool showMatch = false;
+    bool countPossibleMatches = false;
     bool optionsDone = false;
     Uint showMatch_backrefIndex = 0;
     Uint64 testNum0, testNum1;
@@ -630,6 +633,9 @@ int main(int argc, char *argv[])
                     showMatch_backrefIndex = 0;
             }
             else
+            if (argv[i][1]=='X')
+                countPossibleMatches = true;
+            else
             if (argv[i][1]=='O')
             {
                 try
@@ -859,13 +865,20 @@ int main(int argc, char *argv[])
                 }
                 default:
                 {
+                    Uint64 possibleMatchesCount;
+                    Uint64 *possibleMatchesCount_ptr = countPossibleMatches ? &possibleMatchesCount : NULL;
+
                     if (testNumInc)
                         for (Uint64 i=testNum0;; i+=testNumInc)
                         {
                             Uint64 returnMatch;
-                            if (regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch))
+                            bool matched = regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch, possibleMatchesCount_ptr);
+                            if (matched || countPossibleMatches)
                             {
                                 printf("%*llu", testNum_digits, i);
+                                if (countPossibleMatches)
+                                    printf(" -> %llu", *possibleMatchesCount_ptr);
+                                else
                                 if (showMatch)
                                     printf(" -> %*llu", testNum_digits, returnMatch);
                                 putchar('\n');
@@ -887,9 +900,12 @@ int main(int argc, char *argv[])
                             {
                                 Uint64 input = readNumericConstant<Uint64>(line);
                                 Uint64 returnMatch;
-                                bool matched = regex.MatchNumber(input, mathMode, showMatch_backrefIndex, returnMatch);
+                                bool matched = regex.MatchNumber(input, mathMode, showMatch_backrefIndex, returnMatch, possibleMatchesCount_ptr);
                                 if (verbose)
                                 {
+                                    if (countPossibleMatches)
+                                        printf("%llu -> %llu\n", input, *possibleMatchesCount_ptr);
+                                    else
                                     if (matched)
                                         printf("%llu -> %llu\n", input, returnMatch);
                                     else
@@ -1201,6 +1217,9 @@ int main(int argc, char *argv[])
                 }
                 default:
                 {
+                    Uint64 possibleMatchesCount;
+                    Uint64 *possibleMatchesCount_ptr = countPossibleMatches ? &possibleMatchesCount : NULL;
+
                     LineGetter lineGetter(1<<15);
                     const char newline = '\n';
                     for (;;)
@@ -1210,8 +1229,11 @@ int main(int argc, char *argv[])
                             break;
                         const char *returnMatch;
                         size_t returnMatchLength;
-                        if (regex.MatchString(line, showMatch_backrefIndex, returnMatch, returnMatchLength))
+                        if (regex.MatchString(line, showMatch_backrefIndex, returnMatch, returnMatchLength, possibleMatchesCount_ptr))
                         {
+                            if (countPossibleMatches)
+                                printf("%llu\n", *possibleMatchesCount_ptr);
+                            else
                             if (showMatch)
                                 printf("%.*s\n", returnMatchLength, returnMatch);
                             else
