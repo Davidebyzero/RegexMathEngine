@@ -732,7 +732,7 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
         matcher.groupStackTop--;
         matcher.alternative = group->parentAlternative;
         matcher.position = matcher.groupStackTop[+1].position;
-        if (group->type == RegexGroup_NegativeLookahead)
+        if (group->type == RegexGroup_NegativeLookahead || group->type == RegexGroup_NegativeLookinto)
         {
             // if we've reached here, it means no match was found inside the negative lookahead, which makes it a match outside
             if (!group->self) // group->self will be NULL if this is the lookaround in a conditional

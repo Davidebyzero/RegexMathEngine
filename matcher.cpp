@@ -47,7 +47,7 @@ void RegexMatcher<USE_STRINGS>::nonMatch(NonMatchType type)
     {
         if (verb != RegexVerb_None && verb != RegexVerb_Then)
         {
-            if (groupStackTop->group->type == RegexGroup_NegativeLookahead && stack->okayToTryAlternatives(*this))
+            if ((groupStackTop->group->type == RegexGroup_NegativeLookahead || groupStackTop->group->type == RegexGroup_NegativeLookinto) && stack->okayToTryAlternatives(*this))
                 verb = RegexVerb_None;
         }
         else

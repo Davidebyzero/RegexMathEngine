@@ -863,7 +863,7 @@ finished_parsing:
                 thisSymbol      = group->self ? group->self + 1 : (*thisAlternative)->symbols; // group->self will be NULL if this is the lookaround in a conditional
 
                 anchorStack.pop();
-                if (group->self && group->minCount && group->type != RegexGroup_NegativeLookahead)
+                if (group->self && group->minCount && group->type != RegexGroup_NegativeLookahead && group->type != RegexGroup_NegativeLookinto )
                     anchorStack.top().currentAlternativeAnchored |= anchored;
             }
         }
