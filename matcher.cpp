@@ -95,7 +95,8 @@ template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
 {
     bool enteringLookinto = false;
-    Uint64 inputLookintoSize;
+    Uint64      inputLookintoSize;
+    const char *inputLookintoPtr = NULL;
     {
         Uint64 newPosition = position;
         switch (group->type)
@@ -113,19 +114,16 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
                     inputLookintoSize = position - startPosition;
                 else
                 {
-                    Uint64 multiple;
-                    const char *pBackref;
-                    readCapture(backrefIndex - 1, multiple, pBackref);
-                    if (multiple == NON_PARTICIPATING_CAPTURE_GROUP)
+                    readCapture(backrefIndex - 1, inputLookintoSize, inputLookintoPtr);
+                    if (inputLookintoSize == NON_PARTICIPATING_CAPTURE_GROUP)
                     {
                         if (!emulate_ECMA_NPCGs)
                         {
                             nonMatch();
                             return;
                         }
-                        multiple = 0;
+                        inputLookintoSize = 0;
                     }
-                    inputLookintoSize = multiple;
                 }
                 break;
             }
@@ -165,8 +163,7 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
     if (enteringLookinto)
     {
         Backtrack_EnterGroupLookinto<USE_STRINGS> *pushLookinto = stack.template push< Backtrack_EnterGroupLookinto<USE_STRINGS> >();
-        pushLookinto->inputOutside = input;
-        input = inputLookintoSize;
+        pushLookinto->pushInput(*this, inputLookintoSize, inputLookintoPtr);
         position = 0;
     }
     else
@@ -338,13 +335,13 @@ bool matchWordCharacter(Uchar ch);
 
 template<> void RegexMatcher<false>::initInput(Uint64 _input, Uint numCaptureGroups)
 {
-    input = _input;
+    input = input0 = _input;
     basicCharIsWordCharacter = matchWordCharacter(basicChar);
 }
 template<> void RegexMatcher<true>::initInput(Uint64 _input, Uint numCaptureGroups)
 {
-    stringToMatchAgainst = (const char *)_input;
-    input = strlen(stringToMatchAgainst);
+    stringToMatchAgainst = stringToMatchAgainst0 = (const char *)_input;
+    input = input0 = strlen(stringToMatchAgainst);
     delete [] captureOffsets;
     captureOffsets = new const char * [numCaptureGroups];
     for (Uint i=0; i<numCaptureGroups; i++)
