@@ -94,6 +94,8 @@ void RegexMatcher<USE_STRINGS>::pushStack()
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
 {
+    bool enteringLookinto = false;
+    Uint64 inputLookintoSize;
     {
         Uint64 newPosition = position;
         switch (group->type)
@@ -102,9 +104,13 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
         case RegexGroup_LookintoMolecular:
         case RegexGroup_NegativeLookinto:
             {
+                enteringLookinto = true;
                 Uint backrefIndex = ((RegexGroupLookinto*)group)->backrefIndex;
-                if (backrefIndex == UINT_MAX || backrefIndex == 0)
-                    newPosition = 0;
+                if (backrefIndex == UINT_MAX)
+                    inputLookintoSize = input;
+                else
+                if (backrefIndex == 0)
+                    inputLookintoSize = position - startPosition;
                 else
                 {
                     Uint64 multiple;
@@ -119,7 +125,7 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
                         }
                         multiple = 0;
                     }
-                    newPosition = input - multiple;
+                    inputLookintoSize = multiple;
                 }
                 break;
             }
@@ -153,12 +159,18 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
     groupStackTop->group       = group;
     groupStackTop->numCaptured = 0;
 
-    position = newPosition;
-
     if (group->possessive)
         stack.template push< Backtrack_BeginAtomicGroup<USE_STRINGS> >();
 
-    stack.template push< Backtrack_EnterGroup<USE_STRINGS> >();
+    if (enteringLookinto)
+    {
+        Backtrack_EnterGroupLookinto<USE_STRINGS> *pushLookinto = stack.template push< Backtrack_EnterGroupLookinto<USE_STRINGS> >();
+        pushLookinto->inputOutside = input;
+        input = inputLookintoSize;
+        position = 0;
+    }
+    else
+        stack.template push< Backtrack_EnterGroup<USE_STRINGS> >();
 
     if (group->type == RegexGroup_Atomic)
         stack.template push< Backtrack_BeginAtomicGroup<USE_STRINGS> >();

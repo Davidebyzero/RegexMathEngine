@@ -21,6 +21,7 @@ extern RegexSymbol  *nullSymbol;
 
 template <bool> class BacktrackNode;
 template <bool> class RegexMatcher;
+template <bool> class Backtrack_EnterGroupLookinto;
 class GroupStackNode;
 
 template <bool USE_STRINGS>
@@ -137,6 +138,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     friend class Backtrack_AtomicCapture<USE_STRINGS>;
     friend class Backtrack_SkipGroup<USE_STRINGS>;
     friend class Backtrack_EnterGroup<USE_STRINGS>;
+    friend class Backtrack_EnterGroupLookinto<USE_STRINGS>;
     friend class Backtrack_LeaveGroup<USE_STRINGS>;
     friend class Backtrack_LeaveGroupLazily<USE_STRINGS>;
     friend class Backtrack_LeaveCaptureGroup_Base<false, USE_STRINGS>;
@@ -713,6 +715,7 @@ class Backtrack_SkipGroup : public BacktrackNode<USE_STRINGS>
 template <bool USE_STRINGS>
 class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
 {
+    friend class Backtrack_EnterGroupLookinto<USE_STRINGS>;
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
     {
         return sizeof(*this);
@@ -782,6 +785,37 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
     virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
     {
         fprintf(f, "Backtrack_EnterGroup\n");
+    }
+};
+
+template <bool USE_STRINGS>
+class Backtrack_EnterGroupLookinto : public Backtrack_EnterGroup<USE_STRINGS>
+{
+    friend class RegexMatcher<USE_STRINGS>;
+    Uint64 inputOutside;
+
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return sizeof(*this);
+    }
+    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        matcher.input = inputOutside;
+        return Backtrack_EnterGroup<USE_STRINGS>::popTo(matcher);
+    }
+    virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        matcher.input = inputOutside;
+        return Backtrack_EnterGroup<USE_STRINGS>::popForNegativeLookahead(matcher);
+    }
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        matcher.input = inputOutside;
+        return Backtrack_EnterGroup<USE_STRINGS>::popForAtomicCapture(matcher);
+    }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fprintf(f, "Backtrack_EnterGroupLookinto\n");
     }
 };
 
