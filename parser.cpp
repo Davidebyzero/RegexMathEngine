@@ -38,7 +38,7 @@ void RegexParser::addSymbol(const char *buf, RegexSymbol *newSymbol)
 void RegexParser::fixLookaheadQuantifier()
 {
     // it makes no difference whether a lookahead is repeated once or an infinite number of times, so limit them to 1 iteration
-    if (symbol->type == RegexSymbol_Group && ((RegexGroup*)symbol)->isLookahead())
+    if (symbol->type == RegexSymbol_Group && ((RegexGroup*)symbol)->isLookaround())
     {
         symbol->minCount = symbol->minCount ? 1 : 0;
         symbol->maxCount = symbol->maxCount ? 1 : 0;
@@ -164,6 +164,34 @@ void RegexParser::closeGroup(RegexPattern **&alternatives, std::queue<RegexPatte
             (*symbol)->parentAlternative = &alternatives[i];
     }
     alternatives[i] = NULL;
+}
+
+RegexGroup *RegexParser::parseLookinto(const char *&buf)
+{
+    if (!allow_lookinto)
+        throw RegexParsingError(buf, "Unrecognized character after (?");
+    RegexGroup *group;
+    Uint backrefIndex = UINT_MAX;
+    if (inrange(*buf, '0', '9'))
+    {
+        try
+        {
+            backrefIndex = readNumericConstant<Uint>(buf);
+        }
+        catch (ParsingError)
+        {
+            throw RegexParsingError(buf, "Group number is too big");
+        }
+    }
+    switch (*buf)
+    {
+    case '=':                                                                                                     group = new RegexGroupLookinto(RegexGroup_Lookinto         , backrefIndex); break;
+    case '*': if (!allow_molecular_lookaround) throw RegexParsingError(buf, "Unrecognized character after (?^");  group = new RegexGroupLookinto(RegexGroup_LookintoMolecular, backrefIndex); break;
+    case '!':                                                                                                     group = new RegexGroupLookinto(RegexGroup_NegativeLookinto , backrefIndex); break;
+    default:                                   throw RegexParsingError(buf, "Unrecognized character after (?^");
+    }
+    buf++;
+    return group;
 }
 
 RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
@@ -401,12 +429,13 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
                 case '?':
                     switch (buf[1])
                     {
-                    case ':':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_NonCapturing);       break;
-                    case '>': if (!allow_atomic_groups      ) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_Atomic);             break;
-                    case '|': if (!allow_branch_reset_groups) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_BranchReset);        break;
-                    case '=':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_Lookahead);          break;
-                    case '*': if (!allow_molecular_lookahead) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_LookaheadMolecular); break;
-                    case '!':                                                                                                   buf+=2; group = new RegexGroup(RegexGroup_NegativeLookahead);  break;
+                    case ':':                                                                                                    buf+=2; group = new RegexGroup(RegexGroup_NonCapturing);       break;
+                    case '>': if (!allow_atomic_groups       ) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_Atomic);             break;
+                    case '|': if (!allow_branch_reset_groups ) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_BranchReset);        break;
+                    case '=':                                                                                                    buf+=2; group = new RegexGroup(RegexGroup_Lookahead);          break;
+                    case '*': if (!allow_molecular_lookaround) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; group = new RegexGroup(RegexGroup_LookaheadMolecular); break;
+                    case '!':                                                                                                    buf+=2; group = new RegexGroup(RegexGroup_NegativeLookahead);  break;
+                    case '^':                                                                                                    buf+=2; group = parseLookinto(buf);                            break;
                     case '(':
                         if (!allow_conditionals && !allow_lookaround_conditionals)
                             throw RegexParsingError(buf, "Unrecognized character after (?");
@@ -428,17 +457,18 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
                         else
                         if (allow_lookaround_conditionals && *buf == '?')
                         {
+                            const char *bufOrig = buf-1;
                             switch (buf[1])
                             {
-                            case '=':                                                                                                   lookaroundCondition = new RegexGroup(RegexGroup_Lookahead);          break;
-                            case '*': if (!allow_molecular_lookahead) throw RegexParsingError(buf, "Unrecognized character after (?");  lookaroundCondition = new RegexGroup(RegexGroup_LookaheadMolecular); break;
-                            case '!':                                                                                                   lookaroundCondition = new RegexGroup(RegexGroup_NegativeLookahead);  break;
+                            case '=':                                                                                                    buf+=2; lookaroundCondition = new RegexGroup(RegexGroup_Lookahead);          break;
+                            case '*': if (!allow_molecular_lookaround) throw RegexParsingError(buf, "Unrecognized character after (?");  buf+=2; lookaroundCondition = new RegexGroup(RegexGroup_LookaheadMolecular); break;
+                            case '!':                                                                                                    buf+=2; lookaroundCondition = new RegexGroup(RegexGroup_NegativeLookahead);  break;
+                            case '^':                                                                                                    buf+=2; lookaroundCondition = parseLookinto(buf);                            break;
                             default:
                                 goto condition_not_found;
                             }
                             group = new RegexLookaroundConditional(lookaroundCondition);
-                            lookaroundCondition->originalCode = buf-1;
-                            buf += 2;
+                            lookaroundCondition->originalCode = bufOrig;
                         }
                         else condition_not_found:
                             throw RegexParsingError(buf,
@@ -769,8 +799,33 @@ finished_parsing:
                 break;
             case RegexSymbol_Group:
                 RegexGroup *group = (RegexGroup*)(*thisSymbol);
-                if (group->type == RegexGroup_Conditional && ((RegexConditional*)group)->backrefIndex >= backrefIndex)
-                    throw RegexParsingError((*thisSymbol)->originalCode, "reference to non-existent capture group");
+                switch (group->type)
+                {
+                case RegexGroup_Lookinto:
+                case RegexGroup_LookintoMolecular:
+                case RegexGroup_NegativeLookinto:
+                    if (((RegexGroupLookinto*)group)->backrefIndex+1 > backrefIndex+1)
+                        throw RegexParsingError((*thisSymbol)->originalCode, "reference to non-existent capture group");
+                    break;
+                case RegexGroup_Conditional:
+                    if (((RegexConditional*)group)->backrefIndex >= backrefIndex)
+                        throw RegexParsingError((*thisSymbol)->originalCode, "reference to non-existent capture group");
+                    break;
+                case RegexGroup_LookaroundConditional:
+                    {
+                        RegexGroup *lookaround = ((RegexLookaroundConditional*)group)->lookaround;
+                        switch (lookaround->type)
+                        {
+                        case RegexGroup_Lookinto:
+                        case RegexGroup_LookintoMolecular:
+                        case RegexGroup_NegativeLookinto:
+                            if (((RegexGroupLookinto*)lookaround)->backrefIndex+1 > backrefIndex+1)
+                                throw RegexParsingError((*thisSymbol)->originalCode, "reference to non-existent capture group");
+                            break;
+                        }
+                        break;
+                    }
+                }
                 *groupStackTop++ = group;
                 thisAlternative = group->alternatives;
                 thisSymbol      = group->alternatives[0]->symbols;

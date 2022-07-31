@@ -25,7 +25,8 @@ extern bool emulate_ECMA_NPCGs;
 extern bool allow_empty_character_classes;
 extern bool no_empty_optional;
 extern bool allow_quantifiers_on_assertions;
-extern bool allow_molecular_lookahead;
+extern bool allow_molecular_lookaround;
+extern bool allow_lookinto;
 extern bool allow_atomic_groups;
 extern bool allow_branch_reset_groups;
 extern bool allow_possessive_quantifiers;
@@ -69,6 +70,9 @@ enum RegexGroupType
     RegexGroup_Lookahead,
     RegexGroup_LookaheadMolecular,
     RegexGroup_NegativeLookahead,
+    RegexGroup_Lookinto,
+    RegexGroup_LookintoMolecular,
+    RegexGroup_NegativeLookinto,
     RegexGroup_Conditional,
     RegexGroup_LookaroundConditional,
 };
@@ -195,9 +199,9 @@ class RegexGroup : public RegexSymbol
     RegexGroupType type;
 public:
     RegexGroup(RegexGroupType type) : RegexSymbol(RegexSymbol_Group), type(type) {}
-    bool isLookahead()
+    bool isLookaround()
     {
-        return type == RegexGroup_Lookahead || type == RegexGroup_LookaheadMolecular || type == RegexGroup_NegativeLookahead;
+        return type == RegexGroup_Lookahead || type == RegexGroup_LookaheadMolecular || type == RegexGroup_NegativeLookahead || type == RegexGroup_Lookinto || type == RegexGroup_LookintoMolecular || type == RegexGroup_NegativeLookinto;
     }
 };
 
@@ -248,6 +252,16 @@ class RegexLookaroundConditional : public RegexGroup
     RegexGroup *lookaround;
 public:
     RegexLookaroundConditional(RegexGroup *lookaround) : RegexGroup(RegexGroup_LookaroundConditional), lookaround(lookaround) {}
+};
+
+class RegexGroupLookinto : public RegexGroup
+{
+    friend class RegexParser;
+    friend class RegexMatcher<false>;
+    friend class RegexMatcher<true>;
+    Uint backrefIndex; // UINT_MAX = input string; 0 = the match so far; 1... = \1...
+public:
+    RegexGroupLookinto(RegexGroupType type, Uint backrefIndex) : RegexGroup(type), backrefIndex(backrefIndex) {}
 };
 
 class RegexBackref : public RegexSymbol

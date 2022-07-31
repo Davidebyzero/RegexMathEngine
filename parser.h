@@ -45,6 +45,7 @@ class RegexParser
     static void skipWhitespace(const char *&buf);
     void closeAlternative(RegexSymbol **&symbols, std::queue<RegexSymbol*> &symbolQueue);
     void closeGroup(RegexPattern **&alternatives, std::queue<RegexPattern*> &patternQueue);
+    RegexGroup *parseLookinto(const char *&buf);
 public:
     RegexParser(RegexGroupRoot &regex, const char *buf);
 };

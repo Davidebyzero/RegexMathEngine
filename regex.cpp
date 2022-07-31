@@ -92,7 +92,8 @@ bool emulate_ECMA_NPCGs = true;
 bool allow_empty_character_classes = true;
 bool no_empty_optional = true;
 bool allow_quantifiers_on_assertions = true;
-bool allow_molecular_lookahead = false;
+bool allow_molecular_lookaround = false;
+bool allow_lookinto = false;
 bool allow_atomic_groups = false;
 bool allow_branch_reset_groups = false;
 bool allow_possessive_quantifiers = false;
@@ -150,6 +151,8 @@ Options:\n\
                       specification disallows it.\n\
   -x EXT,EXT,...      Enable extensions. Currently available extensions are:\n\
                       ml   Molecular (non-atomic) lookahead: (?*...)\n\
+                      li   Lookinto: (?^=...), (?^!...), (?^N=...), (?^N!...)\n\
+                           if \"ml\" is enabled also, (?^*...), (?^N*...)\n\
                       ag   Atomic Grouping: (?>...)\n\
                       brg  Branch Reset Groups: (?|(...)|(...)|...)\n\
                       pq   Possessive Quantifiers: p*+ p++ p?+ p{A,B}+\n\
@@ -393,7 +396,8 @@ int main(int argc, char *argv[])
                     allow_empty_character_classes = false;
                     no_empty_optional = false;
                     allow_quantifiers_on_assertions = true;
-                    allow_molecular_lookahead = false;
+                    allow_molecular_lookaround = false;
+                    allow_lookinto = false;
                     allow_atomic_groups = true;
                     allow_branch_reset_groups = true;
                     allow_possessive_quantifiers = true;
@@ -469,7 +473,13 @@ int main(int argc, char *argv[])
                     if (strncmp(s, "ml", strlength("ml"))==0)
                     {
                         s += strlength("ml");
-                        allow_molecular_lookahead = true;
+                        allow_molecular_lookaround = true;
+                    }
+                    else
+                    if (strncmp(s, "li", strlength("li"))==0)
+                    {
+                        s += strlength("li");
+                        allow_lookinto = true;
                     }
                     else
                     if (strncmp(s, "ag", strlength("ag"))==0)
@@ -523,7 +533,8 @@ int main(int argc, char *argv[])
                     if (strncmp(s, "all", strlength("all"))==0)
                     {
                         s += strlength("all");
-                        allow_molecular_lookahead = true;
+                        allow_molecular_lookaround = true;
+                        allow_lookinto = true;
                         allow_atomic_groups = true;
                         allow_branch_reset_groups = true;
                         allow_possessive_quantifiers = true;

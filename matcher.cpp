@@ -94,6 +94,38 @@ void RegexMatcher<USE_STRINGS>::pushStack()
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
 {
+    {
+        Uint64 newPosition = position;
+        switch (group->type)
+        {
+        case RegexGroup_Lookinto:
+        case RegexGroup_LookintoMolecular:
+        case RegexGroup_NegativeLookinto:
+            {
+                Uint backrefIndex = ((RegexGroupLookinto*)group)->backrefIndex;
+                if (backrefIndex == UINT_MAX || backrefIndex == 0)
+                    newPosition = 0;
+                else
+                {
+                    Uint64 multiple;
+                    const char *pBackref;
+                    readCapture(backrefIndex - 1, multiple, pBackref);
+                    if (multiple == NON_PARTICIPATING_CAPTURE_GROUP)
+                    {
+                        if (!emulate_ECMA_NPCGs)
+                        {
+                            nonMatch();
+                            return;
+                        }
+                        multiple = 0;
+                    }
+                    newPosition = input - multiple;
+                }
+                break;
+            }
+        }
+    }
+
     RegexPattern **alternativeTmp = group->alternatives;
 
     if (group->type == RegexGroup_Conditional)
@@ -120,6 +152,8 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
     groupStackTop->loopCount   = 1;
     groupStackTop->group       = group;
     groupStackTop->numCaptured = 0;
+
+    position = newPosition;
 
     if (group->possessive)
         stack.template push< Backtrack_BeginAtomicGroup<USE_STRINGS> >();
@@ -1135,7 +1169,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                 if (group->type == RegexGroup_Atomic)
                     popAtomicGroup(group);
                 else
-                if (group->type == RegexGroup_Lookahead)
+                if (group->type == RegexGroup_Lookahead || group->type == RegexGroup_Lookinto)
                 {
                     if (verb == RegexVerb_Accept)
                         verb = RegexVerb_None;
@@ -1178,7 +1212,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                     continue;
                 }
                 else
-                if (group->type == RegexGroup_LookaheadMolecular)
+                if (group->type == RegexGroup_LookaheadMolecular || group->type == RegexGroup_LookintoMolecular)
                 {
                     if (verb == RegexVerb_Accept)
                         verb = RegexVerb_None;
@@ -1206,7 +1240,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                     continue;
                 }
                 else
-                if (group->type == RegexGroup_NegativeLookahead)
+                if (group->type == RegexGroup_NegativeLookahead || group->type == RegexGroup_NegativeLookinto)
                 {
                     if (verb == RegexVerb_Accept)
                         verb = RegexVerb_None;
@@ -1304,6 +1338,25 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                     case RegexGroup_Lookahead:          openSymbol=" (?="; break;
                     case RegexGroup_LookaheadMolecular: openSymbol=" (?*"; break;
                     case RegexGroup_NegativeLookahead:  openSymbol=" (?!"; break;
+                    case RegexGroup_Lookinto:
+                    case RegexGroup_LookintoMolecular:
+                    case RegexGroup_NegativeLookinto:
+                        {
+                            char lookintoStr[strlength(" (?^4294967296=")+1] = " (?^";
+                            Uint backrefIndex = ((RegexGroupLookinto*)i->group)->backrefIndex;
+                            char *lookintoStrBuf = lookintoStr + strlength(" (?^");
+                            if (backrefIndex != UINT_MAX)
+                                lookintoStrBuf += sprintf(lookintoStrBuf, "%u", backrefIndex);
+                            switch (i->group->type)
+                            {
+                            case RegexGroup_Lookinto:          *lookintoStrBuf++ = '='; break;
+                            case RegexGroup_LookintoMolecular: *lookintoStrBuf++ = '*'; break;
+                            case RegexGroup_NegativeLookinto:  *lookintoStrBuf++ = '!'; break;
+                            }
+                            *lookintoStrBuf = '\0';
+                            openSymbol = lookintoStr;
+                            break;
+                        }
                     case RegexGroup_Conditional:
                         {
                             char conditionalStr[strlength(" (?(4294967296)")+1];
