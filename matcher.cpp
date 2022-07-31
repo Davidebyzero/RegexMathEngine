@@ -1379,7 +1379,27 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                         case RegexGroup_Lookahead:          openSymbol=" (?(?=)"; break;
                         case RegexGroup_LookaheadMolecular: openSymbol=" (?(?*)"; break;
                         case RegexGroup_NegativeLookahead:  openSymbol=" (?(?!)"; break;
-                        default: UNREACHABLE_CODE;
+                        case RegexGroup_Lookinto:
+                        case RegexGroup_LookintoMolecular:
+                        case RegexGroup_NegativeLookinto:
+                            {
+                                char lookintoStr[strlength(" (?(?^4294967296=")+1] = " (?^";
+                                Uint backrefIndex = ((RegexGroupLookinto*)((RegexLookaroundConditional*)i->group)->lookaround)->backrefIndex;
+                                char *lookintoStrBuf = lookintoStr + strlength(" (?^");
+                                if (backrefIndex != UINT_MAX)
+                                    lookintoStrBuf += sprintf(lookintoStrBuf, "%u", backrefIndex);
+                                switch (((RegexLookaroundConditional*)i->group)->lookaround->type)
+                                {
+                                case RegexGroup_Lookinto:          *lookintoStrBuf++ = '='; break;
+                                case RegexGroup_LookintoMolecular: *lookintoStrBuf++ = '*'; break;
+                                case RegexGroup_NegativeLookinto:  *lookintoStrBuf++ = '!'; break;
+                                }
+                                *lookintoStrBuf++ = ')';
+                                *lookintoStrBuf   = '\0';
+                                openSymbol = lookintoStr;
+                                break;
+                            }
+                            default: UNREACHABLE_CODE;
                         }
                         break;
                     default:
