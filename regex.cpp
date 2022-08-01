@@ -68,6 +68,7 @@ enum StringModeTest
     StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED,
     StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED,
     StringModeTest_SMOOTH_NUMBERS,
+    StringModeTest_TRIANGULAR_TABLE,
 };
 enum NumericalModeTest
 {
@@ -228,6 +229,14 @@ String mode tests:\n\
                            range which has the smallest prime factor. If there\n\
                            are more than one with the same smallest prime\n\
                            factor, any one of them will be accepted.\n\
+\n\
+  triangular-table         Tests any regex taking two comma-delimited positive\n\
+                           parameters in unary, where the second parameter must\n\
+                           be less than or equal to the first. Prints the output\n\
+                           in a triangular table. The row indicates the first\n\
+                           parameter, and the column the second. Unlike all the\n\
+                           other tests, this only displays the output, and\n\
+                           doesn't verify its correctness.\n\
 \n\
 Numerical mode (unary) tests:\n\
   Fibonacci                Match only Fibonacci numbers.\n\
@@ -434,6 +443,7 @@ int main(int argc, char *argv[])
                     else if (strcmp(&argv[i][2+strlength("test=")], "decimal-byte"     )==0) stringModeTest = StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED;
                     else if (strcmp(&argv[i][2+strlength("test=")], "decimal-byte-0"   )==0) stringModeTest = StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED;
                     else if (strcmp(&argv[i][2+strlength("test=")], "smoothest-numbers")==0) stringModeTest = StringModeTest_SMOOTH_NUMBERS;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "triangular-table" )==0) stringModeTest = StringModeTest_TRIANGULAR_TABLE;
                     else if (strcmp(&argv[i][2+strlength("test=")], "Fibonacci"        )==0) numericalModeTest = NumericalModeTest_NUMBERS_FIBONACCI;
                     else if (strcmp(&argv[i][2+strlength("test=")], "power-of-2"       )==0) numericalModeTest = NumericalModeTest_NUMBERS_POWER_OF_2;
                     else if (strcmp(&argv[i][2+strlength("test=")], "triangular"       )==0) numericalModeTest = NumericalModeTest_NUMBERS_TRIANGULAR;
@@ -1224,6 +1234,46 @@ int main(int argc, char *argv[])
                         str[i  ] = '\0';
                     }
                     delete [] str;
+                    break;
+                }
+                case StringModeTest_TRIANGULAR_TABLE:
+                {
+                    Uint64 possibleMatchesCount;
+                    Uint64 *possibleMatchesCount_ptr = countPossibleMatches ? &possibleMatchesCount : NULL;
+
+                    Uint64 maxSize = 15;
+                    const char numeral = 'x';
+                    char *str = (char*)malloc(maxSize*2+1+1);
+                    for (Uint64 n=1;; n++)
+                    {
+                        if (n > maxSize)
+                        {
+                            maxSize *= 2;
+                            str = (char*)realloc(str, maxSize*2+1+1);
+                        }
+                        if (n>1)
+                        {
+                            putchar('\n');
+                            if (lineBuffered)
+                                fflush(stdout);
+                        }
+                        for (Uint64 k=1; k<=n; k++)
+                        {
+                            if (k>1)
+                                putchar(' ');
+
+                            memset(str    , numeral, n); str[n    ] = ',';
+                            memset(str+n+1, numeral, k); str[n+1+k] = 0;
+
+                            const char *returnMatch;
+                            size_t returnMatchLength;
+                            bool matched = regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength, possibleMatchesCount_ptr);
+                            if (countPossibleMatches)
+                                printf("%4llu", *possibleMatchesCount_ptr);
+                            else if (matched)
+                                printf("%4llu", returnMatchLength);
+                        }
+                    }
                     break;
                 }
                 default:
