@@ -236,7 +236,8 @@ String mode tests:\n\
                            in a triangular table. The row indicates the first\n\
                            parameter, and the column the second. Unlike all the\n\
                            other tests, this only displays the output, and\n\
-                           doesn't verify its correctness.\n\
+                           doesn't verify its correctness. This can be combined\n\
+                           with the -t NUM0[..NUM1] parameter.\n\
 \n\
 Numerical mode (unary) tests:\n\
   Fibonacci                Match only Fibonacci numbers.\n\
@@ -1241,21 +1242,23 @@ int main(int argc, char *argv[])
                     Uint64 possibleMatchesCount;
                     Uint64 *possibleMatchesCount_ptr = countPossibleMatches ? &possibleMatchesCount : NULL;
 
-                    Uint64 maxSize = 15;
+                    Uint64 maxSize = 64;
                     const char numeral = 'x';
                     char *str = (char*)malloc(maxSize*2+1+1);
-                    for (Uint64 n=1;; n++)
+                    for (Uint64 n = testNumInc ? testNum0 : 1;; n++)
                     {
-                        if (n > maxSize)
-                        {
-                            maxSize *= 2;
-                            str = (char*)realloc(str, maxSize*2+1+1);
-                        }
                         if (n>1)
                         {
                             putchar('\n');
                             if (lineBuffered)
                                 fflush(stdout);
+                        }
+                        if (testNumInc && n > testNum1)
+                            break;
+                        if (n > maxSize)
+                        {
+                            maxSize *= 2;
+                            str = (char*)realloc(str, maxSize*2+1+1);
                         }
                         for (Uint64 k=1; k<=n; k++)
                         {
