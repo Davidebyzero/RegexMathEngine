@@ -107,7 +107,7 @@ Uint optimizationLevel = 2;
 
 static void printShortUsage(const char *argv0)
 {
-    fprintf(stderr, "Use the \"--help\" option to see full information on command-line options.\n", argv0);
+    fprintf(stderr, "Use the \"--help\" option to see full information on command-line options.\n");
 }
 
 static void printUsage(const char *argv0)
@@ -845,9 +845,9 @@ int main(int argc, char *argv[])
                             z = n+1;
                         }
                         if (regex.MatchNumber(n, mathMode, showMatch_backrefIndex, returnMatch))
-                            printf("%llu -> %llu\n", n, returnMatch);
+                            printf("%u -> %llu\n", n, returnMatch);
                         else
-                            printf("%llu -> no match (FALSE NEGATIVE)\n", n);
+                            printf("%u -> no match (FALSE NEGATIVE)\n", n);
                         n += m;
                         m++;
                     }
@@ -1213,7 +1213,7 @@ int main(int argc, char *argv[])
                                 printf("%llu, %llu -> %llu,%llu - INCORRECT! (delimiter included in match)\n", j, k, j - (returnMatch-str), returnMatch-str + returnMatchLength - (j+1));
                             else
                             if (!inrange64(returnMatchLength, j, k))
-                                printf("%llu, %llu -> %llu - INCORRECT! (outside range)\n", j, k, returnMatchLength);
+                                printf("%llu, %llu -> %" PRIsize_t " - INCORRECT! (outside range)\n", j, k, returnMatchLength);
                             else
                             {
                                 Uint64 smallestLargestPrimeFactor = k;
@@ -1225,7 +1225,7 @@ int main(int argc, char *argv[])
                                 }
                                 Uint64 returned_largestPrimeFactor = largestPrimeFactor(returnMatchLength);
                                 if (returned_largestPrimeFactor != smallestLargestPrimeFactor)
-                                    printf("%llu, %llu -> %llu (largest prime factor %llu) - INCORRECT! (should have smallest largest prime factor %llu)\n", j, k, returnMatchLength, returned_largestPrimeFactor, smallestLargestPrimeFactor);
+                                    printf("%llu, %llu -> %" PRIsize_t " (largest prime factor %llu) - INCORRECT! (should have smallest largest prime factor %llu)\n", j, k, returnMatchLength, returned_largestPrimeFactor, smallestLargestPrimeFactor);
                             }
 
                             str[j] = numeral;
@@ -1271,7 +1271,7 @@ int main(int argc, char *argv[])
                             if (countPossibleMatches)
                                 printf("%4llu", *possibleMatchesCount_ptr);
                             else if (matched)
-                                printf("%4llu", returnMatchLength);
+                                printf("%4" PRIsize_t, returnMatchLength);
                         }
                     }
                     break;
@@ -1296,7 +1296,7 @@ int main(int argc, char *argv[])
                                 printf("%llu\n", *possibleMatchesCount_ptr);
                             else
                             if (showMatch)
-                                printf("%.*s\n", returnMatchLength, returnMatch);
+                                printf("%.*s\n", returnMatchLength < INT_MAX ? (int)returnMatchLength : INT_MAX, returnMatch);
                             else
                                 puts(line);
                             if (lineBuffered)
@@ -1311,7 +1311,7 @@ int main(int argc, char *argv[])
     }
     catch (RegexParsingError err)
     {
-        fprintf(stderr, "Error parsing regex pattern at offset %u: %s\n", err.buf - buf, err.msg);
+        fprintf(stderr, "Error parsing regex pattern at offset %" PRIptrdiff_t ": %s\n", err.buf - buf, err.msg);
         return -1;
     }
 }

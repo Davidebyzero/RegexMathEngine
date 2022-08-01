@@ -65,6 +65,14 @@ char (*__strlength_helper(char const (&_String)[size]))[size];
 #define FLEXIBLE_SIZE_ARRAY
 #endif
 
+#ifdef _MSC_VER
+#define PRIptrdiff_t "Iu"
+#define PRIsize_t    "Iu"
+#else
+#define PRIptrdiff_t "tu"
+#define PRIsize_t    "zu"
+#endif
+
 template <typename UINT_TYPE>
 UINT_TYPE readNumericConstant(const char *&buf);
 

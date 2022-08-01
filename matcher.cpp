@@ -1536,7 +1536,7 @@ void RegexMatcher<true>::fprintCapture(FILE *f, Uint64 length, const char *offse
         }
         s++;
     }
-    fprintf(f, "\" (%llu:%llu)", offset - stringToMatchAgainst, length);
+    fprintf(f, "\" (%" PRIptrdiff_t ":%llu)", offset - stringToMatchAgainst, length);
 }
 template <>
 void RegexMatcher<true>::fprintCapture(FILE *f, Uint i)
