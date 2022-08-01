@@ -523,8 +523,8 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
 
             add_nested_group:
                 curGroupDepth++;
-                // The current lookaround matching code can't handle quantifiers, so leave room in case we will be wrapping it in a non-capturing group (can't know at this point if it has a quantifier or not)
-                if (group->isLookaround())
+                // Neither the current lookaround nor atomic group matching code can handle quantifiers, so leave room in case we will be wrapping it in a non-capturing group (can't know at this point if it has a quantifier or not)
+                if (group->isLookaround() || group->type == RegexGroup_Atomic)
                     curGroupDepth++;
                 if (maxGroupDepth < curGroupDepth)
                     maxGroupDepth = curGroupDepth;
@@ -582,8 +582,8 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
                     ((RegexLookaroundConditional*)group)->lookaround->parentAlternative = group->alternatives;
 
                 curGroupDepth--;
-                // The current lookaround matching code can't handle quantifiers, so leave room in case we will be wrapping it in a non-capturing group (can't know at this point if it has a quantifier or not)
-                if (group->isLookaround())
+                // Neither the current lookaround nor atomic group matching code can handle quantifiers, so leave room in case we will be wrapping it in a non-capturing group (can't know at this point if it has a quantifier or not)
+                if (group->isLookaround() || group->type == RegexGroup_Atomic)
                     curGroupDepth--;
 
                 ParsingStack *stackDown = stack->below;
@@ -841,7 +841,8 @@ finished_parsing:
                     }
                 }
                 // The current lookaround matching code can't handle quantifiers, so wrap it in a non-capturing group with a quantifier if it needs one.
-                if (group->isLookaround() && (group->maxCount != group->minCount || group->maxCount > 1))
+                if (group->isLookaround()            && (group->maxCount != group->minCount || group->maxCount > 1) ||
+                    group->type == RegexGroup_Atomic &&                                        group->maxCount > 1)
                 {
                     RegexGroup *wrapper = new RegexGroup(RegexGroup_NonCapturing);
                     wrapper->originalCode = group->originalCode;
