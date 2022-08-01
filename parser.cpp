@@ -37,11 +37,18 @@ void RegexParser::addSymbol(const char *buf, RegexSymbol *newSymbol)
 
 void RegexParser::fixLookaheadQuantifier()
 {
-    // it makes no difference whether a lookahead is repeated once or an infinite number of times, so limit them to 1 iteration
+    // It makes no difference whether a lookahead is repeated once or an infinite number of times, so limit them to 1 iteration.
+    // But in persistent backrefs mode this isn't true (unless it's a negative lookaround), as captures made in the lookaround can be influenced by their previous values.
     if (symbol->type == RegexSymbol_Group && ((RegexGroup*)symbol)->isLookaround())
     {
-        symbol->minCount = symbol->minCount ? 1 : 0;
-        symbol->maxCount = symbol->maxCount ? 1 : 0;
+        if (!enable_persistent_backrefs || ((RegexGroup*)symbol)->isNegativeLookaround())
+        {
+            symbol->minCount = symbol->minCount ? 1 : 0;
+            symbol->maxCount = symbol->maxCount ? 1 : 0;
+        }
+        // In no-empty-optional mode, the maxCount might as well be set equal to the minCount for a lookaround, because the match will always be empty.
+        if (no_empty_optional)
+            symbol->maxCount = symbol->minCount;
     }
 }
 
@@ -516,6 +523,9 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
 
             add_nested_group:
                 curGroupDepth++;
+                // The current lookaround matching code can't handle quantifiers, so leave room in case we will be wrapping it in a non-capturing group (can't know at this point if it has a quantifier or not)
+                if (group->isLookaround())
+                    curGroupDepth++;
                 if (maxGroupDepth < curGroupDepth)
                     maxGroupDepth = curGroupDepth;
 
@@ -572,6 +582,9 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
                     ((RegexLookaroundConditional*)group)->lookaround->parentAlternative = group->alternatives;
 
                 curGroupDepth--;
+                // The current lookaround matching code can't handle quantifiers, so leave room in case we will be wrapping it in a non-capturing group (can't know at this point if it has a quantifier or not)
+                if (group->isLookaround())
+                    curGroupDepth--;
 
                 ParsingStack *stackDown = stack->below;
                 delete stack;
@@ -712,6 +725,7 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
             else
             {
                 symbol->minCount = 0;
+                fixLookaheadQuantifier();
                 symbolCountSpecified = true;
             }
             break;
@@ -825,6 +839,35 @@ finished_parsing:
                         }
                         break;
                     }
+                }
+                // The current lookaround matching code can't handle quantifiers, so wrap it in a non-capturing group with a quantifier if it needs one.
+                if (group->isLookaround() && (group->maxCount != group->minCount || group->maxCount > 1))
+                {
+                    RegexGroup *wrapper = new RegexGroup(RegexGroup_NonCapturing);
+                    wrapper->originalCode = group->originalCode;
+                    wrapper->minCount     = group->minCount;
+                    wrapper->maxCount     = group->maxCount;
+                    wrapper->lazy         = group->lazy;
+                    wrapper->possessive   = group->possessive;
+                    group->minCount   = 1;
+                    group->maxCount   = 1;
+                    group->lazy       = false;
+                    group->possessive = false;
+                    wrapper->alternatives    = new RegexPattern* [1 + 1];
+                    wrapper->alternatives[0] = new RegexPattern;
+                    wrapper->alternatives[0]->symbols = (RegexSymbol**)malloc((1 + 1) * sizeof(RegexSymbol*));
+                    wrapper->alternatives[0]->symbols[0] = group;
+                    wrapper->alternatives[0]->symbols[1] = NULL;
+                    wrapper->alternatives[1] = NULL;
+                    wrapper->parentAlternative = thisAlternative;
+                    wrapper->self              = thisSymbol;
+                    group  ->parentAlternative = &wrapper->alternatives[0];
+                    group  ->self              = &wrapper->alternatives[0]->symbols[0];
+                    *groupStackTop++ = wrapper;
+                    *thisSymbol      = wrapper;
+                    thisAlternative = &wrapper->alternatives[0];
+                    thisSymbol      = &wrapper->alternatives[0]->symbols[0];
+                    anchorStack.push(0);
                 }
                 *groupStackTop++ = group;
                 thisAlternative = group->alternatives;
