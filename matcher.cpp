@@ -47,7 +47,7 @@ void RegexMatcher<USE_STRINGS>::nonMatch(NonMatchType type)
     {
         if (verb != RegexVerb_None && verb != RegexVerb_Then)
         {
-            if ((groupStackTop->group->type == RegexGroup_NegativeLookahead || groupStackTop->group->type == RegexGroup_NegativeLookinto) && stack->okayToTryAlternatives(*this))
+            if ((groupStackTop->group->isNegativeLookaround()) && stack->okayToTryAlternatives(*this))
                 verb = RegexVerb_None;
         }
         else
@@ -1249,7 +1249,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                     continue;
                 }
                 else
-                if (group->type == RegexGroup_NegativeLookahead || group->type == RegexGroup_NegativeLookinto)
+                if (group->isNegativeLookaround())
                 {
                     if (verb == RegexVerb_Accept)
                         verb = RegexVerb_None;

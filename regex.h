@@ -203,6 +203,10 @@ public:
     {
         return type == RegexGroup_Lookahead || type == RegexGroup_LookaheadMolecular || type == RegexGroup_NegativeLookahead || type == RegexGroup_Lookinto || type == RegexGroup_LookintoMolecular || type == RegexGroup_NegativeLookinto;
     }
+    bool isNegativeLookaround()
+    {
+        return type == RegexGroup_NegativeLookahead || type == RegexGroup_NegativeLookinto;
+    }
 };
 
 class RegexGroupRoot : public RegexGroup
