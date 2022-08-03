@@ -77,6 +77,8 @@ enum NumericalModeTest
     NumericalModeTest_NUMBERS_POWER_OF_2,
     NumericalModeTest_NUMBERS_TRIANGULAR,
     NumericalModeTest_DIV_SQRT2,
+    NumericalModeTest_DIV_SQRT2_up,
+    NumericalModeTest_DIV_SQRT2_any,
 };
 
 
@@ -245,6 +247,9 @@ Numerical mode (unary) tests:\n\
   triangular               Match only triangular numbers.\n\
   div-sqrt2                Take any number as input, and output that number\n\
                            divided by the square root of 2, rounded down.\n\
+  div-sqrt2-up             The above, but rounded up.\n\
+  div-sqrt2-any            The above, but allowing the rounding to be either\n\
+                           up or down.\n\
 ");
 }
 
@@ -449,6 +454,8 @@ int main(int argc, char *argv[])
                     else if (strcmp(&argv[i][2+strlength("test=")], "power-of-2"       )==0) numericalModeTest = NumericalModeTest_NUMBERS_POWER_OF_2;
                     else if (strcmp(&argv[i][2+strlength("test=")], "triangular"       )==0) numericalModeTest = NumericalModeTest_NUMBERS_TRIANGULAR;
                     else if (strcmp(&argv[i][2+strlength("test=")], "div-sqrt2"        )==0) numericalModeTest = NumericalModeTest_DIV_SQRT2;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "div-sqrt2-up"     )==0) numericalModeTest = NumericalModeTest_DIV_SQRT2_up;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "div-sqrt2-any"    )==0) numericalModeTest = NumericalModeTest_DIV_SQRT2_any;
                     else
                     {
                         fprintf(stderr, "Error: Unrecognized test \"%s\"\n", &argv[i][2+strlength("test=")]);
@@ -855,11 +862,15 @@ int main(int argc, char *argv[])
                     break;
                 }
                 case NumericalModeTest_DIV_SQRT2:
+                case NumericalModeTest_DIV_SQRT2_up:
+                case NumericalModeTest_DIV_SQRT2_any:
                 {
                     const double sqrt2 = sqrt(2.);
                     for (Uint64 i=0;; i++)
                     {
                         Uint64 answer = (Uint64)floor(i / sqrt2);
+                        if (numericalModeTest == NumericalModeTest_DIV_SQRT2_up)
+                            answer += 1;
                         Uint64 returnMatch;
                         bool matched = regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch);
                         if (!matched)
@@ -869,9 +880,15 @@ int main(int argc, char *argv[])
                                 fflush(stdout);
                         }
                         else
-                        if (returnMatch != answer)
+                        if (returnMatch != answer && (numericalModeTest != NumericalModeTest_DIV_SQRT2_any || returnMatch != answer+1))
                         {
-                            printf("%9llu -> %9llu (off by %2lld, should be %9llu)\n", i, returnMatch, returnMatch-answer, answer);
+                            int64 error = returnMatch - answer;
+                            if (numericalModeTest == NumericalModeTest_DIV_SQRT2_any && error > 0)
+                                error -= 1;
+                            printf("%9llu -> %9llu (off by %2lld, should be %9llu", i, returnMatch, error, answer);
+                            if (numericalModeTest == NumericalModeTest_DIV_SQRT2_any)
+                                printf(" or %9llu", answer+1);
+                            fputs(")\n", stdout);
                             if (lineBuffered)
                                 fflush(stdout);
                         }
