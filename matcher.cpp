@@ -108,7 +108,7 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
                 enteringLookinto = true;
                 Uint backrefIndex = ((RegexGroupLookinto*)group)->backrefIndex;
                 if (backrefIndex == UINT_MAX)
-                    inputLookintoSize = input;
+                    inputLookintoSize = input0;
                 else
                 if (backrefIndex == 0)
                     inputLookintoSize = position - startPosition;
