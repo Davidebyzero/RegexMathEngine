@@ -69,6 +69,7 @@ enum StringModeTest
     StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED,
     StringModeTest_SMOOTH_NUMBERS,
     StringModeTest_TRIANGULAR_TABLE,
+    StringModeTest_TRIANGULAR_TABLE2,
 };
 enum NumericalModeTest
 {
@@ -240,6 +241,7 @@ String mode tests:\n\
                            other tests, this only displays the output, and\n\
                            doesn't verify its correctness. This can be combined\n\
                            with the -t NUM0[..NUM1] parameter.\n\
+  triangular-table2        The above, but with the order of arguments reversed.\n\
 \n\
 Numerical mode (unary) tests:\n\
   Fibonacci                Match only Fibonacci numbers.\n\
@@ -450,6 +452,7 @@ int main(int argc, char *argv[])
                     else if (strcmp(&argv[i][2+strlength("test=")], "decimal-byte-0"   )==0) stringModeTest = StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED;
                     else if (strcmp(&argv[i][2+strlength("test=")], "smoothest-numbers")==0) stringModeTest = StringModeTest_SMOOTH_NUMBERS;
                     else if (strcmp(&argv[i][2+strlength("test=")], "triangular-table" )==0) stringModeTest = StringModeTest_TRIANGULAR_TABLE;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "triangular-table2")==0) stringModeTest = StringModeTest_TRIANGULAR_TABLE2;
                     else if (strcmp(&argv[i][2+strlength("test=")], "Fibonacci"        )==0) numericalModeTest = NumericalModeTest_NUMBERS_FIBONACCI;
                     else if (strcmp(&argv[i][2+strlength("test=")], "power-of-2"       )==0) numericalModeTest = NumericalModeTest_NUMBERS_POWER_OF_2;
                     else if (strcmp(&argv[i][2+strlength("test=")], "triangular"       )==0) numericalModeTest = NumericalModeTest_NUMBERS_TRIANGULAR;
@@ -1255,6 +1258,7 @@ int main(int argc, char *argv[])
                     break;
                 }
                 case StringModeTest_TRIANGULAR_TABLE:
+                case StringModeTest_TRIANGULAR_TABLE2:
                 {
                     Uint64 possibleMatchesCount;
                     Uint64 *possibleMatchesCount_ptr = countPossibleMatches ? &possibleMatchesCount : NULL;
@@ -1282,8 +1286,10 @@ int main(int argc, char *argv[])
                             if (k>1)
                                 putchar(' ');
 
-                            memset(str    , numeral, n); str[n    ] = ',';
-                            memset(str+n+1, numeral, k); str[n+1+k] = 0;
+                            Uint64 a=n, b=k;
+                            if (stringModeTest == StringModeTest_TRIANGULAR_TABLE2) {a=k; b=n;}
+                            memset(str    , numeral, a); str[a    ] = ',';
+                            memset(str+a+1, numeral, b); str[a+1+b] = 0;
 
                             const char *returnMatch;
                             size_t returnMatchLength;
