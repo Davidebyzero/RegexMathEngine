@@ -1310,11 +1310,12 @@ int main(int argc, char *argv[])
                             break;
                         const char *returnMatch;
                         size_t returnMatchLength;
-                        if (regex.MatchString(line, showMatch_backrefIndex, returnMatch, returnMatchLength, possibleMatchesCount_ptr))
+                        bool matched = regex.MatchString(line, showMatch_backrefIndex, returnMatch, returnMatchLength, possibleMatchesCount_ptr);
+                        if (countPossibleMatches)
+                            printf("%llu\n", *possibleMatchesCount_ptr);
+                        else
+                        if (matched)
                         {
-                            if (countPossibleMatches)
-                                printf("%llu\n", *possibleMatchesCount_ptr);
-                            else
                             if (showMatch)
                                 printf("%.*s\n", returnMatchLength < INT_MAX ? (int)returnMatchLength : INT_MAX, returnMatch);
                             else
