@@ -171,6 +171,7 @@ Options:\n\
                       is equivalent to:\n\
                       --npcg- --ecc- --neo- -x ag,pq,cnd,rs,pbr\n\
   -o                  Show only the part of the line that matched\n\
+  -v, --invert-match  Show non-matching inputs instead of matching inputs\n\
   -X                  Exhaustive mode; counts the number of possible matches,\n\
                       without reporting what the actual matches are.\n\
   -O NUMBER           Specifies the optimization level, from 0 to 2. This\n\
@@ -310,6 +311,7 @@ int main(int argc, char *argv[])
     bool verbose = false;
     bool lineBuffered = false;
     bool showMatch = false;
+    bool invertMatch = false;
     bool countPossibleMatches = false;
     bool optionsDone = false;
     Uint showMatch_backrefIndex = 0;
@@ -348,6 +350,9 @@ int main(int argc, char *argv[])
                 {
                     lineBuffered = true;
                 }
+                else
+                if (strcmp(&argv[i][2], "invert-match")==0)
+                    invertMatch = true;
                 else
                 if (strncmp(&argv[i][2], "num=", strlength("num="))==0)
                 {
@@ -665,6 +670,9 @@ int main(int argc, char *argv[])
                     showMatch_backrefIndex = 0;
             }
             else
+            if (argv[i][1]=='v')
+                invertMatch = true;
+            else
             if (argv[i][1]=='X')
                 countPossibleMatches = true;
             else
@@ -763,6 +771,12 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (invertMatch && (showMatch || countPossibleMatches || verbose))
+    {
+        fprintf(stderr, "Error: -v cannot be combined with -o, -X, or --verbose\n");
+        printShortUsage(argv[0]);
+        return -1;
+    }
     if (countPossibleMatches && showMatch)
     {
         fprintf(stderr, "Error: -X cannot currently be combined with -o\n");
@@ -921,6 +935,16 @@ int main(int argc, char *argv[])
                         {
                             Uint64 returnMatch;
                             bool matched = regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch, possibleMatchesCount_ptr);
+                            if (invertMatch)
+                            {
+                                if (!matched)
+                                {
+                                    printf("%*llu\n", testNum_digits, i);
+                                    if (lineBuffered)
+                                        fflush(stdout);
+                                }
+                            }
+                            else
                             if (matched || countPossibleMatches)
                             {
                                 printf("%*llu", testNum_digits, i);
@@ -949,6 +973,12 @@ int main(int argc, char *argv[])
                                 Uint64 input = readNumericConstant<Uint64>(line);
                                 Uint64 returnMatch;
                                 bool matched = regex.MatchNumber(input, mathMode, showMatch_backrefIndex, returnMatch, possibleMatchesCount_ptr);
+                                if (invertMatch)
+                                {
+                                    if (!matched)
+                                        printf("%llu\n", input);
+                                }
+                                else
                                 if (verbose)
                                 {
                                     if (countPossibleMatches)
@@ -1323,6 +1353,16 @@ int main(int argc, char *argv[])
                         const char *returnMatch;
                         size_t returnMatchLength;
                         bool matched = regex.MatchString(line, showMatch_backrefIndex, returnMatch, returnMatchLength, possibleMatchesCount_ptr);
+                        if (invertMatch)
+                        {
+                            if (!matched)
+                            {
+                                puts(line);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
+                        }
+                        else
                         if (countPossibleMatches)
                             printf("%llu\n", *possibleMatchesCount_ptr);
                         else
