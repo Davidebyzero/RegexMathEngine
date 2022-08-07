@@ -763,6 +763,12 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (countPossibleMatches && showMatch)
+    {
+        fprintf(stderr, "Error: -X cannot currently be combined with -o\n");
+        printShortUsage(argv[0]);
+        return -1;
+    }
     if (!buf)
     {
         fprintf(stderr, "Error: No pattern specified\n");
