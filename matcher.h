@@ -178,6 +178,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     Uint64 numSteps;
 
     char match; // zero = looking for match, negative = match failed, positive = match found
+    bool nonMatchHappened;
 
     enum NonMatchType
     {

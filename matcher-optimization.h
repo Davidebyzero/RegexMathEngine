@@ -50,9 +50,10 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_ConstGrpNonCapturing(RegexSymbol *th
 template <bool USE_STRINGS> // currently implemented only for !USE_STRINGS
 void RegexMatcher<USE_STRINGS>::matchSymbol_ConstGrpCapturing(RegexSymbol *thisSymbol)
 {
+    nonMatchHappened = false;
     Uint64 position0 = position;
     Uint64 multiple = matchSymbol_ConstGroup(thisSymbol);
-    if (multiple != NON_PARTICIPATING_CAPTURE_GROUP && position > position0)
+    if (multiple != NON_PARTICIPATING_CAPTURE_GROUP && position > position0 && !nonMatchHappened)
     {
         Uint backrefIndex = ((RegexConstGroupCapturing*)thisSymbol)->backrefIndex;
 

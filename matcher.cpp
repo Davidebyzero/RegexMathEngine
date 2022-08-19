@@ -40,6 +40,8 @@ void RegexMatcher<USE_STRINGS>::nonMatch(NonMatchType type)
         }
     }
 
+    nonMatchHappened = true;
+
     position = groupStackTop->position;
 
     // if any changes are made here, they may need to be duplicated in Backtrack_Commit<USE_STRINGS>::popTo()
