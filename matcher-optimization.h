@@ -1,5 +1,74 @@
 #include "math-optimization.h"
 
+template <bool USE_STRINGS> // currently implemented only for !USE_STRINGS
+Uint64 RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroup(RegexSymbol *thisSymbol)
+{
+    RegexGroup *const group = ((RegexConstGroup*)thisSymbol)->originalGroup;
+    RegexPattern **insideAlternative = group->alternatives;
+    Uint64 multiple = 0;
+    for (RegexSymbol **insideSymbol = insideAlternative[0]->symbols; *insideSymbol; insideSymbol++)
+    {
+        switch ((*insideSymbol)->type)
+        {
+        case RegexSymbol_NoOp:
+            break;
+        case RegexSymbol_Character:
+            multiple += (*insideSymbol)->minCount;
+            break;
+        case RegexSymbol_Backref:
+            {
+                Uint64 thisMultiple;
+                const char *pBackref;
+                readCapture(((RegexBackref*)*insideSymbol)->index, thisMultiple, pBackref);
+                if (thisMultiple == NON_PARTICIPATING_CAPTURE_GROUP)
+                {
+                    if (!emulate_ECMA_NPCGs && (*insideSymbol)->minCount != 0)
+                    {
+                        nonMatch();
+                        return NON_PARTICIPATING_CAPTURE_GROUP;
+                    }
+                    thisMultiple = 0;
+                }
+                multiple += thisMultiple * (*insideSymbol)->minCount;
+                break;
+            }
+        }
+    }
+    if (multiple == 0) // don't backtrack when it will make no difference to do so
+    {
+        symbol++;
+        return 0;
+    }
+    matchSymbol_Character_or_Backref(thisSymbol, multiple, (const char *)NULL);
+    return multiple;
+}
+template <bool USE_STRINGS> // currently implemented only for !USE_STRINGS
+void RegexMatcher<USE_STRINGS>::matchSymbol_ConstGrpNonCapturing(RegexSymbol *thisSymbol)
+{
+    matchSymbol_ConstGroup(thisSymbol);
+}
+template <bool USE_STRINGS> // currently implemented only for !USE_STRINGS
+void RegexMatcher<USE_STRINGS>::matchSymbol_ConstGrpCapturing(RegexSymbol *thisSymbol)
+{
+    Uint64 position0 = position;
+    Uint64 multiple = matchSymbol_ConstGroup(thisSymbol);
+    if (multiple != NON_PARTICIPATING_CAPTURE_GROUP && position > position0)
+    {
+        Uint backrefIndex = ((RegexConstGroupCapturing*)thisSymbol)->backrefIndex;
+
+        Backtrack_LeaveConstGroupCapturing<USE_STRINGS> *pushStack = stack.template push< Backtrack_LeaveConstGroupCapturing<USE_STRINGS> >();
+        pushStack->backrefIndex = backrefIndex;
+
+        Uint64 prevValue = captures[backrefIndex];
+        writeCapture(backrefIndex, multiple, (const char *)NULL);
+        if (!enable_persistent_backrefs || prevValue == NON_PARTICIPATING_CAPTURE_GROUP)
+        {
+            *captureStackTop++ = backrefIndex;
+            groupStackTop->numCaptured++;
+        }
+    }
+}
+
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::matchSymbol_IsPrime(RegexSymbol *thisSymbol)
 {
@@ -28,10 +97,39 @@ template <bool USE_STRINGS>
 ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbol **thisSymbol)
 // return true if the group has been rewritten into a specialized symbol
 {
-    if (optimizationLevel >= 2)
+    if (optimizationLevel && !USE_STRINGS)
     {
         RegexGroup *const group = (RegexGroup*)(*thisSymbol);
-        if (!USE_STRINGS && group->type == RegexGroup_NegativeLookahead && group->minCount)
+        if ((group->type == RegexGroup_NonCapturing || group->type == RegexGroup_Capturing) && group->maxCount)
+        {
+            RegexPattern **insideAlternative = group->alternatives;
+            if (!insideAlternative[+1])
+            {
+                for (RegexSymbol **insideSymbol = insideAlternative[0]->symbols; *insideSymbol;)
+                {
+                    if ((*insideSymbol)->type != RegexSymbol_Character && (*insideSymbol)->type != RegexSymbol_Backref && (*insideSymbol)->type != RegexSymbol_NoOp || (*insideSymbol)->minCount != (*insideSymbol)->maxCount)
+                        break;
+                    insideSymbol++;
+                    if (!*insideSymbol)
+                    {
+                        const char    *originalCode      = (*thisSymbol)->originalCode;
+                        RegexPattern **parentAlternative = (*thisSymbol)->parentAlternative;
+
+                        *thisSymbol = group->type == RegexGroup_NonCapturing ? new RegexConstGroup(group) : new RegexConstGroupCapturing(group, ((RegexGroupCapturing*)group)->backrefIndex);
+                        (*thisSymbol)->minCount          = group->minCount;
+                        (*thisSymbol)->maxCount          = group->maxCount;
+                        (*thisSymbol)->lazy              = group->lazy;
+                        (*thisSymbol)->possessive        = group->possessive;
+                        (*thisSymbol)->parentAlternative = parentAlternative;
+                        (*thisSymbol)->self              = thisSymbol;
+                        (*thisSymbol)->originalCode      = originalCode;
+                        return true;
+                    }
+                }
+            }
+        }
+        else
+        if (optimizationLevel >= 2 && group->type == RegexGroup_NegativeLookahead && group->minCount)
         {
             RegexPattern **insideAlternative = group->alternatives;
             RegexSymbol **insideSymbol = insideAlternative[0]->symbols;

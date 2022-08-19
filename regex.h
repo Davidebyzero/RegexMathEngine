@@ -57,6 +57,9 @@ enum RegexSymbolType
     RegexSymbol_WordCharacterNot,
     RegexSymbol_WordCharacter,
 
+    RegexSymbol_ConstGrpNonCapturing,
+    RegexSymbol_ConstGrpCapturing,
+
     RegexSymbol_IsPrime,
     RegexSymbol_IsPowerOf2,
 };
@@ -98,6 +101,7 @@ template<bool> class Backtrack_SkipGroup;
 template<bool> class Backtrack_EnterGroup;
 template<bool> class Backtrack_BeginAtomicGroup;
 template<bool> class Backtrack_SelfCapture;
+template<bool> class Backtrack_LeaveConstGroupCapturing;
 template<bool> class Backtrack_LeaveGroup;
 template<bool> class Backtrack_LeaveCaptureGroup;
 template<bool> class Backtrack_LoopGroup;
@@ -291,6 +295,26 @@ public:
         Uint8 c = ch;
         return allowedChars[c/8] & (1 << (c%8));
     }
+};
+
+class RegexConstGroup : public RegexSymbol
+{
+    friend RegexMatcher<false>;
+    friend RegexMatcher<true>;
+    RegexGroup *originalGroup;
+protected:
+    RegexConstGroup(RegexGroup *originalGroup, RegexSymbolType type) : RegexSymbol(type), originalGroup(originalGroup) {}
+public:
+    RegexConstGroup(RegexGroup *originalGroup) : RegexSymbol(RegexSymbol_ConstGrpNonCapturing), originalGroup(originalGroup) {}
+};
+
+class RegexConstGroupCapturing : public RegexConstGroup
+{
+    friend RegexMatcher<false>;
+    friend RegexMatcher<true>;
+    Uint backrefIndex; // zero-numbered; 0 corresponds to \1
+public:
+    RegexConstGroupCapturing(RegexGroup *originalGroup, Uint backrefIndex) : RegexConstGroup(originalGroup, RegexSymbol_ConstGrpCapturing), backrefIndex(backrefIndex) {}
 };
 
 class RegexParsingError

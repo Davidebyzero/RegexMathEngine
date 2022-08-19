@@ -140,6 +140,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     friend class Backtrack_SkipGroup<USE_STRINGS>;
     friend class Backtrack_EnterGroup<USE_STRINGS>;
     friend class Backtrack_EnterGroupLookinto<USE_STRINGS>;
+    friend class Backtrack_LeaveConstGroupCapturing<USE_STRINGS>;
     friend class Backtrack_LeaveGroup<USE_STRINGS>;
     friend class Backtrack_LeaveGroupLazily<USE_STRINGS>;
     friend class Backtrack_LeaveCaptureGroup_Base<false, USE_STRINGS>;
@@ -242,8 +243,12 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void matchSymbol_Space                (RegexSymbol *thisSymbol);
     void matchSymbol_WordCharacterNot     (RegexSymbol *thisSymbol);
     void matchSymbol_WordCharacter        (RegexSymbol *thisSymbol);
+    void matchSymbol_ConstGrpNonCapturing (RegexSymbol *thisSymbol);
+    void matchSymbol_ConstGrpCapturing    (RegexSymbol *thisSymbol);
     void matchSymbol_IsPrime              (RegexSymbol *thisSymbol);
     void matchSymbol_IsPowerOf2           (RegexSymbol *thisSymbol);
+
+    Uint64 matchSymbol_ConstGroup(RegexSymbol *thisSymbol);
 
     template <typename MATCH_TYPE>
     inline bool runtimeOptimize_matchSymbol_Character_or_Backref(RegexSymbol *const thisSymbol, Uint64 const multiple, MATCH_TYPE const repetend);
@@ -318,6 +323,8 @@ class GroupStackNode
     friend class Backtrack_SkipGroup<true>;
     friend class Backtrack_EnterGroup<false>;
     friend class Backtrack_EnterGroup<true>;
+    friend class Backtrack_LeaveConstGroupCapturing<false>;
+    friend class Backtrack_LeaveConstGroupCapturing<true>;
     friend class Backtrack_LeaveGroup<false>;
     friend class Backtrack_LeaveGroup<true>;
     friend class Backtrack_LeaveGroupLazily<false>;
@@ -947,6 +954,66 @@ class Backtrack_LeaveMolecularLookahead : public BacktrackNode<USE_STRINGS>
     virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
     {
         fprintf(f, "Backtrack_LeaveMolecularLookahead: position=%llu, numCaptured=%u, alternative=%u\n", position, numCaptured, alternative);
+    }
+};
+
+template <bool USE_STRINGS>
+class Backtrack_LeaveConstGroupCapturing : public BacktrackNode<USE_STRINGS>
+{
+    friend class RegexMatcher<USE_STRINGS>;
+    Uint backrefIndex;
+    void popCaptureGroup(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        matcher.captures[backrefIndex] = NON_PARTICIPATING_CAPTURE_GROUP;
+        matcher.captureStackTop--;
+        matcher.groupStackTop->numCaptured--;
+#ifdef _DEBUG
+        if (*matcher.captureStackTop != backrefIndex)
+            THROW_ENGINEBUG;
+#endif
+    }
+protected:
+    virtual void popCapture(RegexMatcher<USE_STRINGS> &matcher)
+    {
+    }
+
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return sizeof(*this);
+    }
+    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        if (enable_persistent_backrefs)
+            popCapture(matcher);
+        else
+            popCaptureGroup(matcher);
+        return false;
+    }
+    virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        popTo(matcher);
+    }
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return 1;
+    }
+    virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
+    {
+        return captureTuple(matcher.captures[backrefIndex], NULL, backrefIndex);
+    }
+    virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return false;
+    }
+    virtual void fprintDebugBase(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fprintf(f, ": backrefIndex=%u", backrefIndex);
+    }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fputs("Backtrack_LeaveConstGroupCapturing", f);
+        fprintDebugBase(matcher, f);
+        fputc('\n', f);
     }
 };
 
