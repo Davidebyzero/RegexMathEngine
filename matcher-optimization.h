@@ -106,9 +106,12 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
             RegexPattern **insideAlternative = group->alternatives;
             if (!insideAlternative[+1])
             {
+                Uint backrefIndex = group->type == RegexGroup_Capturing ? ((RegexGroupCapturing*)group)->backrefIndex : UINT_MAX;
                 for (RegexSymbol **insideSymbol = insideAlternative[0]->symbols; *insideSymbol;)
                 {
                     if ((*insideSymbol)->type != RegexSymbol_Character && (*insideSymbol)->type != RegexSymbol_Backref && (*insideSymbol)->type != RegexSymbol_NoOp || (*insideSymbol)->minCount != (*insideSymbol)->maxCount)
+                        break;
+                    if ((*insideSymbol)->type == RegexSymbol_Backref && ((RegexBackref*)*insideSymbol)->index == backrefIndex)
                         break;
                     insideSymbol++;
                     if (!*insideSymbol)
@@ -116,7 +119,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                         const char    *originalCode      = (*thisSymbol)->originalCode;
                         RegexPattern **parentAlternative = (*thisSymbol)->parentAlternative;
 
-                        *thisSymbol = group->type == RegexGroup_NonCapturing ? new RegexConstGroup(group) : new RegexConstGroupCapturing(group, ((RegexGroupCapturing*)group)->backrefIndex);
+                        *thisSymbol = group->type == RegexGroup_NonCapturing ? new RegexConstGroup(group) : new RegexConstGroupCapturing(group, backrefIndex);
                         (*thisSymbol)->minCount          = group->minCount;
                         (*thisSymbol)->maxCount          = group->maxCount;
                         (*thisSymbol)->lazy              = group->lazy;
