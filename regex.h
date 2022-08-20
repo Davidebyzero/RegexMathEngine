@@ -57,8 +57,8 @@ enum RegexSymbolType
     RegexSymbol_WordCharacterNot,
     RegexSymbol_WordCharacter,
 
-    RegexSymbol_ConstGrpNonCapturing,
-    RegexSymbol_ConstGrpCapturing,
+    RegexSymbol_ConstGroupNonCapturing,
+    RegexSymbol_ConstGroupCapturing,
 
     RegexSymbol_IsPrime,
     RegexSymbol_IsPowerOf2,
@@ -305,7 +305,7 @@ class RegexConstGroup : public RegexSymbol
 protected:
     RegexConstGroup(RegexGroup *originalGroup, RegexSymbolType type) : RegexSymbol(type), originalGroup(originalGroup) {}
 public:
-    RegexConstGroup(RegexGroup *originalGroup) : RegexSymbol(RegexSymbol_ConstGrpNonCapturing), originalGroup(originalGroup) {}
+    RegexConstGroup(RegexGroup *originalGroup) : RegexSymbol(RegexSymbol_ConstGroupNonCapturing), originalGroup(originalGroup) {}
 };
 
 class RegexConstGroupCapturing : public RegexConstGroup
@@ -314,7 +314,7 @@ class RegexConstGroupCapturing : public RegexConstGroup
     friend RegexMatcher<true>;
     Uint backrefIndex; // zero-numbered; 0 corresponds to \1
 public:
-    RegexConstGroupCapturing(RegexGroup *originalGroup, Uint backrefIndex) : RegexConstGroup(originalGroup, RegexSymbol_ConstGrpCapturing), backrefIndex(backrefIndex) {}
+    RegexConstGroupCapturing(RegexGroup *originalGroup, Uint backrefIndex) : RegexConstGroup(originalGroup, RegexSymbol_ConstGroupCapturing), backrefIndex(backrefIndex) {}
 };
 
 class RegexParsingError

@@ -970,11 +970,11 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
             case RegexSymbol_WordCharacter:
                 matchFunction(*thisSymbol++) = chooseBuiltinCharacterClassFunction(matchWordCharacter,    &RegexMatcher<USE_STRINGS>::matchSymbol_WordCharacter);
                 break;
-            case RegexSymbol_ConstGrpNonCapturing:
-                matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_ConstGrpNonCapturing;
+            case RegexSymbol_ConstGroupNonCapturing:
+                matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroupNonCapturing;
                 break;
-            case RegexSymbol_ConstGrpCapturing:
-                matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_ConstGrpCapturing;
+            case RegexSymbol_ConstGroupCapturing:
+                matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroupCapturing;
                 break;
             case RegexSymbol_IsPrime:
             case RegexSymbol_IsPowerOf2:

@@ -43,12 +43,12 @@ Uint64 RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroup(RegexSymbol *thisSymbol
     return multiple;
 }
 template <bool USE_STRINGS> // currently implemented only for !USE_STRINGS
-void RegexMatcher<USE_STRINGS>::matchSymbol_ConstGrpNonCapturing(RegexSymbol *thisSymbol)
+void RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroupNonCapturing(RegexSymbol *thisSymbol)
 {
     matchSymbol_ConstGroup(thisSymbol);
 }
 template <bool USE_STRINGS> // currently implemented only for !USE_STRINGS
-void RegexMatcher<USE_STRINGS>::matchSymbol_ConstGrpCapturing(RegexSymbol *thisSymbol)
+void RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroupCapturing(RegexSymbol *thisSymbol)
 {
     nonMatchHappened = false;
     Uint64 position0 = position;
