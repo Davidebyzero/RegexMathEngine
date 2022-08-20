@@ -1000,7 +1000,7 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                 }
                 break;
             case RegexSymbol_Group:
-                if (staticallyOptimizeGroup(thisSymbol))
+                if (thisSymbol != &(RegexSymbol*&)rootGroup && staticallyOptimizeGroup(thisSymbol))
                     break;
                 matchFunction(*thisSymbol) = &RegexMatcher<USE_STRINGS>::matchSymbol_Group;
                 RegexGroup *group = (RegexGroup*)(*thisSymbol);
