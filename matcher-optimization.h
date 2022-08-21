@@ -297,7 +297,12 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
 {
     if (optimizationLevel && !thisSymbol->possessive)
     {
-        if (symbol[+1] && symbol[+1]->type==RegexSymbol_AnchorEnd)
+        RegexSymbol *nextSymbol;
+        RegexSymbol **nextSymbolPtr = symbol + 1;
+        while (*nextSymbolPtr && ((*nextSymbolPtr)->type == RegexSymbol_IsPrime || (*nextSymbolPtr)->type == RegexSymbol_IsPowerOf2 || (*nextSymbolPtr)->type == RegexSymbol_Group && ((RegexGroup*)*nextSymbolPtr)->isNegativeLookaround()))
+            nextSymbolPtr++;
+        nextSymbol = *nextSymbolPtr;
+        if (nextSymbol && nextSymbol->type==RegexSymbol_AnchorEnd)
         {
             Uint64 spaceLeft = input - position;
             currentMatch = spaceLeft / multiple;
@@ -316,9 +321,23 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
             symbol++;
             return true;
         }
-        RegexSymbol *nextSymbol = symbol[+1];
         RegexGroup *thisGroup = groupStackTop->group;
         bool afterEndOfGroup = false;
+        if (nextSymbol && nextSymbol->type==RegexSymbol_Backref && nextSymbolPtr[+1] && nextSymbolPtr[+1]->type==RegexSymbol_AnchorEnd && nextSymbol->minCount==1 && nextSymbol->maxCount==1)
+        {
+            Uint64 subtract = captures[((RegexBackref*)nextSymbol)->index];
+            if (subtract == NON_PARTICIPATING_CAPTURE_GROUP)
+            {
+                nonMatch();
+                return true;
+            }
+            Uint64 spaceLeft = input - position;
+            if (subtract > spaceLeft || (spaceLeft - subtract) % multiple != 0)
+            {
+                nonMatch();
+                return true;
+            }
+        }
         if (nextSymbol && nextSymbol->type==RegexSymbol_Group ||
             !nextSymbol && !alternative[+1] && groupStackTop > groupStackBase
                         && (thisGroup->type==RegexGroup_Capturing || thisGroup->type==RegexGroup_NonCapturing)
