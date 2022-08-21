@@ -309,7 +309,8 @@ void *RegexMatcher<USE_STRINGS>::loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pus
         else
             readCapture(backrefIndex, *(Uint64*)(pushLoop->buffer + sizeof(const char*)), *(const char**)pushLoop->buffer);
 
-        if (writeCaptureRelative(backrefIndex, groupStackTop->position, position) && captures[backrefIndex] == NON_PARTICIPATING_CAPTURE_GROUP)
+        bool firstCapture = captures[backrefIndex] == NON_PARTICIPATING_CAPTURE_GROUP;
+        if (writeCaptureRelative(backrefIndex, groupStackTop->position, position) && firstCapture)
         {
             *captureStackTop++ = backrefIndex;
             groupStackTop->numCaptured++;

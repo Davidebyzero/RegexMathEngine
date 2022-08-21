@@ -1383,6 +1383,7 @@ protected:
         if (group->type == RegexGroup_Capturing)
         {
             Uint backrefIndex = ((RegexGroupCapturing*)group)->backrefIndex;
+            bool becomeUnset;
             if (numCaptured != 0)
             {
                 const char *&dummy = (const char *&)buffer;
@@ -1390,14 +1391,19 @@ protected:
                     matcher.writeCapture(backrefIndex, *(Uint64*)(buffer                      ), dummy);
                 else
                     matcher.writeCapture(backrefIndex, *(Uint64*)(buffer + sizeof(const char*)), *(const char**)buffer);
+                becomeUnset = matcher.captures[backrefIndex] == NON_PARTICIPATING_CAPTURE_GROUP;
             }
             else
+            {
+                matcher.captures[backrefIndex] = NON_PARTICIPATING_CAPTURE_GROUP;
+                becomeUnset = true;
+            }
+            if (becomeUnset)
             {
 #ifdef _DEBUG
                 if (matcher.captureStackTop[-1] != backrefIndex)
                     THROW_ENGINEBUG;
 #endif
-                matcher.captures[backrefIndex] = NON_PARTICIPATING_CAPTURE_GROUP;
                 matcher.captureStackTop--;
                 matcher.groupStackTop->numCaptured--;
             }
