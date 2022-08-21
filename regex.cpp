@@ -172,6 +172,14 @@ Options:\n\
                       --npcg- --ecc- --neo- -x ag,pq,cnd,rs,pbr\n\
   -o                  Show only the part of the line that matched\n\
   -v, --invert-match  Show non-matching inputs instead of matching inputs\n\
+  -q [NUM0[..NUM1]]   Show the NUM0th..NUM1th (zero-indexed) number(s) that are\n\
+                      a match. Implies \"--num=x\" if \"--num\" was not specified.\n\
+                      Can be combined with \"--invert-match\". If NUM0 is not\n\
+                      specified, it will be read from standard input.\n\
+  -Q [NUM]            Show the first NUM numbers that are a match. Implies\n\
+                      \"--num=x\" if \"--num\" was not specified. Can be combined\n\
+                      with \"--invert-match\". If NUM is not specified, it will be\n\
+                      read from standard input.\n\
   -X                  Exhaustive mode; counts the number of possible matches,\n\
                       without reporting what the actual matches are.\n\
   -O NUMBER           Specifies the optimization level, from 0 to 2. This\n\
@@ -312,14 +320,74 @@ int main(int argc, char *argv[])
     bool lineBuffered = false;
     bool showMatch = false;
     bool invertMatch = false;
+    bool showSequenceNth = false;
+    bool showSequenceUpTo = false;
     bool countPossibleMatches = false;
     bool optionsDone = false;
     Uint showMatch_backrefIndex = 0;
-    Uint64 testNum0, testNum1;
-    Uint testNum_digits;
-    int64 testNumInc = 0;
+    Uint64 testNum0, testNum1; Uint testNum_digits; int64 testNumInc = 0;
+    Uint64  seqNum0,  seqNum1; Uint  seqNum_digits; int64  seqNumInc = 0;
+    auto setFullTestRange = [&]()
+    {
+        testNum0 = 0;
+        testNum1 = ULLONG_MAX;
+        testNumInc = 1;
+        testNum_digits = 0;
+    };
+
     for (int i=1; i<argc; i++)
     {
+        auto parseRange = [&](Uint64 &num0, Uint64 &num1, Uint &num_digits, int64 &numInc, const char *optionName, const char *onlyOneErrorStr) -> int
+        {
+            if (numInc)
+            {
+                fprintf(stderr, onlyOneErrorStr);
+                printShortUsage(argv[0]);
+                return -1;
+            }
+            try
+            {
+                const char *rangeStr = &argv[i][2];
+                if (!*rangeStr)
+                {
+                    if (++i >= argc)
+                        throw ParsingError();
+                    rangeStr = argv[i];
+                }
+                if (!inrange(*rangeStr, '0', '9'))
+                    throw ParsingError();
+                num0 = readNumericConstant<Uint64>(rangeStr);
+                if (!*rangeStr)
+                {
+                    num1 = num0;
+                    num_digits = 1;
+                    numInc = +1;
+                }
+                else
+                {
+                    if (*rangeStr!='.' || *++rangeStr!='.' || (++rangeStr, !inrange(*rangeStr, '0', '9')))
+                        throw ParsingError();
+                    const char *prevPos = rangeStr;
+                    num1 = readNumericConstant<Uint64>(rangeStr);
+                    num_digits = (Uint)(rangeStr - prevPos);
+                    if (*rangeStr)
+                    {
+                        fprintf(stderr, "Error: \"-%s\" must be followed by a numerical range only\n", optionName);
+                        printShortUsage(argv[0]);
+                        return -1;
+                    }
+                    numInc = num0 <= num1 ? +1 : -1;
+                }
+            }
+            catch (ParsingError)
+            {
+                fprintf(stderr, "Error: \"-%s\" must be followed by a numerical range\n", optionName);
+                printShortUsage(argv[0]);
+                return -1;
+            }
+            return 0;
+        };
+
         if (argv[i][0]=='-')
         {
             if (argv[i][1]=='-')
@@ -673,6 +741,82 @@ int main(int argc, char *argv[])
             if (argv[i][1]=='v')
                 invertMatch = true;
             else
+            if (argv[i][1]=='q')
+            {
+                if (!mathMode)
+                    mathMode = 'x';
+                const char *onlyOneErrorStr = "Error: In this version, only one sequence range may be specified\n";
+                if (showSequenceNth)
+                {
+                    fprintf(stderr, onlyOneErrorStr);
+                    printShortUsage(argv[0]);
+                    return -1;
+                }
+                if (argv[i][2] || i+1 < argc && argv[i+1][0] != '-')
+                {
+                    if (int retval = parseRange(seqNum0, seqNum1, seqNum_digits, seqNumInc, "t", onlyOneErrorStr))
+                        return retval;
+                    if (seqNumInc != 1)
+                    {
+                        fprintf(stderr, "Error: In this version, only ascending sequence ranges are supported\n");
+                        printShortUsage(argv[0]);
+                        return -1;
+                    }
+                    setFullTestRange();
+                }
+                showSequenceNth = true;
+            }
+            else
+            if (argv[i][1]=='Q')
+            {
+                if (!mathMode)
+                    mathMode = 'x';
+                if (showSequenceNth || showSequenceUpTo)
+                {
+                    fprintf(stderr, "Error: Only one sequence range may be specified\n");
+                    printShortUsage(argv[0]);
+                    return -1;
+                }
+                const char *optStr = &argv[i][2];
+                if (*optStr || i+1 < argc && argv[i+1][0] != '-')
+                {
+                    try
+                    {
+                        if (!*optStr)
+                        {
+                            ++i;
+                            optStr = argv[i];
+                        }
+                        if (!inrange(*optStr, '0', '9'))
+                            throw ParsingError();
+                        const char *prevPos = optStr;
+                        seqNum1 = readNumericConstant<Uint64>(optStr);
+                        seqNum_digits = (Uint)(optStr - prevPos);
+                        if (*optStr)
+                            throw ParsingError();
+                    }
+                    catch (ParsingError)
+                    {
+                        fprintf(stderr, "Error: \"-Q\" must be followed by a number\n");
+                        printShortUsage(argv[0]);
+                        return -1;
+                    }
+                    if (seqNum1 == 0)
+                        seqNum0 = 1;
+                    else
+                    {
+                        seqNum0 = 0;
+                        seqNum1--;
+                        seqNum_digits = intLength(seqNum1);
+                    }
+                    seqNumInc = 1;
+                    setFullTestRange();
+                    showSequenceNth = true;
+                }
+                else
+                    showSequenceUpTo = true;
+            }
+            else
             if (argv[i][1]=='X')
                 countPossibleMatches = true;
             else
@@ -703,52 +847,8 @@ int main(int argc, char *argv[])
             else
             if (argv[i][1]=='t')
             {
-                if (testNumInc)
-                {
-                    fprintf(stderr, "Error: In this version, only one test range may be specified\n");
-                    printShortUsage(argv[0]);
-                    return -1;
-                }
-                try
-                {
-                    const char *rangeStr = &argv[i][2];
-                    if (!*rangeStr)
-                    {
-                        if (++i >= argc)
-                            throw ParsingError();
-                        rangeStr = argv[i];
-                    }
-                    if (!inrange(*rangeStr, '0', '9'))
-                        throw ParsingError();
-                    testNum0 = readNumericConstant<Uint64>(rangeStr);
-                    if (!*rangeStr)
-                    {
-                        testNum1 = testNum0;
-                        testNum_digits = 1;
-                        testNumInc = +1;
-                    }
-                    else
-                    {
-                        if (*rangeStr!='.' || *++rangeStr!='.' || (++rangeStr, !inrange(*rangeStr, '0', '9')))
-                            throw ParsingError();
-                        const char *prevPos = rangeStr;
-                        testNum1 = readNumericConstant<Uint64>(rangeStr);
-                        testNum_digits = (Uint)(rangeStr - prevPos);
-                        if (*rangeStr)
-                        {
-                            fprintf(stderr, "Error: \"-t\" must be followed by a numerical range only\n");
-                            printShortUsage(argv[0]);
-                            return -1;
-                        }
-                        testNumInc = testNum0 <= testNum1 ? +1 : -1;
-                    }
-                }
-                catch (ParsingError)
-                {
-                    fprintf(stderr, "Error: \"-t\" must be followed by a numerical range\n");
-                    printShortUsage(argv[0]);
-                    return -1;
-                }
+                if (int retval = parseRange(testNum0, testNum1, testNum_digits, testNumInc, "t", "Error: In this version, only one test range may be specified\n"))
+                    return retval;
             }
             else
             if (!argv[i][1])
@@ -774,6 +874,18 @@ int main(int argc, char *argv[])
     if (invertMatch && (showMatch || countPossibleMatches || verbose))
     {
         fprintf(stderr, "Error: -v cannot be combined with -o, -X, or --verbose\n");
+        printShortUsage(argv[0]);
+        return -1;
+    }
+    if (showSequenceNth && (showSequenceUpTo || showMatch || countPossibleMatches))
+    {
+        fprintf(stderr, "Error: -q cannot be combined with -Q, -o, or -X\n");
+        printShortUsage(argv[0]);
+        return -1;
+    }
+    if (showSequenceUpTo && (showMatch || countPossibleMatches))
+    {
+        fprintf(stderr, "Error: -q cannot be combined with -o or -X\n");
         printShortUsage(argv[0]);
         return -1;
     }
@@ -930,7 +1042,9 @@ int main(int argc, char *argv[])
                     Uint64 possibleMatchesCount;
                     Uint64 *possibleMatchesCount_ptr = countPossibleMatches ? &possibleMatchesCount : NULL;
 
-                    if (testNumInc)
+                    auto showSequence = [&](bool showIndex)
+                    {
+                        Uint64 seqNum = 0;
                         for (Uint64 i=testNum0;; i+=testNumInc)
                         {
                             Uint64 returnMatch;
@@ -939,27 +1053,45 @@ int main(int argc, char *argv[])
                             {
                                 if (!matched)
                                 {
-                                    printf("%*llu\n", testNum_digits, i);
-                                    if (lineBuffered)
-                                        fflush(stdout);
+                                    if (showIndex && seqNumInc && seqNum >= seqNum0)
+                                        printf("%*llu: ", seqNum_digits, seqNum);
+                                    if (!seqNumInc || seqNum >= seqNum0)
+                                    {
+                                        printf("%*llu\n", testNum_digits, i);
+                                        if (lineBuffered)
+                                            fflush(stdout);
+                                    }
+                                    if (seqNumInc && seqNum++ >= seqNum1)
+                                        break;
                                 }
                             }
                             else
                             if (matched || countPossibleMatches)
                             {
-                                printf("%*llu", testNum_digits, i);
-                                if (countPossibleMatches)
-                                    printf(" -> %llu", *possibleMatchesCount_ptr);
-                                else
-                                if (showMatch)
-                                    printf(" -> %*llu", testNum_digits, returnMatch);
-                                putchar('\n');
-                                if (lineBuffered)
-                                    fflush(stdout);
+                                if (showIndex && seqNumInc && seqNum >= seqNum0)
+                                    printf("%*llu: ", seqNum_digits, seqNum);
+                                if (!seqNumInc || seqNum >= seqNum0)
+                                {
+                                    printf("%*llu", testNum_digits, i);
+                                    if (countPossibleMatches)
+                                        printf(" -> %llu", *possibleMatchesCount_ptr);
+                                    else
+                                    if (showMatch)
+                                        printf(" -> %*llu", testNum_digits, returnMatch);
+                                    putchar('\n');
+                                    if (lineBuffered)
+                                        fflush(stdout);
+                                }
+                                if (seqNumInc && seqNum++ >= seqNum1)
+                                    break;
                             }
                             if (i==testNum1)
                                 break;
                         }
+                    };
+
+                    if (testNumInc)
+                        showSequence(true);
                     else
                     {
                         LineGetter lineGetter(1<<5);
@@ -971,27 +1103,48 @@ int main(int argc, char *argv[])
                             if (inrange(*line, '0', '9'))
                             {
                                 Uint64 input = readNumericConstant<Uint64>(line);
-                                Uint64 returnMatch;
-                                bool matched = regex.MatchNumber(input, mathMode, showMatch_backrefIndex, returnMatch, possibleMatchesCount_ptr);
-                                if (invertMatch)
+                                if (showSequenceNth)
                                 {
-                                    if (!matched)
-                                        printf("%llu\n", input);
+                                    setFullTestRange();
+                                    seqNum0 = seqNum1 = input;
+                                    seqNumInc = 1;
+                                    seqNum_digits = 0;
+                                    showSequence(false);
                                 }
                                 else
-                                if (verbose)
+                                if (showSequenceUpTo)
                                 {
-                                    if (countPossibleMatches)
-                                        printf("%llu -> %llu\n", input, *possibleMatchesCount_ptr);
+                                    setFullTestRange();
+                                    seqNum0 = 0;
+                                    seqNum1 = input - 1;
+                                    seqNumInc = 1;
+                                    seqNum_digits = intLength(seqNum1);
+                                    showSequence(true);
+                                }
+                                else
+                                {
+                                    Uint64 returnMatch;
+                                    bool matched = regex.MatchNumber(input, mathMode, showMatch_backrefIndex, returnMatch, possibleMatchesCount_ptr);
+                                    if (invertMatch)
+                                    {
+                                        if (!matched)
+                                            printf("%llu\n", input);
+                                    }
+                                    else
+                                    if (verbose)
+                                    {
+                                        if (countPossibleMatches)
+                                            printf("%llu -> %llu\n", input, *possibleMatchesCount_ptr);
+                                        else
+                                        if (matched)
+                                            printf("%llu -> %llu\n", input, returnMatch);
+                                        else
+                                            printf("%llu -> no match\n", input);
+                                    }
                                     else
                                     if (matched)
-                                        printf("%llu -> %llu\n", input, returnMatch);
-                                    else
-                                        printf("%llu -> no match\n", input);
+                                        printf("%llu\n", returnMatch);
                                 }
-                                else
-                                if (matched)
-                                    printf("%llu\n", returnMatch);
                             }
                             else
                                 puts(line);

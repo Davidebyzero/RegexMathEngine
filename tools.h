@@ -76,6 +76,9 @@ char (*__strlength_helper(char const (&_String)[size]))[size];
 template <typename UINT_TYPE>
 UINT_TYPE readNumericConstant(const char *&buf);
 
+Uint intLength(Uint32 i);
+Uint intLength(Uint64 i);
+
 class ParsingError {};
 
 template <typename TYPE>
