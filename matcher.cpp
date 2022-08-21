@@ -1088,19 +1088,20 @@ void RegexMatcher<USE_STRINGS>::popAtomicGroup(RegexGroup *const group)
         int numCaptured = stack->popForAtomicCapture(*this);
         numCapturedDelta += numCaptured;
         if (enable_persistent_backrefs)
-            for (int i=0; i<numCaptured; i++)
+            for (int i=0; i<abs(numCaptured); i++)
                 writeCaptureAtomicTmp(stack->popForAtomicForwardCapture(*this, i));
         stack.pop(*this);
         if (done)
             break;
     }
 
-    // the following is needed for atomic lookahead but not for atomic groups... todo: reacquaint myself with the reason for this, and make the two more similar if it makes sense to do so
-    //groupStackTop->numCaptured += enable_persistent_backrefs ? captureIndexNumUsedAtomicTmp : numCapturedDelta;
+    if (enable_persistent_backrefs)
+        numCapturedDelta = captureIndexNumUsedAtomicTmp;
+    groupStackTop->numCaptured += numCapturedDelta;
 
     if (numCapturedDelta)
     {
-        Backtrack_AtomicCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_AtomicCapture<USE_STRINGS> >(Backtrack_AtomicCapture<USE_STRINGS>::get_size(enable_persistent_backrefs ? captureIndexNumUsedAtomicTmp : numCapturedDelta));
+        Backtrack_AtomicCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_AtomicCapture<USE_STRINGS> >(Backtrack_AtomicCapture<USE_STRINGS>::get_size(numCapturedDelta));
         pushStack->numCaptured       = numCapturedDelta; // will be overridding by "transfer" call below if we're in enable_persistent_backrefs mode
         pushStack->parentAlternative = group->parentAlternative;
         pushStack->transfer(*this);
@@ -1202,17 +1203,19 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                         int numCaptured = stack->popForAtomicCapture(*this);
                         numCapturedDelta += numCaptured;
                         if (enable_persistent_backrefs)
-                            for (int i=0; i<numCaptured; i++)
+                            for (int i=0; i<abs(numCaptured); i++)
                                 writeCaptureAtomicTmp(stack->popForAtomicForwardCapture(*this, i));
                         stack.pop(*this);
                     }
                     while (groupStackTop >= groupStackOldTop);
 
-                    groupStackTop->numCaptured += enable_persistent_backrefs ? captureIndexNumUsedAtomicTmp : numCapturedDelta;
+                    if (enable_persistent_backrefs)
+                        numCapturedDelta = captureIndexNumUsedAtomicTmp;
+                    groupStackTop->numCaptured += numCapturedDelta;
 
                     if (numCapturedDelta)
                     {
-                        Backtrack_AtomicCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_AtomicCapture<USE_STRINGS> >(Backtrack_AtomicCapture<USE_STRINGS>::get_size(enable_persistent_backrefs ? captureIndexNumUsedAtomicTmp : numCapturedDelta));
+                        Backtrack_AtomicCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_AtomicCapture<USE_STRINGS> >(Backtrack_AtomicCapture<USE_STRINGS>::get_size(numCapturedDelta));
                         pushStack->numCaptured       = numCapturedDelta; // will be overridding by "transfer" call below if we're in enable_persistent_backrefs mode
                         pushStack->parentAlternative = group->parentAlternative;
                         pushStack->transfer(*this);

@@ -1456,7 +1456,15 @@ protected:
     }
     virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
     {
-        return captureTuple(0, NULL, 0);
+        RegexGroupCapturing *group = (RegexGroupCapturing*)matcher.groupStackTop->group;
+#ifdef _DEBUG
+        if (group->type != RegexGroup_Capturing)
+            THROW_ENGINEBUG;
+#endif
+        if (!USE_STRINGS)
+            return captureTuple(*(Uint64*)(buffer                      ), NULL                 , ((RegexGroupCapturing*)matcher.groupStackTop->group)->backrefIndex);
+        else
+            return captureTuple(*(Uint64*)(buffer + sizeof(const char*)), *(const char**)buffer, ((RegexGroupCapturing*)matcher.groupStackTop->group)->backrefIndex);
     }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
