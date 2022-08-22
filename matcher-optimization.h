@@ -73,7 +73,15 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroupCapturing(RegexSymbol *thi
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::matchSymbol_IsPrime(RegexSymbol *thisSymbol)
 {
-    Uint64 spaceLeft = input - position;
+    Uint64 spaceLeft;
+    if (!thisSymbol->possessive)
+        spaceLeft = input - position;
+    else
+    {
+        const char *ptr;
+        if (!getLookintoEntrace(((RegexBackref*)thisSymbol)->index, spaceLeft, ptr))
+            return;
+    }
     if (inrange64(spaceLeft, thisSymbol->lazy, 1) || isPrime(spaceLeft))
     {
         symbol++;
@@ -85,7 +93,15 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_IsPrime(RegexSymbol *thisSymbol)
 template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::matchSymbol_IsPowerOf2(RegexSymbol *thisSymbol)
 {
-    Uint64 spaceLeft = input - position;
+    Uint64 spaceLeft;
+    if (!thisSymbol->possessive)
+        spaceLeft = input - position;
+    else
+    {
+        const char *ptr;
+        if (!getLookintoEntrace(((RegexBackref*)thisSymbol)->index, spaceLeft, ptr))
+            return;
+    }
     if ((spaceLeft != 0 || thisSymbol->lazy) && !(spaceLeft & (spaceLeft - 1)))
     {
         symbol++;
@@ -133,7 +149,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
             }
         }
         else
-        if (optimizationLevel >= 2 && group->type == RegexGroup_NegativeLookahead && group->minCount)
+        if (optimizationLevel >= 2 && group->isNegativeLookaround() && group->minCount)
         {
             RegexPattern **insideAlternative = group->alternatives;
             RegexSymbol **insideSymbol = insideAlternative[0]->symbols;
@@ -167,12 +183,16 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                         const char    *originalCode      = (*thisSymbol)->originalCode;
                         RegexPattern **parentAlternative = (*thisSymbol)->parentAlternative;
 
-                        *thisSymbol = new RegexSymbol(RegexSymbol_IsPrime);
+                        bool isLookinto = group->type == RegexGroup_NegativeLookinto;
+                        *thisSymbol = isLookinto ? new RegexBackref(RegexSymbol_IsPrime) : new RegexSymbol(RegexSymbol_IsPrime);
                         (*thisSymbol)->lazy              = matchZero ? 0 : 1;
+                        (*thisSymbol)->possessive        = isLookinto;
                         (*thisSymbol)->parentAlternative = parentAlternative;
                         (*thisSymbol)->self              = thisSymbol;
                         (*thisSymbol)->originalCode      = originalCode;
                         (*thisSymbol)->originalSymbol    = originalSymbol;
+                        if (isLookinto)
+                            ((RegexBackref*)*thisSymbol)->index = ((RegexGroupLookinto*)group)->backrefIndex;
                         matchFunction(*thisSymbol) = &RegexMatcher<USE_STRINGS>::matchSymbol_IsPrime;
                         thisSymbol++;
                         init_isPrime();
@@ -230,12 +250,16 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                                         const char    *originalCode      = (*thisSymbol)->originalCode;
                                         RegexPattern **parentAlternative = (*thisSymbol)->parentAlternative;
 
-                                        *thisSymbol = new RegexSymbol(RegexSymbol_IsPowerOf2);
+                                        bool isLookinto = group->type == RegexGroup_NegativeLookinto;
+                                        *thisSymbol = isLookinto ? new RegexBackref(RegexSymbol_IsPowerOf2) : new RegexSymbol(RegexSymbol_IsPowerOf2);
                                         (*thisSymbol)->lazy              = matchZero;
+                                        (*thisSymbol)->possessive        = isLookinto;
                                         (*thisSymbol)->parentAlternative = parentAlternative;
                                         (*thisSymbol)->self              = thisSymbol;
                                         (*thisSymbol)->originalCode      = originalCode;
                                         (*thisSymbol)->originalSymbol    = originalSymbol;
+                                        if (isLookinto)
+                                            ((RegexBackref*)*thisSymbol)->index = ((RegexGroupLookinto*)group)->backrefIndex;
                                         matchFunction(*thisSymbol) = &RegexMatcher<USE_STRINGS>::matchSymbol_IsPowerOf2;
                                         thisSymbol++;
                                         return true;
@@ -272,12 +296,16 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                             const char    *originalCode      = (*thisSymbol)->originalCode;
                             RegexPattern **parentAlternative = (*thisSymbol)->parentAlternative;
 
-                            *thisSymbol = new RegexSymbol(RegexSymbol_IsPowerOf2);
+                            bool isLookinto = group->type == RegexGroup_NegativeLookinto;
+                            *thisSymbol = isLookinto ? new RegexBackref(RegexSymbol_IsPowerOf2) : new RegexSymbol(RegexSymbol_IsPowerOf2);
                             (*thisSymbol)->lazy              = (bool&)innerSymbol1[0]->minCount; // can be cast by reinterpretation since the value has already been narrowed down to being 0 or 1
+                            (*thisSymbol)->possessive        = isLookinto;
                             (*thisSymbol)->parentAlternative = parentAlternative;
                             (*thisSymbol)->self              = thisSymbol;
                             (*thisSymbol)->originalCode      = originalCode;
                             (*thisSymbol)->originalSymbol    = originalSymbol;
+                            if (isLookinto)
+                                ((RegexBackref*)*thisSymbol)->index = ((RegexGroupLookinto*)group)->backrefIndex;
                             matchFunction(*thisSymbol) = &RegexMatcher<USE_STRINGS>::matchSymbol_IsPowerOf2;
                             thisSymbol++;
                             return true;

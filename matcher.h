@@ -190,6 +190,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void nonMatch(NonMatchType type = NonMatch_Default);
     void yesMatch(Uint64 newPosition, bool haveChoice);
     void pushStack();
+    bool getLookintoEntrace(Uint backrefIndex, Uint64 &inputLookintoSize, const char *&inputLookintoPtr);
     void enterGroup(RegexGroup *group);
     void leaveGroup(Backtrack_LeaveGroup<USE_STRINGS> *pushStack, Uint64 pushPosition);
     void leaveLazyGroup();

@@ -94,6 +94,30 @@ void RegexMatcher<USE_STRINGS>::pushStack()
 }
 
 template <bool USE_STRINGS>
+bool RegexMatcher<USE_STRINGS>::getLookintoEntrace(Uint backrefIndex, Uint64 &inputLookintoSize, const char *&inputLookintoPtr)
+{
+    if (backrefIndex == UINT_MAX)
+        inputLookintoSize = input0;
+    else
+    if (backrefIndex == 0)
+        inputLookintoSize = position - startPosition;
+    else
+    {
+        readCapture(backrefIndex - 1, inputLookintoSize, inputLookintoPtr);
+        if (inputLookintoSize == NON_PARTICIPATING_CAPTURE_GROUP)
+        {
+            if (!emulate_ECMA_NPCGs)
+            {
+                nonMatch();
+                return false;
+            }
+            inputLookintoSize = 0;
+        }
+    }
+    return true;
+}
+
+template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
 {
     bool enteringLookinto = false;
@@ -106,29 +130,9 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
         case RegexGroup_Lookinto:
         case RegexGroup_LookintoMolecular:
         case RegexGroup_NegativeLookinto:
-            {
-                enteringLookinto = true;
-                Uint backrefIndex = ((RegexGroupLookinto*)group)->backrefIndex;
-                if (backrefIndex == UINT_MAX)
-                    inputLookintoSize = input0;
-                else
-                if (backrefIndex == 0)
-                    inputLookintoSize = position - startPosition;
-                else
-                {
-                    readCapture(backrefIndex - 1, inputLookintoSize, inputLookintoPtr);
-                    if (inputLookintoSize == NON_PARTICIPATING_CAPTURE_GROUP)
-                    {
-                        if (!emulate_ECMA_NPCGs)
-                        {
-                            nonMatch();
-                            return;
-                        }
-                        inputLookintoSize = 0;
-                    }
-                }
-                break;
-            }
+            enteringLookinto = true;
+            getLookintoEntrace(((RegexGroupLookinto*)group)->backrefIndex, inputLookintoSize, inputLookintoPtr);
+            break;
         }
     }
 

@@ -280,6 +280,7 @@ class RegexBackref : public RegexSymbol
     Uint index; // zero-numbered; 0 corresponds to \1
 public:
     RegexBackref() : RegexSymbol(RegexSymbol_Backref) {}
+    RegexBackref(RegexSymbolType type) : RegexSymbol(type) {}
 };
 
 class RegexCharacterClass : public RegexSymbol
