@@ -341,7 +341,7 @@ int main(int argc, char *argv[])
         {
             if (numInc)
             {
-                fprintf(stderr, onlyOneErrorStr);
+                fputs(onlyOneErrorStr, stderr);
                 printShortUsage(argv[0]);
                 return -1;
             }
@@ -748,7 +748,7 @@ int main(int argc, char *argv[])
                 const char *onlyOneErrorStr = "Error: In this version, only one sequence range may be specified\n";
                 if (showSequenceNth)
                 {
-                    fprintf(stderr, onlyOneErrorStr);
+                    fputs(onlyOneErrorStr, stderr);
                     printShortUsage(argv[0]);
                     return -1;
                 }
