@@ -131,7 +131,8 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
         case RegexGroup_LookintoMolecular:
         case RegexGroup_NegativeLookinto:
             enteringLookinto = true;
-            getLookintoEntrace(((RegexGroupLookinto*)group)->backrefIndex, inputLookintoSize, inputLookintoPtr);
+            if (!getLookintoEntrace(((RegexGroupLookinto*)group)->backrefIndex, inputLookintoSize, inputLookintoPtr))
+                return;
             break;
         }
     }
