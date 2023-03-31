@@ -356,8 +356,12 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
             Uint64 subtract = captures[((RegexBackref*)nextSymbol)->index];
             if (subtract == NON_PARTICIPATING_CAPTURE_GROUP)
             {
-                nonMatch();
-                return true;
+                if (!emulate_ECMA_NPCGs)
+                {
+                    nonMatch();
+                    return true;
+                }
+                subtract = 0;
             }
             Uint64 spaceLeft = input - position;
             if (subtract > spaceLeft || (spaceLeft - subtract) % multiple != 0)
