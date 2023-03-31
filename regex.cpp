@@ -21,6 +21,7 @@ class Regex
     RegexGroupRoot regex;
     Uint numCaptureGroups;
     Uint maxGroupDepth;
+    Uint maxLookintoDepth;
 public:
     Regex(const char *buf);
     bool MatchNumber(Uint64 input, char basicChar, Uint returnMatch_backrefIndex, Uint64 &returnMatch, Uint64 *possibleMatchesCount_ptr);
@@ -38,6 +39,7 @@ Regex::Regex(const char *buf)
     RegexParser parser(regex, buf);
     numCaptureGroups = parser.backrefIndex;
     maxGroupDepth    = parser.maxGroupDepth;
+    maxLookintoDepth = parser.maxLookintoDepth;
 }
 
 bool Regex::MatchNumber(Uint64 input, char basicChar, Uint returnMatch_backrefIndex, Uint64 &returnMatch, Uint64 *possibleMatchesCount_ptr=NULL)
@@ -45,13 +47,13 @@ bool Regex::MatchNumber(Uint64 input, char basicChar, Uint returnMatch_backrefIn
     RegexMatcher<false> match;
     match.basicChar = basicChar;
     Uint64 returnMatchOffset;
-    return match.Match(regex, numCaptureGroups, maxGroupDepth, input, returnMatch_backrefIndex, returnMatchOffset, returnMatch, possibleMatchesCount_ptr);
+    return match.Match(regex, numCaptureGroups, maxGroupDepth, maxLookintoDepth, input, returnMatch_backrefIndex, returnMatchOffset, returnMatch, possibleMatchesCount_ptr);
 }
 
 bool Regex::MatchString(const char *stringToMatchAgainst, Uint returnMatch_backrefIndex, const char *&returnMatch, size_t &returnMatchLength, Uint64 *possibleMatchesCount_ptr=NULL)
 {
     RegexMatcher<true> match;
-    bool result = match.Match(regex, numCaptureGroups, maxGroupDepth, (Uint64)stringToMatchAgainst, returnMatch_backrefIndex, (Uint64 &)returnMatch, (Uint64 &)returnMatchLength, possibleMatchesCount_ptr);
+    bool result = match.Match(regex, numCaptureGroups, maxGroupDepth, maxLookintoDepth, (Uint64)stringToMatchAgainst, returnMatch_backrefIndex, (Uint64 &)returnMatch, (Uint64 &)returnMatchLength, possibleMatchesCount_ptr);
     (const char *&)returnMatch = stringToMatchAgainst + (size_t)(Uint64 &)returnMatch;
     return result;
 }

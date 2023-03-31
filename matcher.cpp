@@ -341,13 +341,16 @@ void *RegexMatcher<USE_STRINGS>::loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pus
 
 bool matchWordCharacter(Uchar ch);
 
-template<> void RegexMatcher<false>::initInput(Uint64 _input, Uint numCaptureGroups)
+template<> void RegexMatcher<false>::initInput(Uint64 _input, Uint numCaptureGroups, Uint maxLookintoDepth)
 {
     input = input0 = _input;
     basicCharIsWordCharacter = matchWordCharacter(basicChar);
 }
-template<> void RegexMatcher<true>::initInput(Uint64 _input, Uint numCaptureGroups)
+template<> void RegexMatcher<true>::initInput(Uint64 _input, Uint numCaptureGroups, Uint maxLookintoDepth)
 {
+    stringLookintoBase = new const char * [maxLookintoDepth];
+    stringLookintoTop = stringLookintoBase;
+
     stringToMatchAgainst = stringToMatchAgainst0 = (const char *)_input;
     input = input0 = strlen(stringToMatchAgainst);
     delete [] captureOffsets;
@@ -1112,12 +1115,37 @@ void RegexMatcher<USE_STRINGS>::popAtomicGroup(RegexGroup *const group)
     }
 }
 
+template<> void RegexMatcher<false>::pushLookintoInput(Uint64 newInput, const char *newStringToMatchAgainst)
+{
+    *inputLookintoTop++  = input;
+    input = newInput;
+}
+template<> void RegexMatcher<true>::pushLookintoInput(Uint64 newInput, const char *newStringToMatchAgainst)
+{
+    *inputLookintoTop++  = input;
+    *stringLookintoTop++ = stringToMatchAgainst;
+    input = newInput;
+    stringToMatchAgainst = newStringToMatchAgainst ? newStringToMatchAgainst : stringToMatchAgainst0;
+}
+
+template<> void RegexMatcher<false>::popLookintoInput()
+{
+    input = *--inputLookintoTop;
+}
+template<> void RegexMatcher<true>::popLookintoInput()
+{
+    input = *--inputLookintoTop;
+    stringToMatchAgainst = *--stringLookintoTop;
+}
+
 template <bool USE_STRINGS>
-bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr)
+bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint maxLookintoDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr)
 {
     delete [] groupStackBase;
     groupStackBase = new GroupStackNode [maxGroupDepth];
     groupStackTop = groupStackBase;
+    inputLookintoBase = new Uint64 [maxLookintoDepth];
+    inputLookintoTop = inputLookintoBase;
     if (matchFunction(&regex) != &RegexMatcher<USE_STRINGS>::matchSymbol_Group)
         virtualizeSymbols(&regex);
 
@@ -1141,7 +1169,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
 
     verb = RegexVerb_None;
 
-    initInput(_input, numCaptureGroups);
+    initInput(_input, numCaptureGroups, maxLookintoDepth);
 
     if (possibleMatchesCount_ptr)
         *possibleMatchesCount_ptr = 0;
@@ -1249,6 +1277,9 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                     pushStack->numCaptured = groupStackTop->numCaptured;
                     pushStack->alternative = (Uint)(alternative - groupStackTop->group->alternatives);
 
+                    if (group->type == RegexGroup_LookintoMolecular)
+                        popLookintoInput();
+
                     position    = groupStackTop->position;
                     alternative = group->parentAlternative;
                     if (!group->self) // group->self will be NULL if this is the lookaround in a conditional
@@ -1336,8 +1367,12 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                 delete [] copy;
 
                 if (debugTrace > 1)
+                {
                     for (GroupStackNode *i = groupStackTop; i >= groupStackBase; i--)
                         fprintf(stderr, "  %llu, #%llu, (%u): %s\n", i->position, i->loopCount, i->numCaptured, i->group->originalCode);
+                    for (Uint64 *i = inputLookintoTop; --i >= inputLookintoBase;)
+                        fprintf(stderr, "  (?^{%llu})\n", *i);
+                }
 #ifdef _DEBUG
                 fprintf(stderr, "Step %llu: {%llu|%llu} <%llu> ", numSteps, position, input - position, stack.getStackDepth());
 #else
@@ -1564,5 +1599,5 @@ void RegexMatcher<true>::fprintCapture(FILE *f, Uint i)
     fprintCapture(f, captures[i], captureOffsets[i]);
 }
 
-template bool RegexMatcher<false>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr);
-template bool RegexMatcher<true >::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr);
+template bool RegexMatcher<false>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint maxLookintoDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr);
+template bool RegexMatcher<true >::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint maxLookintoDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr);

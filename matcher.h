@@ -124,6 +124,9 @@ struct RegexMatcherBase<true>
     const char *stringToMatchAgainst;
     const char **captureOffsets;
     const char **captureOffsetsAtomicTmp; // only used with enable_persistent_backrefs
+
+    const char **stringLookintoBase;
+    const char **stringLookintoTop;
 };
 
 template <bool USE_STRINGS>
@@ -162,6 +165,9 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     Uint *captureIndexesAtomicTmp; // only used with enable_persistent_backrefs
     Uint64 *capturesAtomicTmp; // only used with enable_persistent_backrefs
 
+    Uint64 *inputLookintoBase;
+    Uint64 *inputLookintoTop;
+
     RegexVerb verb; // can only be RegexVerb_None, RegexVerb_Commit, RegexVerb_Prune, RegexVerb_Skip, or RegexVerb_Then
     Uint64 skipPosition; // for RegexVerb_Skip
     Backtrack<USE_STRINGS> stack;
@@ -198,8 +204,10 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     Backtrack_LoopGroup<USE_STRINGS> *pushStack_LoopGroup();
     void *loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pushLoop, Uint64 pushPosition, Uint64 oldPosition, Uint alternativeNum);
     void popAtomicGroup(RegexGroup *const group);
+    inline void pushLookintoInput(Uint64 newInput, const char *newStringToMatchAgainst);
+    inline void  popLookintoInput();
 
-    inline void initInput(Uint64 _input, Uint numCaptureGroups);
+    inline void initInput(Uint64 _input, Uint numCaptureGroups, Uint maxLookintoDepth);
     inline void  readCapture(Uint index, Uint64 &multiple, const char *&pBackref);
     inline void writeCapture(Uint index, Uint64  multiple, const char * pBackref);
     inline bool writeCaptureRelative(Uint index, Uint64 start, Uint64 end); // returns true iff this changes the capture's value
@@ -270,8 +278,13 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
 public:
     inline RegexMatcher();
     inline ~RegexMatcher();
-    bool Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr);
+    bool Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint maxLookintoDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr);
 };
+
+template <> void RegexMatcher<false>::pushLookintoInput(Uint64 newInput, const char *newStringToMatchAgainst);
+template <> void RegexMatcher<false>::popLookintoInput();
+template <> void RegexMatcher<true>::pushLookintoInput(Uint64 newInput, const char *newStringToMatchAgainst);
+template <> void RegexMatcher<true>::popLookintoInput();
 
 template <> void RegexMatcher<false>::fprintCapture(FILE *f, Uint64 length, const char *offset);
 template <> void RegexMatcher<false>::fprintCapture(FILE *f, Uint i);
@@ -803,12 +816,10 @@ template <bool USE_STRINGS> class Backtrack_EnterGroupLookinto;
 template <> class Backtrack_EnterGroupLookinto<false> : public Backtrack_EnterGroup<false>
 {
     friend class RegexMatcher<false>;
-    Uint64 inputOutside;
 
     void pushInput(RegexMatcher<false> &matcher, Uint64 newInput, const char *newStringToMatchAgainst)
     {
-        inputOutside = matcher.input;
-        matcher.input = newInput;
+        matcher.pushLookintoInput(newInput, newStringToMatchAgainst);
     }
     virtual size_t getSize(RegexMatcher<false> &matcher)
     {
@@ -816,17 +827,17 @@ template <> class Backtrack_EnterGroupLookinto<false> : public Backtrack_EnterGr
     }
     virtual bool popTo(RegexMatcher<false> &matcher)
     {
-        matcher.input = inputOutside;
+        matcher.popLookintoInput();
         return Backtrack_EnterGroup<false>::popTo(matcher);
     }
     virtual void popForNegativeLookahead(RegexMatcher<false> &matcher)
     {
-        matcher.input = inputOutside;
+        matcher.popLookintoInput();
         return Backtrack_EnterGroup<false>::popForNegativeLookahead(matcher);
     }
     virtual int popForAtomicCapture(RegexMatcher<false> &matcher)
     {
-        matcher.input = inputOutside;
+        matcher.popLookintoInput();
         return Backtrack_EnterGroup<false>::popForAtomicCapture(matcher);
     }
     virtual void fprintDebug(RegexMatcher<false> &matcher, FILE *f)
@@ -837,15 +848,10 @@ template <> class Backtrack_EnterGroupLookinto<false> : public Backtrack_EnterGr
 template <> class Backtrack_EnterGroupLookinto<true> : public Backtrack_EnterGroup<true>
 {
     friend class RegexMatcher<true>;
-    Uint64 inputOutside;
-    const char *stringToMatchAgainstOutside;
 
     void pushInput(RegexMatcher<true> &matcher, Uint64 newInput, const char *newStringToMatchAgainst)
     {
-        inputOutside = matcher.input;
-        stringToMatchAgainstOutside = matcher.stringToMatchAgainst;
-        matcher.input = newInput;
-        matcher.stringToMatchAgainst = newStringToMatchAgainst ? newStringToMatchAgainst : matcher.stringToMatchAgainst0;
+        matcher.pushLookintoInput(newInput, newStringToMatchAgainst);
     }
     virtual size_t getSize(RegexMatcher<true> &matcher)
     {
@@ -853,20 +859,17 @@ template <> class Backtrack_EnterGroupLookinto<true> : public Backtrack_EnterGro
     }
     virtual bool popTo(RegexMatcher<true> &matcher)
     {
-        matcher.input = inputOutside;
-        matcher.stringToMatchAgainst = stringToMatchAgainstOutside;
+        matcher.popLookintoInput();
         return Backtrack_EnterGroup<true>::popTo(matcher);
     }
     virtual void popForNegativeLookahead(RegexMatcher<true> &matcher)
     {
-        matcher.input = inputOutside;
-        matcher.stringToMatchAgainst = stringToMatchAgainstOutside;
+        matcher.popLookintoInput();
         return Backtrack_EnterGroup<true>::popForNegativeLookahead(matcher);
     }
     virtual int popForAtomicCapture(RegexMatcher<true> &matcher)
     {
-        matcher.input = inputOutside;
-        matcher.stringToMatchAgainst = stringToMatchAgainstOutside;
+        matcher.popLookintoInput();
         return Backtrack_EnterGroup<true>::popForAtomicCapture(matcher);
     }
     virtual void fprintDebug(RegexMatcher<true> &matcher, FILE *f)
@@ -932,6 +935,13 @@ class Backtrack_LeaveMolecularLookahead : public BacktrackNode<USE_STRINGS>
         matcher.groupStackTop->numCaptured = numCaptured;
         matcher.groupStackTop[-1].numCaptured -= numCaptured;
         matcher.alternative = group->alternatives + alternative;
+
+        Uint64      inputLookintoSize;
+        const char *inputLookintoPtr = NULL;
+        if (!matcher.getLookintoEntrace(((RegexGroupLookinto*)group)->backrefIndex, inputLookintoSize, inputLookintoPtr))
+            return false;
+        matcher.pushLookintoInput(inputLookintoSize, inputLookintoPtr);
+
         return false;
     }
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)

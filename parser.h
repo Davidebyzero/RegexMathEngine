@@ -35,6 +35,8 @@ class RegexParser
     Uint backrefIndex; // zero-numbered; 0 corresponds to \1
     Uint maxGroupDepth; // minimum is 1 (meaning, root group only)
     Uint curGroupDepth;
+    Uint maxLookintoDepth;
+    Uint curLookintoDepth;
     bool symbolCountSpecified;
     bool symbolLazinessSpecified;
 

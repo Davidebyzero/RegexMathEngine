@@ -267,6 +267,8 @@ class RegexGroupLookinto : public RegexGroup
     friend class RegexParser;
     friend class RegexMatcher<false>;
     friend class RegexMatcher<true>;
+    friend class Backtrack_LeaveMolecularLookahead<false>;
+    friend class Backtrack_LeaveMolecularLookahead<true>;
     Uint backrefIndex; // UINT_MAX = input string; 0 = the match so far; 1... = \1...
 public:
     RegexGroupLookinto(RegexGroupType type, Uint backrefIndex) : RegexGroup(type), backrefIndex(backrefIndex) {}

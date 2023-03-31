@@ -214,6 +214,8 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
     backrefIndex = 0;
     maxGroupDepth = 1;
     curGroupDepth = 1;
+    maxLookintoDepth = 0;
+    curLookintoDepth = 0;
 
     for (;;)
     {
@@ -528,6 +530,16 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
                     curGroupDepth++;
                 if (maxGroupDepth < curGroupDepth)
                     maxGroupDepth = curGroupDepth;
+                switch (group->type)
+                {
+                case RegexGroup_Lookinto:
+                case RegexGroup_LookintoMolecular:
+                case RegexGroup_NegativeLookinto:
+                    curLookintoDepth++;
+                    if (maxLookintoDepth < curLookintoDepth)
+                        maxLookintoDepth = curLookintoDepth;
+                    break;
+                }
 
                 group->parentAlternative = NULL;
                 group->self = NULL;
@@ -584,7 +596,17 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
                 curGroupDepth--;
                 // Neither the current lookaround nor atomic group matching code can handle quantifiers, so leave room in case we will be wrapping it in a non-capturing group (can't know at this point if it has a quantifier or not)
                 if (group->isLookaround() || group->type == RegexGroup_Atomic)
+                {
                     curGroupDepth--;
+                    switch (group->type)
+                    {
+                    case RegexGroup_Lookinto:
+                    case RegexGroup_LookintoMolecular:
+                    case RegexGroup_NegativeLookinto:
+                        curLookintoDepth--;
+                        break;
+                    }
+                }
 
                 ParsingStack *stackDown = stack->below;
                 delete stack;
