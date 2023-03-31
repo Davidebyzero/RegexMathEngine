@@ -1335,6 +1335,9 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                 fprintf(stderr, "%s\n", copy);
                 delete [] copy;
 
+                if (debugTrace > 1)
+                    for (GroupStackNode *i = groupStackTop; i >= groupStackBase; i--)
+                        fprintf(stderr, "  %llu, #%llu, (%u): %s\n", i->position, i->loopCount, i->numCaptured, i->group->originalCode);
 #ifdef _DEBUG
                 fprintf(stderr, "Step %llu: {%llu|%llu} <%llu> ", numSteps, position, input - position, stack.getStackDepth());
 #else
