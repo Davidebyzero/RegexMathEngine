@@ -1102,7 +1102,6 @@ void RegexMatcher<USE_STRINGS>::popAtomicGroup(RegexGroup *const group)
 
     if (enable_persistent_backrefs)
         numCapturedDelta = captureIndexNumUsedAtomicTmp;
-    groupStackTop->numCaptured += numCapturedDelta;
 
     if (numCapturedDelta)
     {
