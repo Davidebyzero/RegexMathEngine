@@ -326,12 +326,12 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
                                 if (inRange == 2)
                                     throw RegexParsingError(buf, "Invalid range in character class");
                                 Uint8 backup1 = allowedChars[1] & ((1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)); // '\t','\n','\v','\f','\r'
-                                Uint8 backup2 = allowedChars[(Uchar)' '/8] & (1 << ((Uchar)' '%8));
-                                Uint8 backup3 = allowedChars[(Uchar)' '/8] & (1 << ((Uchar)' '%8)); // non-breaking space; WARNING: may not be portable
+                                Uint8 backup2 = allowedChars[(Uchar)' ' /8] & (1 << ((Uchar)' ' %8));
+                                Uint8 backup3 = allowedChars[(Uchar)0xA0/8] & (1 << ((Uchar)0xA0%8)); // non-breaking space; WARNING: may not be portable
                                 memset(allowedChars, 0xFF, sizeof(allowedChars));
                                 allowedChars[1] |= backup1;
-                                allowedChars[(Uchar)' '/8] |= backup2;
-                                allowedChars[(Uchar)' '/8] |= backup3;
+                                allowedChars[(Uchar)' ' /8] |= backup2;
+                                allowedChars[(Uchar)0xA0/8] |= backup3; // non-breaking space; WARNING: may not be portable
                                 inRange = -1;
                                 buf++;
                                 break;
@@ -340,8 +340,8 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
                             if (inRange == 2)
                                 throw RegexParsingError(buf, "Invalid range in character class");
                             allowedChars[1] |= (1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5); // '\t','\n','\v','\f','\r'
-                            allowedChars[(Uchar)' '/8] |= 1 << ((Uchar)' '%8);
-                            allowedChars[(Uchar)' '/8] |= 1 << ((Uchar)' '%8); // non-breaking space; WARNING: may not be portable
+                            allowedChars[(Uchar)' ' /8] |= 1 << ((Uchar)' ' %8);
+                            allowedChars[(Uchar)0xA0/8] |= 1 << ((Uchar)0xA0%8); // non-breaking space; WARNING: may not be portable
                             inRange = -1;
                             buf++;
                             break;

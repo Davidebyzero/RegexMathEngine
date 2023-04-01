@@ -800,8 +800,8 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_WordBoundary(RegexSymbol *thisSymbol
 
 bool matchDigitNot        (Uchar ch) {return !(inrange(ch,'0','9')                                                         );}
 bool matchDigit           (Uchar ch) {return  (inrange(ch,'0','9')                                                         );}
-bool matchSpaceNot        (Uchar ch) {return !(inrange(ch,0x9,0xD) || ch==' ' || ch==(Uchar)' '                            );}
-bool matchSpace           (Uchar ch) {return  (inrange(ch,0x9,0xD) || ch==' ' || ch==(Uchar)' '                            );}
+bool matchSpaceNot        (Uchar ch) {return !(inrange(ch,0x9,0xD) || ch==' ' || ch==(Uchar)0xA0                           );} // non-breaking space; WARNING: may not be portable
+bool matchSpace           (Uchar ch) {return  (inrange(ch,0x9,0xD) || ch==' ' || ch==(Uchar)0xA0                           );} // non-breaking space; WARNING: may not be portable
 bool matchWordCharacterNot(Uchar ch) {return !(inrange(ch,'0','9') || inrange(ch,'A','Z') || inrange(ch,'a','z') || ch=='_');}
 bool matchWordCharacter   (Uchar ch) {return  (inrange(ch,'0','9') || inrange(ch,'A','Z') || inrange(ch,'a','z') || ch=='_');}
 

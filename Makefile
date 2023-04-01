@@ -1,6 +1,7 @@
-CPP	= g++
+CPP = g++ -flto -fwhole-program
+#CPP = clang++ -Wno-switch -Wno-logical-op-parentheses
 
-CFLAGS = -Wno-invalid-offsetof -Ofast -flto -fwhole-program
+CFLAGS = -Wno-invalid-offsetof -Ofast
 
 SRC := matcher.cpp math-optimization.cpp parser.cpp regex.cpp tools.cpp
 
