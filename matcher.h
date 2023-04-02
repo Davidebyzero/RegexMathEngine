@@ -1637,7 +1637,8 @@ class Backtrack_ResetStart : public BacktrackNode<USE_STRINGS>
 
 template<> inline RegexMatcher<false>::RegexMatcher() :
     groupStackBase(NULL),
-    captureStackBase(NULL)
+    captureStackBase(NULL),
+    inputLookintoBase(NULL)
 #ifdef _DEBUG
     ,matcher(*this)
 #endif
@@ -1652,7 +1653,8 @@ template<> inline RegexMatcher<false>::RegexMatcher() :
 }
 template<> inline RegexMatcher<true>::RegexMatcher() :
     groupStackBase(NULL),
-    captureStackBase(NULL)
+    captureStackBase(NULL),
+    inputLookintoBase(NULL)
 #ifdef _DEBUG
     ,matcher(*this)
 #endif
@@ -1666,11 +1668,13 @@ template<> inline RegexMatcher<true>::RegexMatcher() :
         capturesAtomicTmp = NULL;
         captureOffsetsAtomicTmp = NULL;
     }
+    stringLookintoBase = NULL;
 }
 
 template<> inline RegexMatcher<false>::~RegexMatcher()
 {
     delete [] groupStackBase;
+    delete [] inputLookintoBase;
     delete [] captureStackBase;
     delete [] captures;
     if (enable_persistent_backrefs)
@@ -1683,6 +1687,7 @@ template<> inline RegexMatcher<false>::~RegexMatcher()
 template<> inline RegexMatcher<true>::~RegexMatcher()
 {
     delete [] groupStackBase;
+    delete [] inputLookintoBase;
     delete [] captureStackBase;
     delete [] captures;
     delete [] captureOffsets;
@@ -1693,6 +1698,7 @@ template<> inline RegexMatcher<true>::~RegexMatcher()
         delete [] capturesAtomicTmp;
         delete [] captureOffsetsAtomicTmp;
     }
+    delete [] stringLookintoBase;
 }
 
 #pragma pack( pop )

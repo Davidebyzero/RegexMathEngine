@@ -346,6 +346,7 @@ template<> void RegexMatcher<false>::initInput(Uint64 _input, Uint numCaptureGro
 }
 template<> void RegexMatcher<true>::initInput(Uint64 _input, Uint numCaptureGroups, Uint maxLookintoDepth)
 {
+    delete [] stringLookintoBase;
     stringLookintoBase = new const char * [maxLookintoDepth];
     stringLookintoTop = stringLookintoBase;
 
@@ -1145,6 +1146,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
     delete [] groupStackBase;
     groupStackBase = new GroupStackNode [maxGroupDepth];
     groupStackTop = groupStackBase;
+    delete [] inputLookintoBase;
     inputLookintoBase = new Uint64 [maxLookintoDepth];
     inputLookintoTop = inputLookintoBase;
     if (matchFunction(&regex) != &RegexMatcher<USE_STRINGS>::matchSymbol_Group)
