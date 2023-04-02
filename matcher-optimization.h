@@ -1,7 +1,7 @@
 #include "math-optimization.h"
 
 template <bool USE_STRINGS> // currently implemented only for !USE_STRINGS
-Uint64 RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroup(RegexSymbol *thisSymbol)
+Uint64 RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroup(RegexSymbol *thisSymbol, bool capturing)
 {
     RegexGroup *const group = ((RegexConstGroup*)thisSymbol)->originalGroup;
     RegexPattern **insideAlternative = group->alternatives;
@@ -34,31 +34,39 @@ Uint64 RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroup(RegexSymbol *thisSymbol
             }
         }
     }
-    if (multiple == 0) // don't backtrack when it will make no difference to do so
+    if (multiple == 0 && !capturing) // don't backtrack when it will make no difference to do so
     {
         symbol++;
         return 0;
     }
-    matchSymbol_Character_or_Backref(thisSymbol, multiple, (const char *)NULL);
-    return multiple;
+    if (matchSymbol_Character_or_Backref(thisSymbol, multiple, (const char *)NULL))
+        return multiple;
+    return NON_PARTICIPATING_CAPTURE_GROUP;
 }
 template <bool USE_STRINGS> // currently implemented only for !USE_STRINGS
 void RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroupNonCapturing(RegexSymbol *thisSymbol)
 {
-    matchSymbol_ConstGroup(thisSymbol);
+    matchSymbol_ConstGroup(thisSymbol, false);
 }
 template <bool USE_STRINGS> // currently implemented only for !USE_STRINGS
 void RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroupCapturing(RegexSymbol *thisSymbol)
 {
-    nonMatchHappened = false;
     Uint64 position0 = position;
-    Uint64 multiple = matchSymbol_ConstGroup(thisSymbol);
-    if (multiple != NON_PARTICIPATING_CAPTURE_GROUP && position > position0 && !nonMatchHappened)
+    Uint64 multiple = matchSymbol_ConstGroup(thisSymbol, true);
+    if (multiple != NON_PARTICIPATING_CAPTURE_GROUP)
     {
         Uint backrefIndex = ((RegexConstGroupCapturing*)thisSymbol)->backrefIndex;
 
-        Backtrack_LeaveConstGroupCapturing<USE_STRINGS> *pushStack = stack.template push< Backtrack_LeaveConstGroupCapturing<USE_STRINGS> >();
+        Backtrack_LeaveConstGroupCapturing<USE_STRINGS> *pushStack = stack.template push< Backtrack_LeaveConstGroupCapturing<USE_STRINGS> >(Backtrack_LeaveConstGroupCapturing<USE_STRINGS>::get_size());
         pushStack->backrefIndex = backrefIndex;
+        if (enable_persistent_backrefs)
+        {
+            const char *&dummy = (const char *&)pushStack->buffer;
+            if (!USE_STRINGS)
+                readCapture(backrefIndex, *(Uint64*)(pushStack->buffer                      ), dummy);
+            else
+                readCapture(backrefIndex, *(Uint64*)(pushStack->buffer + sizeof(const char*)), *(const char**)pushStack->buffer);
+        }
 
         Uint64 prevValue = captures[backrefIndex];
         writeCapture(backrefIndex, multiple, (const char *)NULL);
@@ -320,8 +328,8 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
 
 template <bool USE_STRINGS>
 template <typename MATCH_TYPE>
-ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Character_or_Backref(RegexSymbol *const thisSymbol, Uint64 const multiple, MATCH_TYPE const repetend)
-// return true if this optimizer function handled the match and the caller should do nothing further
+ALWAYS_INLINE int8 RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Character_or_Backref(RegexSymbol *const thisSymbol, Uint64 const multiple, MATCH_TYPE const repetend)
+// return nonzero if this optimizer function handled the match and the caller should do nothing further: +1 if repetend matched at least once, -1 if it matched zero times
 {
     if (optimizationLevel && !thisSymbol->possessive)
     {
@@ -337,17 +345,18 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
             if (!inrange64(currentMatch, thisSymbol->minCount, MAX_EXTEND(thisSymbol->maxCount)))
             {
                 nonMatch();
-                return true;
+                return -1;
             }
             if (!doesRepetendMatch(repetend, multiple, currentMatch))
             {
                 nonMatch();
-                return true;
+                return -1;
             }
+            int8 matched = currentMatch != 0 ? +1 : -1;
             position     = input - spaceLeft % multiple;
             currentMatch = ULLONG_MAX;
             symbol++;
-            return true;
+            return matched;
         }
         RegexGroup *thisGroup = groupStackTop->group;
         bool afterEndOfGroup = false;
@@ -359,7 +368,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                 if (!emulate_ECMA_NPCGs)
                 {
                     nonMatch();
-                    return true;
+                    return -1;
                 }
                 subtract = 0;
             }
@@ -367,7 +376,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
             if (subtract > spaceLeft || (spaceLeft - subtract) % multiple != 0)
             {
                 nonMatch();
-                return true;
+                return -1;
             }
         }
         if (nextSymbol && nextSymbol->type==RegexSymbol_Group ||
@@ -404,14 +413,14 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                     if (currentMatch < alreadyCaptured)
                     {
                         nonMatch();
-                        return true;
+                        return -1;
                     }
                     currentMatch -= alreadyCaptured;
                     currentMatch /= multiple;
                     if (currentMatch < thisSymbol->minCount)
                     {
                         nonMatch();
-                        return true;
+                        return -1;
                     }
                     if (currentMatch > MAX_EXTEND(thisSymbol->maxCount))
                         currentMatch = MAX_EXTEND(thisSymbol->maxCount);
@@ -420,7 +429,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                         if (!doesRepetendMatch(repetend, multiple, currentMatch))
                         {
                             nonMatch();
-                            return true;
+                            return -1;
                         }
                     }
                     else
@@ -431,15 +440,16 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                             if (currentMatch < thisSymbol->minCount)
                             {
                                 nonMatch();
-                                return true;
+                                return -1;
                             }
                         }
                         pushStack();
                     }
+                    int8 matched = currentMatch != 0 ? +1 : -1;
                     position += currentMatch * multiple;
                     currentMatch = ULLONG_MAX;
                     symbol++;
-                    return true;
+                    return matched;
                 }
             }
             else
@@ -467,27 +477,27 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                                         if (totalLength > input || cannotMatch)
                                         {
                                             nonMatch();
-                                            return true;
+                                            return -1;
                                         }
                                         Uint64 target = input - totalLength;
                                         if (position > target)
                                         {
                                             nonMatch();
-                                            return true;
+                                            return -1;
                                         }
                                         Uint64 spaceLeft = target - groupStackTop->position;
                                         currentMatch = spaceLeft / (1 + currentSymbol->minCount);
                                         if (currentMatch < position - groupStackTop->position)
                                         {
                                             nonMatch();
-                                            return true;
+                                            return -1;
                                         }
                                         currentMatch -= position - groupStackTop->position;
                                         currentMatch /= multiple;
                                         if (currentMatch < thisSymbol->minCount)
                                         {
                                             nonMatch();
-                                            return true;
+                                            return -1;
                                         }
                                         if (currentMatch > MAX_EXTEND(thisSymbol->maxCount))
                                             currentMatch = MAX_EXTEND(thisSymbol->maxCount);
@@ -496,7 +506,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                                             if (!doesRepetendMatch(repetend, multiple, currentMatch))
                                             {
                                                 nonMatch();
-                                                return true;
+                                                return -1;
                                             }
                                         }
                                         else
@@ -507,15 +517,16 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                                                 if (currentMatch < thisSymbol->minCount)
                                                 {
                                                     nonMatch();
-                                                    return true;
+                                                    return -1;
                                                 }
                                             }
                                             pushStack();
                                         }
+                                        int8 matched = currentMatch != 0 ? +1 : -1;
                                         position += currentMatch * multiple;
                                         currentMatch = ULLONG_MAX;
                                         symbol++;
-                                        return true;
+                                        return matched;
                                     }
                                 }
                                 break;
@@ -558,13 +569,13 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                             if (totalLength > input || cannotMatch)
                             {
                                 nonMatch();
-                                return true;
+                                return -1;
                             }
                             Uint64 target = input - totalLength;
                             if (position > target)
                             {
                                 nonMatch();
-                                return true;
+                                return -1;
                             }
                             Uint64 spaceLeft = target - position;
                             RegexGroup *multiplicationGroup = NULL;
@@ -637,7 +648,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                             if (currentMatch < thisSymbol->minCount)
                             {
                                 nonMatch();
-                                return true;
+                                return -1;
                             }
                             if (currentMatch > MAX_EXTEND(thisSymbol->maxCount))
                                 currentMatch = MAX_EXTEND(thisSymbol->maxCount);
@@ -646,7 +657,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                                 if (!doesRepetendMatch(repetend, multiple, currentMatch))
                                 {
                                     nonMatch();
-                                    return true;
+                                    return -1;
                                 }
                             }
                             else
@@ -657,12 +668,13 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                                     if (currentMatch < thisSymbol->minCount)
                                     {
                                         nonMatch();
-                                        return true;
+                                        return -1;
                                     }
                                 }
                                 if (currentMatch != (thisSymbol->lazy ? MAX_EXTEND(thisSymbol->maxCount) : thisSymbol->minCount))
                                     pushStack();
                             }
+                            int8 matched = currentMatch != 0 ? +1 : -1;
                             //position = target - spaceLeft % multiple;
                             position += currentMatch * multiple;
                             currentMatch = ULLONG_MAX;
@@ -678,18 +690,18 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                                 if (spaceLeft < product)
                                 {
                                     nonMatch();
-                                    return true;
+                                    return -1;
                                 }
                                 enterGroup(multiplicationGroup);
                                 symbol = multiplicationAnchor;
                                 position = input;
                             }
-                            return true;
+                            return matched;
                         }
                     }
                 }
             }
         }
     }
-    return false;
+    return 0;
 }

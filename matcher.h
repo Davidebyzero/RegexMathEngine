@@ -184,7 +184,6 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     Uint64 numSteps;
 
     char match; // zero = looking for match, negative = match failed, positive = match found
-    bool nonMatchHappened;
 
     enum NonMatchType
     {
@@ -258,12 +257,12 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void matchSymbol_IsPrime                 (RegexSymbol *thisSymbol);
     void matchSymbol_IsPowerOf2              (RegexSymbol *thisSymbol);
 
-    Uint64 matchSymbol_ConstGroup(RegexSymbol *thisSymbol);
+    Uint64 matchSymbol_ConstGroup(RegexSymbol *thisSymbol, bool capturing);
 
     template <typename MATCH_TYPE>
-    inline bool runtimeOptimize_matchSymbol_Character_or_Backref(RegexSymbol *const thisSymbol, Uint64 const multiple, MATCH_TYPE const repetend);
+    inline int8 runtimeOptimize_matchSymbol_Character_or_Backref(RegexSymbol *const thisSymbol, Uint64 const multiple, MATCH_TYPE const repetend);
     template <typename MATCH_TYPE>
-    void matchSymbol_Character_or_Backref (RegexSymbol *thisSymbol, Uint64 multiple, MATCH_TYPE pBackref);
+    bool matchSymbol_Character_or_Backref (RegexSymbol *thisSymbol, Uint64 multiple, MATCH_TYPE pBackref);
 
     inline void (RegexMatcher<USE_STRINGS>::*&matchFunction(RegexSymbol *thisSymbol))(RegexSymbol *thisSymbol);
     inline bool characterCanMatch(RegexSymbol *thisSymbol);
@@ -974,6 +973,8 @@ class Backtrack_LeaveConstGroupCapturing : public BacktrackNode<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
     Uint backrefIndex;
+    Uint8 buffer[FLEXIBLE_SIZE_ARRAY];
+
     void popCaptureGroup(RegexMatcher<USE_STRINGS> &matcher)
     {
         matcher.captures[backrefIndex] = NON_PARTICIPATING_CAPTURE_GROUP;
@@ -985,13 +986,33 @@ class Backtrack_LeaveConstGroupCapturing : public BacktrackNode<USE_STRINGS>
 #endif
     }
 protected:
-    virtual void popCapture(RegexMatcher<USE_STRINGS> &matcher)
+    void popCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
+        const char *&dummy = (const char *&)buffer;
+        if (!USE_STRINGS)
+            matcher.writeCapture(backrefIndex, *(Uint64*)(buffer                      ), dummy);
+        else
+            matcher.writeCapture(backrefIndex, *(Uint64*)(buffer + sizeof(const char*)), *(const char**)buffer);
+        if (matcher.captures[backrefIndex] == NON_PARTICIPATING_CAPTURE_GROUP)
+        {
+            matcher.captureStackTop--;
+            matcher.groupStackTop->numCaptured--;
+#ifdef _DEBUG
+            if (*matcher.captureStackTop != backrefIndex)
+                THROW_ENGINEBUG;
+#endif
+        }
     }
 
+    static size_t get_size()
+    {
+        return (size_t)&((Backtrack_LeaveConstGroupCapturing*)0)->buffer +
+            (enable_persistent_backrefs ? (sizeof(Uint64) + (USE_STRINGS ? sizeof(const char*) : 0))
+                                        : 0);
+    }
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
     {
-        return sizeof(*this);
+        return get_size();
     }
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -1007,11 +1028,16 @@ protected:
     }
     virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
-        return 1;
+        return -1;
     }
     virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
     {
-        return captureTuple(matcher.captures[backrefIndex], NULL, backrefIndex);
+        if (!enable_persistent_backrefs)
+            return captureTuple(NON_PARTICIPATING_CAPTURE_GROUP         , NULL                 , backrefIndex);
+        if (!USE_STRINGS)
+            return captureTuple(*(Uint64*)(buffer                      ), NULL                 , backrefIndex);
+        else
+            return captureTuple(*(Uint64*)(buffer + sizeof(const char*)), *(const char**)buffer, backrefIndex);
     }
     virtual bool okayToTryAlternatives(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -1019,7 +1045,15 @@ protected:
     }
     virtual void fprintDebugBase(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
     {
-        fprintf(f, ": backrefIndex=%u", backrefIndex);
+        fprintf(f, ": backref=\\%u", backrefIndex+1);
+        if (enable_persistent_backrefs)
+        {
+            fputs(", capture=", f);
+            if (!USE_STRINGS)
+                matcher.fprintCapture(f, *(Uint64*)(buffer                      ), NULL);
+            else
+                matcher.fprintCapture(f, *(Uint64*)(buffer + sizeof(const char*)), *(const char**)buffer);
+        }
     }
     virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
     {

@@ -40,8 +40,6 @@ void RegexMatcher<USE_STRINGS>::nonMatch(NonMatchType type)
         }
     }
 
-    nonMatchHappened = true;
-
     position = groupStackTop->position;
 
     // if any changes are made here, they may need to be duplicated in Backtrack_Commit<USE_STRINGS>::popTo()
@@ -571,19 +569,20 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Backref(RegexSymbol *thisSymbol)
 
 template <bool USE_STRINGS>
 template <typename MATCH_TYPE>
-void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *thisSymbol, Uint64 multiple, MATCH_TYPE repetend)
+bool RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *thisSymbol, Uint64 multiple, MATCH_TYPE repetend)
+// return true if repetend was matched at least once
 {
     if (currentMatch == ULLONG_MAX)
     {
-        if (runtimeOptimize_matchSymbol_Character_or_Backref(thisSymbol, multiple, repetend))
-            return;
+        if (char optimized = runtimeOptimize_matchSymbol_Character_or_Backref(thisSymbol, multiple, repetend))
+            return optimized > 0;
         if (thisSymbol->lazy)
         {
             currentMatch = thisSymbol->minCount;
             if (!doesRepetendMatch(repetend, multiple, currentMatch))
             {
                 nonMatch();
-                return;
+                return false;
             }
         }
         else
@@ -595,7 +594,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                 if (currentMatch < thisSymbol->minCount)
                 {
                     nonMatch();
-                    return;
+                    return false;
                 }
                 if (USE_STRINGS && repetend)
                 {
@@ -603,9 +602,10 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                     if (currentMatch < thisSymbol->minCount)
                     {
                         nonMatch();
-                        return;
+                        return false;
                     }
                 }
+                bool matched = currentMatch != 0;
                 if (currentMatch > thisSymbol->minCount)
                     pushStack();
                 if (USE_STRINGS)
@@ -614,7 +614,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                     position = input - spaceLeft % multiple;
                 currentMatch = ULLONG_MAX;
                 symbol++;
-                return;
+                return matched;
             }
             else
             {
@@ -625,7 +625,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                     if (currentMatch < thisSymbol->minCount)
                     {
                         nonMatch();
-                        return;
+                        return false;
                     }
                 }
             }
@@ -642,20 +642,21 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
                 if (USE_STRINGS && thisSymbol->lazy && currentMatch && !doesRepetendMatchOnce(repetend, multiple, currentMatch-1))
                 {
                     nonMatch();
-                    return;
+                    return false;
                 }
+                bool matched = currentMatch != 0;
                 if (currentMatch != (thisSymbol->lazy ? MAX_EXTEND(thisSymbol->maxCount) : thisSymbol->minCount))
                     pushStack();
                 position     = neededMatch;
                 currentMatch = ULLONG_MAX;
                 symbol++;
-                return;
+                return matched;
             }
         }
         if (thisSymbol->lazy)
         {
             nonMatch();
-            return;
+            return false;
         }
     try_next_match:
         if (thisSymbol->lazy)
@@ -663,7 +664,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
             if (currentMatch == MAX_EXTEND(thisSymbol->maxCount))
             {
                 nonMatch();
-                return;
+                return false;
             }
             currentMatch++;
         }
@@ -672,7 +673,7 @@ void RegexMatcher<USE_STRINGS>::matchSymbol_Character_or_Backref(RegexSymbol *th
             if (currentMatch == thisSymbol->minCount)
             {
                 nonMatch();
-                return;
+                return false;
             }
             currentMatch--;
         }
