@@ -1028,7 +1028,7 @@ protected:
     }
     virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
-        return -1;
+        return 1;
     }
     virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
     {
