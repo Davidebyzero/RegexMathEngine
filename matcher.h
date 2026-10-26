@@ -935,12 +935,14 @@ class Backtrack_LeaveMolecularLookahead : public BacktrackNode<USE_STRINGS>
         matcher.groupStackTop[-1].numCaptured -= numCaptured;
         matcher.alternative = group->alternatives + alternative;
 
-        Uint64      inputLookintoSize;
-        const char *inputLookintoPtr = NULL;
-        if (!matcher.getLookintoEntrace(((RegexGroupLookinto*)group)->backrefIndex, inputLookintoSize, inputLookintoPtr))
-            return false;
-        matcher.pushLookintoInput(inputLookintoSize, inputLookintoPtr);
-
+        if (group->type == RegexGroup_LookintoMolecular)
+        {
+            Uint64      inputLookintoSize;
+            const char *inputLookintoPtr = NULL;
+            if (!matcher.getLookintoEntrace(((RegexGroupLookinto*)group)->backrefIndex, inputLookintoSize, inputLookintoPtr))
+                return false;
+            matcher.pushLookintoInput(inputLookintoSize, inputLookintoPtr);
+        }
         return false;
     }
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
