@@ -205,6 +205,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void popAtomicGroup(RegexGroup *const group);
     inline void pushLookintoInput(Uint64 newInput, const char *newStringToMatchAgainst);
     inline void  popLookintoInput();
+    inline void  readLookintoInput(Uint64 &curInput, const char *&curStringToMatchAgainst);
 
     inline void initInput(Uint64 _input, Uint numCaptureGroups, Uint maxLookintoDepth);
     inline void  readCapture(Uint index, Uint64 &multiple, const char *&pBackref);
@@ -921,6 +922,8 @@ class Backtrack_LeaveMolecularLookahead : public BacktrackNode<USE_STRINGS>
     Uint numCaptured;
     Uint alternative;
     RegexGroup *group;
+    Uint64      inputLookintoSize; // only used for RegexGroup_LookintoMolecular: the lookinto subject in effect at entry
+    const char *inputLookintoPtr;  //   captured so backtracking restores it rather than re-reading a capture the body may have overwritten
 
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -936,13 +939,7 @@ class Backtrack_LeaveMolecularLookahead : public BacktrackNode<USE_STRINGS>
         matcher.alternative = group->alternatives + alternative;
 
         if (group->type == RegexGroup_LookintoMolecular)
-        {
-            Uint64      inputLookintoSize;
-            const char *inputLookintoPtr = NULL;
-            if (!matcher.getLookintoEntrace(((RegexGroupLookinto*)group)->backrefIndex, inputLookintoSize, inputLookintoPtr))
-                return false;
-            matcher.pushLookintoInput(inputLookintoSize, inputLookintoPtr);
-        }
+            matcher.pushLookintoInput(inputLookintoSize, inputLookintoPtr); // restore the entry-time subject; do NOT re-read the capture (the body may have overwritten it)
         return false;
     }
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)

@@ -1143,6 +1143,16 @@ template<> void RegexMatcher<true>::popLookintoInput()
     stringToMatchAgainst = *--stringLookintoTop;
 }
 
+template<> void RegexMatcher<false>::readLookintoInput(Uint64 &curInput, const char *&curStringToMatchAgainst)
+{
+    curInput = input;
+}
+template<> void RegexMatcher<true>::readLookintoInput(Uint64 &curInput, const char *&curStringToMatchAgainst)
+{
+    curInput = input;
+    curStringToMatchAgainst = stringToMatchAgainst;
+}
+
 template <bool USE_STRINGS>
 bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint maxLookintoDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr)
 {
@@ -1284,7 +1294,17 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                     pushStack->alternative = (Uint)(alternative - groupStackTop->group->alternatives);
 
                     if (group->type == RegexGroup_LookintoMolecular)
+                    {
+                        // Snapshot the lookinto subject currently in effect (set at entry) so that, if we
+                        // later backtrack into this group, popTo() restores it rather than re-reading the
+                        // capture, which the group's own body may have overwritten.
+                        Uint64      snapInputLookintoSize;
+                        const char *snapInputLookintoPtr = NULL;
+                        readLookintoInput(snapInputLookintoSize, snapInputLookintoPtr);
+                        pushStack->inputLookintoSize = snapInputLookintoSize;
+                        pushStack->inputLookintoPtr  = snapInputLookintoPtr;
                         popLookintoInput();
+                    }
 
                     position    = groupStackTop->position;
                     alternative = group->parentAlternative;
