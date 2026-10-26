@@ -1143,16 +1143,6 @@ template<> void RegexMatcher<true>::popLookintoInput()
     stringToMatchAgainst = *--stringLookintoTop;
 }
 
-template<> void RegexMatcher<false>::readLookintoInput(Uint64 &curInput, const char *&curStringToMatchAgainst)
-{
-    curInput = input;
-}
-template<> void RegexMatcher<true>::readLookintoInput(Uint64 &curInput, const char *&curStringToMatchAgainst)
-{
-    curInput = input;
-    curStringToMatchAgainst = stringToMatchAgainst;
-}
-
 template <bool USE_STRINGS>
 bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint maxLookintoDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr)
 {
@@ -1286,7 +1276,11 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                     if (verb == RegexVerb_Accept)
                         verb = RegexVerb_None;
 
-                    Backtrack_LeaveMolecularLookahead<USE_STRINGS> *pushStack = stack.template push< Backtrack_LeaveMolecularLookahead<USE_STRINGS> >();
+                    Backtrack_LeaveMolecularLookahead<USE_STRINGS> *pushStack;
+                    if (group->type == RegexGroup_LookintoMolecular)
+                        pushStack = stack.template push< Backtrack_LeaveMolecularLookinto <USE_STRINGS> >(Backtrack_LeaveMolecularLookinto<USE_STRINGS>::get_size());
+                    else
+                        pushStack = stack.template push< Backtrack_LeaveMolecularLookahead<USE_STRINGS> >();
 
                     pushStack->position    = groupStackTop->position;
                     pushStack->group       = group;
@@ -1295,14 +1289,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
 
                     if (group->type == RegexGroup_LookintoMolecular)
                     {
-                        // Snapshot the lookinto subject currently in effect (set at entry) so that, if we
-                        // later backtrack into this group, popTo() restores it rather than re-reading the
-                        // capture, which the group's own body may have overwritten.
-                        Uint64      snapInputLookintoSize;
-                        const char *snapInputLookintoPtr = NULL;
-                        readLookintoInput(snapInputLookintoSize, snapInputLookintoPtr);
-                        pushStack->inputLookintoSize = snapInputLookintoSize;
-                        pushStack->inputLookintoPtr  = snapInputLookintoPtr;
+                        ((Backtrack_LeaveMolecularLookinto<USE_STRINGS>*)pushStack)->readLookintoInput(*this);
                         popLookintoInput();
                     }
 
@@ -1623,6 +1610,21 @@ void RegexMatcher<true>::fprintCapture(FILE *f, Uint i)
 {
     fprintf(f, "\\%u=", i+1);
     fprintCapture(f, captures[i], captureOffsets[i]);
+}
+
+// Snapshot the lookinto subject currently in effect (set at entry) so that, if we later backtrack into this group, popTo() restores it rather than re-reading the capture, which the group's own body may have overwritten.
+template<> void Backtrack_LeaveMolecularLookinto<false>::readLookintoInput(RegexMatcher<false> &matcher)
+{
+    if (enable_persistent_backrefs)
+        *(Uint64     *)(buffer                      ) = matcher.input;
+}
+template<> void Backtrack_LeaveMolecularLookinto<true>::readLookintoInput(RegexMatcher<true> &matcher)
+{
+    if (enable_persistent_backrefs)
+    {
+        *(Uint64     *)(buffer + sizeof(const char*)) = matcher.input;
+        *(const char**)(buffer                      ) = matcher.stringToMatchAgainst;
+    }
 }
 
 template bool RegexMatcher<false>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint maxLookintoDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr);

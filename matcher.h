@@ -149,6 +149,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     friend class Backtrack_LeaveCaptureGroup_Base<false, USE_STRINGS>;
     friend class Backtrack_LeaveCaptureGroup_Base<true , USE_STRINGS>;
     friend class Backtrack_LeaveMolecularLookahead<USE_STRINGS>;
+    friend class Backtrack_LeaveMolecularLookinto<USE_STRINGS>;
     friend class Backtrack_LoopGroup<USE_STRINGS>;
     friend class Backtrack_TryMatch<USE_STRINGS>;
     friend class Backtrack_ResetStart<USE_STRINGS>;
@@ -205,7 +206,6 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void popAtomicGroup(RegexGroup *const group);
     inline void pushLookintoInput(Uint64 newInput, const char *newStringToMatchAgainst);
     inline void  popLookintoInput();
-    inline void  readLookintoInput(Uint64 &curInput, const char *&curStringToMatchAgainst);
 
     inline void initInput(Uint64 _input, Uint numCaptureGroups, Uint maxLookintoDepth);
     inline void  readCapture(Uint index, Uint64 &multiple, const char *&pBackref);
@@ -348,6 +348,8 @@ class GroupStackNode
     friend class Backtrack_LeaveCaptureGroup_Base<true, true >;
     friend class Backtrack_LeaveMolecularLookahead<false>;
     friend class Backtrack_LeaveMolecularLookahead<true>;
+    friend class Backtrack_LeaveMolecularLookinto<false>;
+    friend class Backtrack_LeaveMolecularLookinto<true>;
     friend class Backtrack_LoopGroup<false>;
     friend class Backtrack_LoopGroup<true>;
     friend class Backtrack_TryMatch<false>;
@@ -918,12 +920,11 @@ template <bool USE_STRINGS>
 class Backtrack_LeaveMolecularLookahead : public BacktrackNode<USE_STRINGS>
 {
     friend class RegexMatcher<USE_STRINGS>;
+protected:
     Uint64 position;
     Uint numCaptured;
     Uint alternative;
     RegexGroup *group;
-    Uint64      inputLookintoSize; // only used for RegexGroup_LookintoMolecular: the lookinto subject in effect at entry
-    const char *inputLookintoPtr;  //   captured so backtracking restores it rather than re-reading a capture the body may have overwritten
 
     virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
     {
@@ -937,9 +938,6 @@ class Backtrack_LeaveMolecularLookahead : public BacktrackNode<USE_STRINGS>
         matcher.groupStackTop->numCaptured = numCaptured;
         matcher.groupStackTop[-1].numCaptured -= numCaptured;
         matcher.alternative = group->alternatives + alternative;
-
-        if (group->type == RegexGroup_LookintoMolecular)
-            matcher.pushLookintoInput(inputLookintoSize, inputLookintoPtr); // restore the entry-time subject; do NOT re-read the capture (the body may have overwritten it)
         return false;
     }
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
@@ -965,6 +963,61 @@ class Backtrack_LeaveMolecularLookahead : public BacktrackNode<USE_STRINGS>
     {
         fprintf(f, "Backtrack_LeaveMolecularLookahead: position=%llu, numCaptured=%u, alternative=%u\n", position, numCaptured, alternative);
     }
+};
+
+template <bool USE_STRINGS>
+class Backtrack_LeaveMolecularLookinto : public Backtrack_LeaveMolecularLookahead<USE_STRINGS>
+{
+    friend class RegexMatcher<USE_STRINGS>;
+    // save the lookinto subject in effect at entry, so backtracking restores it rather than re-reading a capture the body may have overwritten
+    Uint8 buffer[FLEXIBLE_SIZE_ARRAY];
+
+    static size_t get_size()
+    {
+        return (size_t)&((Backtrack_LeaveMolecularLookinto*)0)->buffer +
+            (enable_persistent_backrefs ? (sizeof(Uint64) + (USE_STRINGS ? sizeof(const char*) : 0))
+                                        : 0);
+    }
+    virtual size_t getSize(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        return get_size();
+    }
+    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        Backtrack_LeaveMolecularLookahead<USE_STRINGS>::popTo(matcher);
+        if (enable_persistent_backrefs)
+        {
+            // restore the entry-time subject; do NOT re-read the capture (the body may have overwritten it)
+            if (!USE_STRINGS)
+                matcher.pushLookintoInput(*(Uint64*)(buffer                      ), NULL);
+            else
+                matcher.pushLookintoInput(*(Uint64*)(buffer + sizeof(const char*)), *(const char**)buffer);
+        }
+        else
+        {
+            Uint64      inputLookintoSize;
+            const char *inputLookintoPtr = NULL;
+            if (!matcher.getLookintoEntrace(((RegexGroupLookinto*)this->group)->backrefIndex, inputLookintoSize, inputLookintoPtr))
+                return false;
+            matcher.pushLookintoInput(inputLookintoSize, inputLookintoPtr);
+        }
+        return false;
+    }
+    virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
+    {
+        fprintf(f, "Backtrack_LeaveMolecularLookinto: position=%llu, numCaptured=%u, alternative=%u", this->position, this->numCaptured, this->alternative);
+        if (enable_persistent_backrefs)
+        {
+            fputs(", capture=", f);
+            if (!USE_STRINGS)
+                matcher.fprintCapture(f, *(Uint64*)(buffer                      ), NULL);
+            else
+                matcher.fprintCapture(f, *(Uint64*)(buffer + sizeof(const char*)), *(const char**)buffer);
+        }
+        fputc('\n', f);
+    }
+
+    void readLookintoInput(RegexMatcher<USE_STRINGS> &matcher);
 };
 
 template <bool USE_STRINGS>

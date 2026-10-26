@@ -109,6 +109,7 @@ template<bool, bool> class Backtrack_LeaveCaptureGroup_Base;
 template<bool> class Backtrack_LeaveGroupLazily;
 template<bool> class Backtrack_LeaveCaptureGroupLazily;
 template<bool> class Backtrack_LeaveMolecularLookahead;
+template<bool> class Backtrack_LeaveMolecularLookinto;
 template<bool> class Backtrack_TryMatch;
 template<bool> class Backtrack_ResetStart;
 
@@ -269,6 +270,8 @@ class RegexGroupLookinto : public RegexGroup
     friend class RegexMatcher<true>;
     friend class Backtrack_LeaveMolecularLookahead<false>;
     friend class Backtrack_LeaveMolecularLookahead<true>;
+    friend class Backtrack_LeaveMolecularLookinto<false>;
+    friend class Backtrack_LeaveMolecularLookinto<true>;
     Uint backrefIndex; // UINT_MAX = input string; 0 = the match so far; 1... = \1...
 public:
     RegexGroupLookinto(RegexGroupType type, Uint backrefIndex) : RegexGroup(type), backrefIndex(backrefIndex) {}
