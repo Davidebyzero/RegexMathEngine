@@ -641,7 +641,7 @@ ALWAYS_INLINE int8 RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                                                         }
                                                     }
                                                     else
-                                                    if ((*afterSymbol)->minCount==1 && (*afterSymbol)->maxCount==UINT_MAX && afterSymbol[+1]->type==RegexSymbol_AnchorEnd &&
+                                                    if ((*afterSymbol)->minCount==1 && (*afterSymbol)->maxCount==UINT_MAX && afterSymbol[+1] && afterSymbol[+1]->type==RegexSymbol_AnchorEnd &&
                                                         totalLengthSmallerFactor <= multiplication && afterCapture+1 == multiplication)
                                                     {
                                                         lazinessDoesntMatter = true;
