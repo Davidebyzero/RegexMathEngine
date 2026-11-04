@@ -193,7 +193,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                 insideSymbol[2] && insideSymbol[2]->type==RegexSymbol_AnchorEnd && insideSymbol[2]->minCount && !insideSymbol[3])
             {
                 RegexGroup *insideGroup = (RegexGroup*)insideSymbol[0];
-                if (insideGroup->type == RegexGroup_Capturing && insideGroup->minCount==1 && insideGroup->maxCount==1 &&
+                if (insideGroup->type == RegexGroup_Capturing && insideGroup->minCount==1 && insideGroup->maxCount==1 && !insideGroup->possessive &&
                     ((RegexBackref*)insideSymbol[1])->index == ((RegexGroupCapturing*)insideGroup)->backrefIndex)
                 {
                     bool matchZero = true;
@@ -209,7 +209,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                         innerSymbol = innerAlternative[0]->symbols;
 
                     if (innerSymbol[0] && innerSymbol[0]->type==RegexSymbol_Character && innerSymbol[0]->minCount==1 && innerSymbol[0]->maxCount==1        && characterCanMatch(innerSymbol[0]) &&
-                        innerSymbol[1] && innerSymbol[1]->type==RegexSymbol_Character && innerSymbol[1]->minCount==1 && innerSymbol[1]->maxCount==UINT_MAX && characterCanMatch(innerSymbol[1]) && !innerSymbol[2])
+                        innerSymbol[1] && innerSymbol[1]->type==RegexSymbol_Character && innerSymbol[1]->minCount==1 && innerSymbol[1]->maxCount==UINT_MAX && characterCanMatch(innerSymbol[1]) && !innerSymbol[1]->possessive && !innerSymbol[2])
                     {
                         RegexSymbol   *originalSymbol    = (*thisSymbol);
                         const char    *originalCode      = (*thisSymbol)->originalCode;
@@ -240,7 +240,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                 insideSymbol[2] && insideSymbol[2]->type==RegexSymbol_AnchorEnd && insideSymbol[2]->minCount && !insideSymbol[3])
             {
                 RegexGroup *insideGroup = (RegexGroup*)insideSymbol[0];
-                if (insideGroup->type == RegexGroup_Capturing && insideGroup->minCount==1 && insideGroup->maxCount==1 &&
+                if (insideGroup->type == RegexGroup_Capturing && insideGroup->minCount==1 && insideGroup->maxCount==1 && !insideGroup->possessive &&
                     ((RegexBackref*)insideSymbol[1])->index == ((RegexGroupCapturing*)insideGroup)->backrefIndex)
                 {
                     bool matchZero = true;
@@ -316,7 +316,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                 {
                     RegexSymbol **innerSymbol1 = insideGroup1->alternatives[0]->symbols;
                     RegexSymbol **innerSymbol2 = insideGroup2->alternatives[0]->symbols;
-                    if (innerSymbol1[0] && innerSymbol1[0]->type==RegexSymbol_Character && innerSymbol1[0]->minCount<=1 && innerSymbol1[0]->maxCount==UINT_MAX && characterCanMatch(innerSymbol1[0]) && !innerSymbol1[1] &&
+                    if (innerSymbol1[0] && innerSymbol1[0]->type==RegexSymbol_Character && innerSymbol1[0]->minCount<=1 && innerSymbol1[0]->maxCount==UINT_MAX && characterCanMatch(innerSymbol1[0]) && !innerSymbol1[0]->possessive && !innerSymbol1[1] &&
                         innerSymbol2[0] && innerSymbol2[0]->type==RegexSymbol_Backref   && innerSymbol2[0]->minCount==1 && innerSymbol2[0]->maxCount==1 &&
                         innerSymbol2[1] && innerSymbol2[1]->type==RegexSymbol_Backref   && innerSymbol2[1]->minCount==1 && innerSymbol2[1]->maxCount==1 && !innerSymbol2[2])
                     {
@@ -406,12 +406,13 @@ ALWAYS_INLINE int8 RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
         if (nextSymbol && nextSymbol->type==RegexSymbol_Group ||
             !nextSymbol && !alternative[+1] && groupStackTop > groupStackBase
                         && (thisGroup->type==RegexGroup_Capturing || thisGroup->type==RegexGroup_NonCapturing)
+                        && !thisGroup->possessive // can't look past the end of a possessive group, as backtracking can't come back into it
                         && groupStackTop->loopCount==MAX_EXTEND(thisGroup->maxCount) && (nextSymbol = thisGroup->self[+1])
                         && (afterEndOfGroup=true))
         {
             if (afterEndOfGroup && nextSymbol->type!=RegexSymbol_Group)
             {
-                if (nextSymbol->type==RegexSymbol_Backref && thisGroup->type==RegexGroup_Capturing && ((RegexGroupCapturing*)thisGroup)->backrefIndex == ((RegexBackref*)nextSymbol)->index && !thisGroup->possessive &&
+                if (nextSymbol->type==RegexSymbol_Backref && thisGroup->type==RegexGroup_Capturing && ((RegexGroupCapturing*)thisGroup)->backrefIndex == ((RegexBackref*)nextSymbol)->index &&
                     optimizationLevel >= 2 && !thisSymbol->lazy && nextSymbol->minCount==nextSymbol->maxCount)
                 {
                     Uint64 divisor = 1 + nextSymbol->minCount;
