@@ -1231,7 +1231,6 @@ protected:
         {
             matcher.position = matcher.groupStackTop->position -= positionDiff;
             matcher.alternative = &nullAlternative;
-            this->popCapture(matcher);
             return false;
         }
 
