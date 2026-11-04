@@ -714,6 +714,7 @@ class Backtrack_SkipGroup : public BacktrackNode<USE_STRINGS>
     virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
     {
         matcher.position = position;
+        matcher.symbol = group->self;
         matcher.enterGroup(group);
         matcher.currentMatch = ULLONG_MAX;
         return true;
