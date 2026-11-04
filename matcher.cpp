@@ -1348,7 +1348,8 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                 if (group->lazy && groupStackTop->loopCount >= group->minCount)
                     leaveLazyGroup();
                 else
-                if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || group->maxCount == UINT_MAX && groupStackTop->loopCount >= group->minCount && position == groupStackTop->position)
+                if (groupStackTop->loopCount == MAX_EXTEND(group->maxCount) || group->maxCount == UINT_MAX && groupStackTop->loopCount >= group->minCount && position == groupStackTop->position &&
+                    (!no_empty_optional || groupStackTop->loopCount > group->minCount)) // no_empty_optional tries another iteration after an empty mandatory one
                     leaveMaxedOutGroup();
                 else
                     loopGroup(pushStack_LoopGroup(), position, groupStackTop->position, (Uint)(alternative - groupStackTop->group->alternatives)); // todo: optimize this for possessive groups by not pushing unnecessarily onto the stack
