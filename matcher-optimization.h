@@ -259,6 +259,8 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                         if (!innerAlternative[0]->symbols[0] && (innerSymbol = innerAlternative[1]->symbols)[0] ||
                             !innerAlternative[1]->symbols[0] && (innerSymbol = innerAlternative[0]->symbols)[0])
                             matchZero = false;
+                        else
+                            goto not_IsPowerOf2_form1;
                     }
 
                     RegexSymbol *innerSymbol1, *innerSymbol2;
@@ -306,6 +308,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                     }
                 }
             }
+        not_IsPowerOf2_form1:
 
             // (?!(x*)(\1\1)+$)
             if (!insideAlternative[+1] &&
