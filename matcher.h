@@ -1463,9 +1463,41 @@ protected:
     {
         return get_size(numCaptured);
     }
-    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
+    // enable_persistent_backrefs mode only: restore the group's capture to its value from before this iteration,
+    // and if that makes it unset, remove it from the capture stack
+    void restorePersistentCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
         const RegexGroup *group = matcher.groupStackTop->group;
+        if (group->type != RegexGroup_Capturing)
+            return;
+        Uint backrefIndex = ((RegexGroupCapturing*)group)->backrefIndex;
+        bool becomeUnset;
+        if (numCaptured != 0)
+        {
+            const char *&dummy = (const char *&)buffer;
+            if (!USE_STRINGS)
+                matcher.writeCapture(backrefIndex, *(Uint64*)(buffer                      ), dummy);
+            else
+                matcher.writeCapture(backrefIndex, *(Uint64*)(buffer + sizeof(const char*)), *(const char**)buffer);
+            becomeUnset = matcher.captures[backrefIndex] == NON_PARTICIPATING_CAPTURE_GROUP;
+        }
+        else
+        {
+            matcher.captures[backrefIndex] = NON_PARTICIPATING_CAPTURE_GROUP;
+            becomeUnset = true;
+        }
+        if (becomeUnset)
+        {
+#ifdef _DEBUG
+            if (matcher.captureStackTop[-1] != backrefIndex)
+                THROW_ENGINEBUG;
+#endif
+            matcher.captureStackTop--;
+            matcher.groupStackTop->numCaptured--;
+        }
+    }
+    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
+    {
         if (!enable_persistent_backrefs)
         {
             const Uint64 *values = (Uint64*)buffer;
@@ -1492,34 +1524,7 @@ protected:
             }
         }
         else
-        if (group->type == RegexGroup_Capturing)
-        {
-            Uint backrefIndex = ((RegexGroupCapturing*)group)->backrefIndex;
-            bool becomeUnset;
-            if (numCaptured != 0)
-            {
-                const char *&dummy = (const char *&)buffer;
-                if (!USE_STRINGS)
-                    matcher.writeCapture(backrefIndex, *(Uint64*)(buffer                      ), dummy);
-                else
-                    matcher.writeCapture(backrefIndex, *(Uint64*)(buffer + sizeof(const char*)), *(const char**)buffer);
-                becomeUnset = matcher.captures[backrefIndex] == NON_PARTICIPATING_CAPTURE_GROUP;
-            }
-            else
-            {
-                matcher.captures[backrefIndex] = NON_PARTICIPATING_CAPTURE_GROUP;
-                becomeUnset = true;
-            }
-            if (becomeUnset)
-            {
-#ifdef _DEBUG
-                if (matcher.captureStackTop[-1] != backrefIndex)
-                    THROW_ENGINEBUG;
-#endif
-                matcher.captureStackTop--;
-                matcher.groupStackTop->numCaptured--;
-            }
-        }
+            restorePersistentCapture(matcher);
         matcher.groupStackTop->position = position;
         matcher.groupStackTop->loopCount--;
 
@@ -1550,16 +1555,7 @@ protected:
                 *matcher.captureStackTop++ = indexes[i];
         }
         else
-        if (matcher.groupStackTop->group->type == RegexGroup_Capturing)
-        {
-            if (numCaptured == 0)
-            {
-                Uint backrefIndex = ((RegexGroupCapturing*)matcher.groupStackTop->group)->backrefIndex;
-                matcher.captures[backrefIndex] = NON_PARTICIPATING_CAPTURE_GROUP;
-                matcher.captureStackTop--;
-                matcher.groupStackTop->numCaptured--;
-            }
-        }
+            restorePersistentCapture(matcher); // numCaptured is always 1 for a capture group here, so this must check whether the capture becomes unset, as popTo() does
     }
 
     virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
