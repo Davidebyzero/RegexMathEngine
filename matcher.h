@@ -197,6 +197,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void yesMatch(Uint64 newPosition, bool haveChoice);
     void pushStack();
     bool getLookintoEntrace(Uint backrefIndex, Uint64 &inputLookintoSize, const char *&inputLookintoPtr);
+    RegexPattern **getConditionalAlternative(const RegexGroup *group);
     void enterGroup(RegexGroup *group);
     void leaveGroup(Backtrack_LeaveGroup<USE_STRINGS> *pushStack, Uint64 pushPosition);
     void leaveLazyGroup();

@@ -119,6 +119,25 @@ bool RegexMatcher<USE_STRINGS>::getLookintoEntrace(Uint backrefIndex, Uint64 &in
 }
 
 template <bool USE_STRINGS>
+RegexPattern **RegexMatcher<USE_STRINGS>::getConditionalAlternative(const RegexGroup *group)
+{
+    RegexPattern **alternativeTmp = group->alternatives;
+    if (group->type == RegexGroup_Conditional)
+    {
+        Uint64 multiple;
+        const char *pBackref;
+        readCapture(((RegexConditional*)group)->backrefIndex, multiple, pBackref);
+        if (multiple == NON_PARTICIPATING_CAPTURE_GROUP)
+        {
+            alternativeTmp++;
+            if (*alternativeTmp == NULL)
+                return NULL;
+        }
+    }
+    return alternativeTmp;
+}
+
+template <bool USE_STRINGS>
 void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
 {
     bool enteringLookinto = false;
@@ -138,24 +157,12 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
         }
     }
 
-    RegexPattern **alternativeTmp = group->alternatives;
-
-    if (group->type == RegexGroup_Conditional)
+    RegexPattern **alternativeTmp = getConditionalAlternative(group);
+    if (alternativeTmp == NULL)
     {
-        Uint64 multiple;
-        const char *pBackref;
-        readCapture(((RegexConditional*)group)->backrefIndex, multiple, pBackref);
-        if (multiple == NON_PARTICIPATING_CAPTURE_GROUP)
-        {
-            alternativeTmp++;
-            if (*alternativeTmp == NULL)
-            {
-                symbol++;
-                return;
-            }
-        }
+        symbol++; // it's a conditional with no "false" alternative, so skip all iteration(s), because the status of the condition can't change as it's looping
+        return;
     }
-
     alternative = alternativeTmp;
     symbol = (*alternative)->symbols;
 
@@ -323,8 +330,10 @@ void *RegexMatcher<USE_STRINGS>::loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pus
         }
     }
 
-    alternative = group->alternatives;
-    symbol      = group->alternatives[0]->symbols;
+    alternative = getConditionalAlternative(group);
+    if (alternative == NULL)
+        THROW_ENGINEBUG; // should be impossible, because of the "symbol++;" in enterGroup() if getConditionalAlternative() return NULL
+    symbol      = alternative[0]->symbols;
     groupStackTop->position = position;
     currentMatch = ULLONG_MAX;
 
