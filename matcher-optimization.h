@@ -34,8 +34,32 @@ Uint64 RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroup(RegexSymbol *thisSymbol
             }
         }
     }
-    if (multiple == 0 && !capturing) // don't backtrack when it will make no difference to do so
+    if (multiple == 0) // handling of an zero-length constant match can be simplified - and must be, to avoid a possible division by zero that could occur in matchSymbol_Character_or_Backref()
     {
+        if (group->minCount == 0)
+        {
+            if (no_empty_optional || group->maxCount == 0)
+            {
+                symbol++;
+                return NON_PARTICIPATING_CAPTURE_GROUP;
+            }
+            Uint64 count;
+            Uint64 maxCount = group->maxCount == UINT_MAX ? 1 : group->maxCount;
+            if (currentMatch == ULLONG_MAX)
+            {
+                currentMatch = count = group->lazy ? 0 : maxCount;
+                pushStack();
+            }
+            else
+            {
+                count = currentMatch += group->lazy ? 1 : -1;
+                if (currentMatch != (group->lazy ? maxCount : 0))
+                    pushStack();
+            }
+            currentMatch = ULLONG_MAX;
+            symbol++;
+            return count ? 0 : NON_PARTICIPATING_CAPTURE_GROUP;
+        }
         symbol++;
         return 0;
     }
