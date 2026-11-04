@@ -1242,12 +1242,9 @@ protected:
         Backtrack_LeaveGroup<USE_STRINGS>::popTo(matcher);
 
         if (matcher.groupStackTop->loopCount == MAX_EXTEND(this->group->maxCount) ||
-            positionDiff == 0 && matcher.groupStackTop->group->maxCount == UINT_MAX && matcher.groupStackTop->loopCount >= matcher.groupStackTop->group->minCount)
+            !no_empty_optional && positionDiff == 0 && matcher.groupStackTop->group->maxCount == UINT_MAX && matcher.groupStackTop->loopCount >= matcher.groupStackTop->group->minCount)
         {
             matcher.position = matcher.groupStackTop->position -= positionDiff;
-            // At the maximum loop count, still let backtracking try the other alternatives of the last iteration
-            if (matcher.groupStackTop->loopCount != MAX_EXTEND(this->group->maxCount))
-                matcher.alternative = &nullAlternative;
             return false;
         }
 
