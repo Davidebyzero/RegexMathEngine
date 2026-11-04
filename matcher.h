@@ -179,6 +179,10 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
 
     Uint64 position, startPosition;
     Uint64 currentMatch; // ULLONG_MAX means no match has been tried yet
+    // While a capturing constant group is being matched, its capture hasn't been written yet, so runtime optimizations
+    // must not read it from captures[]; see readCaptureForOptimization()
+    Uint constGroupCaptureIndex; // UINT_MAX when no capturing constant group is being matched
+    Uint64 constGroupCaptureValue; // the value the capture will have; NON_PARTICIPATING_CAPTURE_GROUP if it can't be known in advance
     RegexPattern **alternative;
     RegexSymbol  **symbol;
 
@@ -210,6 +214,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
 
     inline void initInput(Uint64 _input, Uint numCaptureGroups, Uint maxLookintoDepth);
     inline void  readCapture(Uint index, Uint64 &multiple, const char *&pBackref);
+    inline bool readCaptureForOptimization(Uint index, Uint64 &value);
     inline void writeCapture(Uint index, Uint64  multiple, const char * pBackref);
     inline bool writeCaptureRelative(Uint index, Uint64 start, Uint64 end); // returns true iff this changes the capture's value
 
@@ -1706,6 +1711,7 @@ template<> inline RegexMatcher<false>::RegexMatcher() :
     ,matcher(*this)
 #endif
 {
+    constGroupCaptureIndex = UINT_MAX;
     captures = NULL;
     if (enable_persistent_backrefs)
     {
@@ -1722,6 +1728,7 @@ template<> inline RegexMatcher<true>::RegexMatcher() :
     ,matcher(*this)
 #endif
 {
+    constGroupCaptureIndex = UINT_MAX;
     captures = NULL;
     captureOffsets = NULL;
     if (enable_persistent_backrefs)

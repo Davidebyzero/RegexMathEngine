@@ -63,10 +63,38 @@ Uint64 RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroup(RegexSymbol *thisSymbol
         symbol++;
         return 0;
     }
-    if (matchSymbol_Character_or_Backref(thisSymbol, multiple, (const char *)NULL))
+    bool matched;
+    if (capturing)
+    {
+        // Our own capture is written only after this returns, so tell the runtime optimizations what it will be: "multiple"
+        // if the group matches at least once. If it can match zero times, the capture keeps its current value in that
+        // case, and unless that's the same value, it can't be known in advance.
+        Uint backrefIndex = ((RegexConstGroupCapturing*)thisSymbol)->backrefIndex;
+        constGroupCaptureIndex = backrefIndex;
+        constGroupCaptureValue = group->minCount != 0 || captures[backrefIndex] == multiple ? multiple : NON_PARTICIPATING_CAPTURE_GROUP;
+        matched = matchSymbol_Character_or_Backref(thisSymbol, multiple, (const char *)NULL);
+        constGroupCaptureIndex = UINT_MAX;
+    }
+    else
+        matched = matchSymbol_Character_or_Backref(thisSymbol, multiple, (const char *)NULL);
+    if (matched)
         return multiple;
     return NON_PARTICIPATING_CAPTURE_GROUP;
 }
+
+template <bool USE_STRINGS>
+inline bool RegexMatcher<USE_STRINGS>::readCaptureForOptimization(Uint index, Uint64 &value)
+// return false if the value can't be known (the optimization must then not be done)
+{
+    if (index != constGroupCaptureIndex)
+    {
+        value = captures[index];
+        return true;
+    }
+    value = constGroupCaptureValue;
+    return value != NON_PARTICIPATING_CAPTURE_GROUP;
+}
+
 template <bool USE_STRINGS> // currently implemented only for !USE_STRINGS
 void RegexMatcher<USE_STRINGS>::matchSymbol_ConstGroupNonCapturing(RegexSymbol *thisSymbol)
 {
@@ -391,9 +419,10 @@ ALWAYS_INLINE int8 RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
         }
         RegexGroup *thisGroup = groupStackTop->group;
         bool afterEndOfGroup = false;
-        if (nextSymbol && nextSymbol->type==RegexSymbol_Backref && nextSymbolPtr[+1] && nextSymbolPtr[+1]->type==RegexSymbol_AnchorEnd && nextSymbol->minCount==1 && nextSymbol->maxCount==1)
+        Uint64 subtract;
+        if (nextSymbol && nextSymbol->type==RegexSymbol_Backref && nextSymbolPtr[+1] && nextSymbolPtr[+1]->type==RegexSymbol_AnchorEnd && nextSymbol->minCount==1 && nextSymbol->maxCount==1 &&
+            readCaptureForOptimization(((RegexBackref*)nextSymbol)->index, subtract))
         {
-            Uint64 subtract = captures[((RegexBackref*)nextSymbol)->index];
             if (subtract == NON_PARTICIPATING_CAPTURE_GROUP)
             {
                 if (!emulate_ECMA_NPCGs)
@@ -563,7 +592,9 @@ ALWAYS_INLINE int8 RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                                 }
                                 break;
                             }
-                            Uint64 thisCapture = captures[((RegexBackref*)currentSymbol)->index];
+                            Uint64 thisCapture;
+                            if (!readCaptureForOptimization(((RegexBackref*)currentSymbol)->index, thisCapture))
+                                break;
                             if (thisCapture != NON_PARTICIPATING_CAPTURE_GROUP)
                             {
                                 totalLength += thisCapture * currentSymbol->minCount;
@@ -637,7 +668,9 @@ ALWAYS_INLINE int8 RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                                             {
                                                 if ((*afterSymbol)->type == RegexSymbol_Backref)
                                                 {
-                                                    Uint64 afterCapture = captures[((RegexBackref*)(*afterSymbol))->index];
+                                                    Uint64 afterCapture;
+                                                    if (!readCaptureForOptimization(((RegexBackref*)(*afterSymbol))->index, afterCapture))
+                                                        break;
                                                     if ((*afterSymbol)->minCount == (*afterSymbol)->maxCount)
                                                     {
                                                         if (afterCapture != NON_PARTICIPATING_CAPTURE_GROUP)
