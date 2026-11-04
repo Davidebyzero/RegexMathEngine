@@ -790,7 +790,9 @@ class Backtrack_EnterGroup : public BacktrackNode<USE_STRINGS>
             matcher.currentMatch = ULLONG_MAX;
             return true;
         }
-        if (matcher.groupStackTop[+1].loopCount > group->minCount && group->minCount != group->maxCount)
+        // For a greedy group, zero iterations is the alternative to the first one. For a lazy group, that has already
+        // been tried before entering the group (see Backtrack_SkipGroup), so trying it again would only repeat it.
+        if (matcher.groupStackTop[+1].loopCount > group->minCount && group->minCount != group->maxCount && !group->lazy)
         {
             matcher.symbol = group->self + 1;
             matcher.currentMatch = ULLONG_MAX;
