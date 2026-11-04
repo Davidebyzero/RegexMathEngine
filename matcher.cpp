@@ -919,11 +919,23 @@ void RegexMatcher<USE_STRINGS>::virtualizeSymbols(RegexGroup *rootGroup)
                 if (characterCanMatch(*thisSymbol))
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_Character;
                 else
+                if ((*thisSymbol)->minCount == 0)
+                {
+                    (*thisSymbol)->type = RegexSymbol_NoOp;
+                    matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_AlwaysMatch;
+                }
+                else
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_NeverMatch;
                 break;
             case RegexSymbol_CharacterClass:
                 if (characterClassCanMatch((RegexCharacterClass*)*thisSymbol))
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_CharacterClass;
+                else
+                if ((*thisSymbol)->minCount == 0)
+                {
+                    (*thisSymbol)->type = RegexSymbol_NoOp;
+                    matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_AlwaysMatch;
+                }
                 else
                     matchFunction(*thisSymbol++) = &RegexMatcher<USE_STRINGS>::matchSymbol_NeverMatch;
                 break;
