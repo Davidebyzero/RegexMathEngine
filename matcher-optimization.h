@@ -663,7 +663,15 @@ ALWAYS_INLINE int8 RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                                 if (lazinessDoesntMatter || thisSymbol->lazy)
                                 {
                                     Uint64 minMatch = thisSymbol->minCount * multiple;
-                                    spaceLeft = (spaceLeft - minMatch) % multiplication + minMatch;
+                                    Uint64 smallestSpaceLeft = (spaceLeft - minMatch) % multiplication + minMatch;
+                                    // If thisSymbol ends a capture group, its count is captured, so it does matter which of the valid
+                                    // counts is taken, and they must be tried in the normal greedy/lazy order. The exception is the
+                                    // multiplication shortcut below, which leaves the group at the greedy count.
+                                    if (afterEndOfGroup && thisGroup->type==RegexGroup_Capturing &&
+                                        !(multiplicationGroup && !thisSymbol->lazy && smallestSpaceLeft % multiple == 0))
+                                        lazinessDoesntMatter = false;
+                                    if (lazinessDoesntMatter || thisSymbol->lazy)
+                                        spaceLeft = smallestSpaceLeft;
                                 }
                                 if (!lazinessDoesntMatter)
                                     lookaheadSymbol = NULL;
