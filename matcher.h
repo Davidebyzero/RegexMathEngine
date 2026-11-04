@@ -1245,7 +1245,9 @@ protected:
             positionDiff == 0 && matcher.groupStackTop->group->maxCount == UINT_MAX && matcher.groupStackTop->loopCount >= matcher.groupStackTop->group->minCount)
         {
             matcher.position = matcher.groupStackTop->position -= positionDiff;
-            matcher.alternative = &nullAlternative;
+            // At the maximum loop count, still let backtracking try the other alternatives of the last iteration
+            if (matcher.groupStackTop->loopCount != MAX_EXTEND(this->group->maxCount))
+                matcher.alternative = &nullAlternative;
             return false;
         }
 
