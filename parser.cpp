@@ -863,8 +863,7 @@ finished_parsing:
                     }
                 }
                 // The current lookaround matching code can't handle quantifiers, so wrap it in a non-capturing group with a quantifier if it needs one.
-                if (group->isLookaround()            && (group->maxCount != group->minCount || group->maxCount > 1) ||
-                    group->type == RegexGroup_Atomic &&                                        group->maxCount > 1)
+                if ((group->isLookaround() || group->type == RegexGroup_Atomic) && (group->maxCount != group->minCount || group->maxCount > 1))
                 {
                     RegexGroup *wrapper = new RegexGroup(RegexGroup_NonCapturing);
                     wrapper->originalCode = group->originalCode;
