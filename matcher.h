@@ -203,7 +203,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     void leaveMaxedOutGroup();
     Backtrack_LoopGroup<USE_STRINGS> *pushStack_LoopGroup();
     void *loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pushLoop, Uint64 pushPosition, Uint64 oldPosition, Uint alternativeNum);
-    void popAtomicGroup(RegexGroup *const group);
+    void popAtomicGroup(RegexGroup *const group, RegexPattern **parentAlternative);
     inline void pushLookintoInput(Uint64 newInput, const char *newStringToMatchAgainst);
     inline void  popLookintoInput();
 

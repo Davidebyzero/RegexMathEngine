@@ -246,7 +246,7 @@ void RegexMatcher<USE_STRINGS>::leaveMaxedOutGroup()
         pushStack = stack.template push< Backtrack_LeaveGroup<USE_STRINGS> >();
     leaveGroup(pushStack, groupStackTop->position);
     if (possessive)
-        popAtomicGroup(group);
+        popAtomicGroup(group, group->parentAlternative);
 }
 
 template <bool USE_STRINGS>
@@ -1091,7 +1091,7 @@ void RegexMatcher<true>::readCaptureAtomicTmp(Uint i, Uint &index, Uint64 &lengt
 }
 
 template <bool USE_STRINGS>
-void RegexMatcher<USE_STRINGS>::popAtomicGroup(RegexGroup *const group)
+void RegexMatcher<USE_STRINGS>::popAtomicGroup(RegexGroup *const group, RegexPattern **parentAlternative)
 {
     int numCapturedDelta = 0;
 
@@ -1115,7 +1115,7 @@ void RegexMatcher<USE_STRINGS>::popAtomicGroup(RegexGroup *const group)
     {
         Backtrack_AtomicCapture<USE_STRINGS> *pushStack = stack.template push< Backtrack_AtomicCapture<USE_STRINGS> >(Backtrack_AtomicCapture<USE_STRINGS>::get_size(numCapturedDelta));
         pushStack->numCaptured       = numCapturedDelta; // will be overridding by "transfer" call below if we're in enable_persistent_backrefs mode
-        pushStack->parentAlternative = group->parentAlternative;
+        pushStack->parentAlternative = parentAlternative;
         pushStack->transfer(*this);
     }
 }
@@ -1224,7 +1224,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                 RegexGroup *const group = groupStackTop->group;
 
                 if (group->type == RegexGroup_Atomic)
-                    popAtomicGroup(group);
+                    popAtomicGroup(group, &nullAlternative);
                 else
                 if (group->type == RegexGroup_Lookahead || group->type == RegexGroup_Lookinto)
                 {
