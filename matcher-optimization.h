@@ -411,7 +411,7 @@ ALWAYS_INLINE int8 RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
         {
             if (afterEndOfGroup && nextSymbol->type!=RegexSymbol_Group)
             {
-                if (nextSymbol->type==RegexSymbol_Backref && thisGroup->type==RegexGroup_Capturing && ((RegexGroupCapturing*)thisGroup)->backrefIndex == ((RegexBackref*)nextSymbol)->index &&
+                if (nextSymbol->type==RegexSymbol_Backref && thisGroup->type==RegexGroup_Capturing && ((RegexGroupCapturing*)thisGroup)->backrefIndex == ((RegexBackref*)nextSymbol)->index && !thisGroup->possessive &&
                     optimizationLevel >= 2 && !thisSymbol->lazy && nextSymbol->minCount==nextSymbol->maxCount)
                 {
                     Uint64 divisor = 1 + nextSymbol->minCount;
