@@ -420,7 +420,7 @@ ALWAYS_INLINE int8 RegexMatcher<USE_STRINGS>::runtimeOptimize_matchSymbol_Charac
                     if (nextSymbolAfter && nextSymbolAfter->type == RegexSymbol_Group)
                     {
                         RegexGroup *group = (RegexGroup*)nextSymbolAfter;
-                        if (group->type != RegexGroup_NegativeLookahead && !group->alternatives[1] && group->minCount==1 && group->maxCount==1)
+                        if (group->IsUnconditionallyAhead() && !group->alternatives[1] && group->minCount==1 && group->maxCount==1)
                         {
                             RegexSymbol **lookaheadSymbol = group->alternatives[0]->symbols;
                             if (*lookaheadSymbol && (*lookaheadSymbol)->type==RegexSymbol_Backref && ((RegexGroupCapturing*)thisGroup)->backrefIndex == ((RegexBackref*)*lookaheadSymbol)->index &&

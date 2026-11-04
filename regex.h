@@ -72,6 +72,7 @@ enum RegexGroupType
     RegexGroup_BranchReset,
     RegexGroup_Lookahead,
     RegexGroup_LookaheadMolecular,
+    // types should be above this point if and only if they unconditionally and positively match ahead
     RegexGroup_NegativeLookahead,
     RegexGroup_Lookinto,
     RegexGroup_LookintoMolecular,
@@ -211,6 +212,10 @@ public:
     bool isNegativeLookaround()
     {
         return type == RegexGroup_NegativeLookahead || type == RegexGroup_NegativeLookinto;
+    }
+    bool IsUnconditionallyAhead()
+    {
+        return type < RegexGroup_NegativeLookahead;
     }
 };
 
