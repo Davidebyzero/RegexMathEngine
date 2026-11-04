@@ -189,6 +189,9 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                         break;
                     if ((*insideSymbol)->type == RegexSymbol_Backref && ((RegexBackref*)*insideSymbol)->index == backrefIndex)
                         break;
+                    // In "--npcg-" mode an unset backref makes the group fail, but with a minimum of 0 it should still match zero times.
+                    if ((*insideSymbol)->type == RegexSymbol_Backref && !emulate_ECMA_NPCGs && group->minCount == 0)
+                        break;
                     insideSymbol++;
                     if (!*insideSymbol)
                     {
