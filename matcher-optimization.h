@@ -206,7 +206,10 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                         matchZero = false;
                     }
                     else
+                    if (!innerAlternative[1])
                         innerSymbol = innerAlternative[0]->symbols;
+                    else
+                        goto not_IsPrime;
 
                     if (innerSymbol[0] && innerSymbol[0]->type==RegexSymbol_Character && innerSymbol[0]->minCount==1 && innerSymbol[0]->maxCount==1        && characterCanMatch(innerSymbol[0]) &&
                         innerSymbol[1] && innerSymbol[1]->type==RegexSymbol_Character && innerSymbol[1]->minCount==1 && innerSymbol[1]->maxCount==UINT_MAX && characterCanMatch(innerSymbol[1]) && !innerSymbol[1]->possessive && !innerSymbol[2])
@@ -232,6 +235,7 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                     }
                 }
             }
+        not_IsPrime:
 
             // (?!(x(xx)+|)\1*$)
             if (!insideAlternative[+1] &&
