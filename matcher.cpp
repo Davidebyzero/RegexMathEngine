@@ -1627,5 +1627,14 @@ template<> void Backtrack_LeaveMolecularLookinto<true>::readLookintoInput(RegexM
     }
 }
 
+template<> void Backtrack_LeaveMolecularLookinto<false>::repushLookintoInput(RegexMatcher<false> &matcher)
+{
+    matcher.pushLookintoInput(matcher.input, NULL);
+}
+template<> void Backtrack_LeaveMolecularLookinto<true>::repushLookintoInput(RegexMatcher<true> &matcher)
+{
+    matcher.pushLookintoInput(matcher.input, matcher.stringToMatchAgainst);
+}
+
 template bool RegexMatcher<false>::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint maxLookintoDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr);
 template bool RegexMatcher<true >::Match(RegexGroupRoot &regex, Uint numCaptureGroups, Uint maxGroupDepth, Uint maxLookintoDepth, Uint64 _input, Uint returnMatch_backrefIndex, Uint64 &returnMatchOffset, Uint64 &returnMatchLength, Uint64 *possibleMatchesCount_ptr);

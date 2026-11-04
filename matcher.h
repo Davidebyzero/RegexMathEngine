@@ -1018,6 +1018,21 @@ class Backtrack_LeaveMolecularLookinto : public Backtrack_LeaveMolecularLookahea
     }
 
     void readLookintoInput(RegexMatcher<USE_STRINGS> &matcher);
+
+    // When a lookahead/atomic group discards this node, the Backtrack_EnterGroupLookinto beneath it will pop a lookinto
+    // input, but ours was already popped when the group was exited; push one back so the input stack stays balanced.
+    void repushLookintoInput(RegexMatcher<USE_STRINGS> &matcher);
+    virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        Backtrack_LeaveMolecularLookahead<USE_STRINGS>::popForNegativeLookahead(matcher);
+        repushLookintoInput(matcher);
+    }
+    virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        int numCaptured = Backtrack_LeaveMolecularLookahead<USE_STRINGS>::popForAtomicCapture(matcher);
+        repushLookintoInput(matcher);
+        return numCaptured;
+    }
 };
 
 template <bool USE_STRINGS>
