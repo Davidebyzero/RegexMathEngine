@@ -181,6 +181,7 @@ RegexGroup *RegexParser::parseLookinto(const char *&buf)
     Uint backrefIndex = UINT_MAX;
     if (inrange(*buf, '0', '9'))
     {
+        const char *buf0 = buf;
         try
         {
             backrefIndex = readNumericConstant<Uint>(buf);
@@ -189,6 +190,10 @@ RegexGroup *RegexParser::parseLookinto(const char *&buf)
         {
             throw RegexParsingError(buf, "Group number is too big");
         }
+        // Inside another lookinto, "the match so far" isn't well-defined (the position is relative to the outer
+        // lookinto's subject, but the match started in the real input), so disallow it for now.
+        if (backrefIndex == 0 && curLookintoDepth)
+            throw RegexParsingError(buf0, "(?^0...) lookinto is not supported inside another lookinto");
     }
     switch (*buf)
     {
