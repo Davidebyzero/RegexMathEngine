@@ -178,6 +178,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     GroupStackNode *groupStackTop;
 
     Uint64 position, startPosition;
+    Uint64 discardedResetStartPosition; // while collapsing an atomic group or lookaround: the startPosition saved by the oldest \K discarded so far, else ULLONG_MAX
     Uint64 currentMatch; // ULLONG_MAX means no match has been tried yet
     // While a capturing constant group is being matched, its capture hasn't been written yet, so runtime optimizations
     // must not read it from captures[]; see readCaptureForOptimization()
@@ -209,6 +210,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     Backtrack_LoopGroup<USE_STRINGS> *pushStack_LoopGroup();
     void *loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pushLoop, Uint64 pushPosition, Uint64 oldPosition, Uint alternativeNum);
     void popAtomicGroup(RegexGroup *const group, RegexPattern **parentAlternative);
+    void pushDiscardedResetStart();
     inline void pushLookintoInput(Uint64 newInput, const char *newStringToMatchAgainst);
     inline void  popLookintoInput();
 
@@ -1686,9 +1688,13 @@ class Backtrack_ResetStart : public BacktrackNode<USE_STRINGS>
     }
     virtual void popForNegativeLookahead(RegexMatcher<USE_STRINGS> &matcher)
     {
+        // the negative lookaround's contents matched, so they're being discarded as a failure; undo the \K
+        matcher.startPosition = startPosition;
     }
     virtual int popForAtomicCapture(RegexMatcher<USE_STRINGS> &matcher)
     {
+        // the \K stays in effect, but backtracking past the atomic group or lookaround must still undo it; see pushDiscardedResetStart()
+        matcher.discardedResetStartPosition = startPosition;
         return 0;
     }
     virtual captureTuple popForAtomicForwardCapture(RegexMatcher<USE_STRINGS> &matcher, Uint captureNum)
@@ -1714,6 +1720,7 @@ template<> inline RegexMatcher<false>::RegexMatcher() :
 #endif
 {
     constGroupCaptureIndex = UINT_MAX;
+    discardedResetStartPosition = ULLONG_MAX;
     captures = NULL;
     if (enable_persistent_backrefs)
     {
@@ -1731,6 +1738,7 @@ template<> inline RegexMatcher<true>::RegexMatcher() :
 #endif
 {
     constGroupCaptureIndex = UINT_MAX;
+    discardedResetStartPosition = ULLONG_MAX;
     captures = NULL;
     captureOffsets = NULL;
     if (enable_persistent_backrefs)

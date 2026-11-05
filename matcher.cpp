@@ -1135,6 +1135,7 @@ void RegexMatcher<USE_STRINGS>::popAtomicGroup(RegexGroup *const group, RegexPat
         if (done)
             break;
     }
+    pushDiscardedResetStart();
 
     if (enable_persistent_backrefs)
         numCapturedDelta = captureIndexNumUsedAtomicTmp;
@@ -1146,6 +1147,18 @@ void RegexMatcher<USE_STRINGS>::popAtomicGroup(RegexGroup *const group, RegexPat
         pushStack->parentAlternative = parentAlternative;
         pushStack->transfer(*this);
     }
+}
+
+// If any \K was discarded while collapsing an atomic group or lookaround, replace it with a single entry that restores
+// the startPosition from before the oldest one, so that backtracking past the group still undoes it
+template <bool USE_STRINGS>
+void RegexMatcher<USE_STRINGS>::pushDiscardedResetStart()
+{
+    if (discardedResetStartPosition == ULLONG_MAX)
+        return;
+    Backtrack_ResetStart<USE_STRINGS> *pushStack = stack.template push< Backtrack_ResetStart<USE_STRINGS> >();
+    pushStack->startPosition = discardedResetStartPosition;
+    discardedResetStartPosition = ULLONG_MAX;
 }
 
 template<> void RegexMatcher<false>::pushLookintoInput(Uint64 newInput, const char *newStringToMatchAgainst)
@@ -1274,6 +1287,7 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                         stack.pop(*this);
                     }
                     while (groupStackTop >= groupStackOldTop);
+                    pushDiscardedResetStart();
 
                     if (enable_persistent_backrefs)
                         numCapturedDelta = captureIndexNumUsedAtomicTmp;
