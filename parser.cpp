@@ -788,6 +788,8 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
                 }
                 else
                 {
+                    if (!inrange(*buf, '0', '9'))
+                        throw RegexParsingError(buf, "Non-numeric character after , in {} quantifier");
                     try
                     {
                         symbol->maxCount = readNumericConstant<Uint>(buf);
