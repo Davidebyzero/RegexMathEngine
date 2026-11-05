@@ -185,6 +185,8 @@ ALWAYS_INLINE bool RegexMatcher<USE_STRINGS>::staticallyOptimizeGroup(RegexSymbo
                 Uint backrefIndex = group->type == RegexGroup_Capturing ? ((RegexGroupCapturing*)group)->backrefIndex : UINT_MAX;
                 for (RegexSymbol **insideSymbol = insideAlternative[0]->symbols; *insideSymbol;)
                 {
+                    if ((*insideSymbol)->type == RegexSymbol_Character && !characterCanMatch(*insideSymbol))
+                        break;
                     if ((*insideSymbol)->type != RegexSymbol_Character && (*insideSymbol)->type != RegexSymbol_Backref && (*insideSymbol)->type != RegexSymbol_NoOp || (*insideSymbol)->minCount != (*insideSymbol)->maxCount)
                         break;
                     if ((*insideSymbol)->type == RegexSymbol_Backref && ((RegexBackref*)*insideSymbol)->index == backrefIndex)
