@@ -172,6 +172,10 @@ Options:\n\
   --pcre              Emulate PCRE as closely as currently possible. This\n\
                       is equivalent to:\n\
                       --npcg- --ecc- --neo- -x ag,pq,cnd,rs,pbr\n\
+                      As well as cancelling \"-x ml,li\" unless they are enabled\n\
+                      in a subsequent OPTION.\n\
+  --pcre2             Emulate PCRE2 as closely as currently possible. Same as\n\
+                      \"--pcre -x ml\".\n\
   -o                  Show only the part of the line that matched\n\
   -v, --invert-match  Show non-matching inputs instead of matching inputs\n\
   -q [NUM0[..NUM1]]   Show the NUM0th..NUM1th (zero-indexed) number(s) that are\n\
@@ -482,13 +486,16 @@ int main(int argc, char *argv[])
                     allow_quantifiers_on_assertions = argv[i][2 + strlength("qa")] == '+';
                 }
                 else
-                if (strcmp(&argv[i][2], "pcre")==0)
+                if (strncmp(&argv[i][2], "pcre", 4)==0 && (strcmp(&argv[i][2 + strlength("pcre")], "1")==0 ||
+                                                           strcmp(&argv[i][2 + strlength("pcre")], "2")==0 ||
+                                                                   argv[i][2 + strlength("pcre")] == '\0'))
                 {
+                    bool pcre2 = argv[i][2 + strlength("pcre")] == '2';
                     emulate_ECMA_NPCGs = false;
                     allow_empty_character_classes = false;
                     no_empty_optional = false;
                     allow_quantifiers_on_assertions = true;
-                    allow_molecular_lookaround = false;
+                    allow_molecular_lookaround = pcre2;
                     allow_lookinto = false;
                     allow_atomic_groups = true;
                     allow_branch_reset_groups = true;
