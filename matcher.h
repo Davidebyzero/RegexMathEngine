@@ -689,6 +689,17 @@ class Backtrack_AtomicCapture : public BacktrackNode<USE_STRINGS>
         matcher.captureIndexNumUsedAtomicTmp = 0;
     }
 
+    // in enable_persistent_backrefs mode, returns how many of the captures were unset before, i.e. how many were pushed onto the capture stack
+    Uint countNewlySet()
+    {
+        const Uint64 *values = (Uint64*)buffer;
+        Uint count = 0;
+        for (Uint i=0; i<numCaptured; i++)
+            if (values[i] == NON_PARTICIPATING_CAPTURE_GROUP)
+                count++;
+        return count;
+    }
+
     virtual void fprintDebug(RegexMatcher<USE_STRINGS> &matcher, FILE *f)
     {
         fputs("Backtrack_AtomicCapture: ", f);

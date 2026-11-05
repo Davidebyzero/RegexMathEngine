@@ -1310,7 +1310,6 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
 
                     if (enable_persistent_backrefs)
                         numCapturedDelta = captureIndexNumUsedAtomicTmp;
-                    groupStackTop->numCaptured += numCapturedDelta;
 
                     if (numCapturedDelta)
                     {
@@ -1318,7 +1317,10 @@ bool RegexMatcher<USE_STRINGS>::Match(RegexGroupRoot &regex, Uint numCaptureGrou
                         pushStack->numCaptured       = numCapturedDelta; // will be overridding by "transfer" call below if we're in enable_persistent_backrefs mode
                         pushStack->parentAlternative = group->parentAlternative;
                         pushStack->transfer(*this);
+                        if (enable_persistent_backrefs)
+                            numCapturedDelta = pushStack->countNewlySet(); // only captures that were unset before the lookaround are on the capture stack
                     }
+                    groupStackTop->numCaptured += numCapturedDelta;
 
                     alternative = group->parentAlternative;
                     if (!group->self) // group->self will be NULL if this is the lookaround in a conditional
