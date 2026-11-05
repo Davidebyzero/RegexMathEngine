@@ -1151,6 +1151,9 @@ int main(int argc, char *argv[])
                                             printf("%llu -> no match\n", input);
                                     }
                                     else
+                                    if (countPossibleMatches)
+                                        printf("%llu\n", *possibleMatchesCount_ptr);
+                                    else
                                     if (matched)
                                         printf("%llu\n", returnMatch);
                                 }
