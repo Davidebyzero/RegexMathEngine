@@ -994,6 +994,7 @@ protected:
     {
         matcher.groupStackTop++;
         matcher.groupStackTop->position    = position;
+        matcher.groupStackTop->loopCount   = 1; // a lookaround is never quantified (it gets wrapped in a group if it needs to be), but its slot on the group stack may since have been used by another group
         matcher.groupStackTop->group       = group;
         matcher.groupStackTop->numCaptured = numCaptured;
         matcher.groupStackTop[-1].numCaptured -= numCaptured;
