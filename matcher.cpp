@@ -154,11 +154,7 @@ RegexPattern **RegexMatcher<USE_STRINGS>::getConditionalAlternative(const RegexG
         const char *pBackref;
         readCapture(((RegexConditional*)group)->backrefIndex, multiple, pBackref);
         if (multiple == NON_PARTICIPATING_CAPTURE_GROUP)
-        {
-            alternativeTmp++;
-            if (*alternativeTmp == NULL)
-                return NULL;
-        }
+            alternativeTmp++; // the parser ensures that this exists, even if empty
     }
     return alternativeTmp;
 }
@@ -184,11 +180,6 @@ void RegexMatcher<USE_STRINGS>::enterGroup(RegexGroup *group)
     }
 
     RegexPattern **alternativeTmp = getConditionalAlternative(group);
-    if (alternativeTmp == NULL)
-    {
-        symbol++; // it's a conditional with no "false" alternative, so skip all iteration(s), because the status of the condition can't change as it's looping
-        return;
-    }
     alternative = alternativeTmp;
     symbol = (*alternative)->symbols;
 
@@ -357,8 +348,6 @@ void *RegexMatcher<USE_STRINGS>::loopGroup(Backtrack_LoopGroup<USE_STRINGS> *pus
     }
 
     alternative = getConditionalAlternative(group);
-    if (alternative == NULL)
-        THROW_ENGINEBUG; // should be impossible, because of the "symbol++;" in enterGroup() if getConditionalAlternative() return NULL
     symbol      = alternative[0]->symbols;
     groupStackTop->position = position;
     currentMatch = ULLONG_MAX;

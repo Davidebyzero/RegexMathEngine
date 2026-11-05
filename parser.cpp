@@ -586,6 +586,13 @@ RegexParser::RegexParser(RegexGroupRoot &regex, const char *buf)
             {
                 RegexGroup *group = stack->group;
                 closeAlternative(stack->alternatives.back()->symbols, stack->symbols);
+                if (group->type == RegexGroup_Conditional && stack->alternatives.size() == 1)
+                {
+                    // A conditional with no "false" branch has an implied empty one; make it explicit, so that when the condition is false,
+                    // the group can be matched and quantified exactly as if it had been written with an empty "no" branch.
+                    stack->alternatives.push(new RegexPattern);
+                    closeAlternative(stack->alternatives.back()->symbols, stack->symbols);
+                }
                 closeGroup(group->alternatives, stack->alternatives);
 
                 if (group->type == RegexGroup_BranchReset)
