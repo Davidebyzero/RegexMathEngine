@@ -51,20 +51,27 @@ void RegexMatcher<USE_STRINGS>::nonMatch(NonMatchType type)
                 verb = RegexVerb_None;
         }
         else
-        if (*alternative && (stack.empty() || stack->okayToTryAlternatives(*this)) && !inrange(groupStackTop->group->type, RegexGroup_Conditional, RegexGroup_LookaroundConditional))
         {
-            alternative++;
-            if (*alternative)
+            bool okayToTryAlternatives = stack.empty() || stack->okayToTryAlternatives(*this);
+            if (*alternative && okayToTryAlternatives && !inrange(groupStackTop->group->type, RegexGroup_Conditional, RegexGroup_LookaroundConditional))
             {
-                verb = RegexVerb_None;
-                if (groupStackTop->group->type==RegexGroup_Lookinto || groupStackTop->group->type==RegexGroup_LookintoMolecular || groupStackTop->group->type==RegexGroup_NegativeLookinto)
-                    position = 0;
-                else
-                    position = groupStackTop->position;
-                symbol = (*alternative)->symbols;
-                currentMatch = ULLONG_MAX;
-                return;
+                alternative++;
+                if (*alternative)
+                {
+                    verb = RegexVerb_None;
+                    if (groupStackTop->group->type==RegexGroup_Lookinto || groupStackTop->group->type==RegexGroup_LookintoMolecular || groupStackTop->group->type==RegexGroup_NegativeLookinto)
+                        position = 0;
+                    else
+                        position = groupStackTop->position;
+                    symbol = (*alternative)->symbols;
+                    currentMatch = ULLONG_MAX;
+                    return;
+                }
             }
+            // A (*THEN) that has run out of alternatives within a negative lookaround makes the lookaround's contents fail
+            // (so the lookaround succeeds), as the other verbs do above, rather than propagating outside it.
+            if (verb == RegexVerb_Then && okayToTryAlternatives && groupStackTop->group->isNegativeLookaround())
+                verb = RegexVerb_None;
         }
 
         if (stack.empty())
