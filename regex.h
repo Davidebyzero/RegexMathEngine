@@ -97,6 +97,7 @@ class RegexPattern;
 template<bool> class RegexMatcher;
 template<bool, RegexVerb, const char *> class Backtrack_Verb;
 template<bool> class Backtrack_Skip;
+template<bool> class Backtrack_Then;
 template<bool> class Backtrack_AtomicCapture;
 template<bool> class Backtrack_SkipGroup;
 template<bool> class Backtrack_EnterGroup;

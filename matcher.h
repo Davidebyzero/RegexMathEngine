@@ -139,6 +139,7 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
     friend class Backtrack_Verb<USE_STRINGS, RegexVerb_Skip  , Backtrack_VerbName_Skip  >;
     friend class Backtrack_Verb<USE_STRINGS, RegexVerb_Then  , Backtrack_VerbName_Then  >;
     friend class Backtrack_Skip<USE_STRINGS>;
+    friend class Backtrack_Then<USE_STRINGS>;
     friend class Backtrack_AtomicCapture<USE_STRINGS>;
     friend class Backtrack_SkipGroup<USE_STRINGS>;
     friend class Backtrack_EnterGroup<USE_STRINGS>;
@@ -171,6 +172,8 @@ class RegexMatcher : public RegexMatcherBase<USE_STRINGS>
 
     RegexVerb verb; // can only be RegexVerb_None, RegexVerb_Commit, RegexVerb_Prune, RegexVerb_Skip, or RegexVerb_Then
     Uint64 skipPosition; // for RegexVerb_Skip
+    GroupStackNode *thenScope; // for RegexVerb_Then: the group in which it takes effect, or NULL if it has none (and thus acts like (*PRUNE))
+    GroupStackNode *findThenScope();
     Backtrack<USE_STRINGS> stack;
     Uint *captureStackBase;
     Uint *captureStackTop;
@@ -532,7 +535,18 @@ class Backtrack_Skip : public Backtrack_Verb<USE_STRINGS, RegexVerb_Skip, Backtr
 };
 
 template <bool USE_STRINGS>
-class Backtrack_Then : public Backtrack_Verb<USE_STRINGS, RegexVerb_Then, Backtrack_VerbName_Then> {};
+class Backtrack_Then : public Backtrack_Verb<USE_STRINGS, RegexVerb_Then, Backtrack_VerbName_Then>
+{
+    virtual bool popTo(RegexMatcher<USE_STRINGS> &matcher)
+    {
+        if (matcher.verb == RegexVerb_None)
+        {
+            matcher.verb = RegexVerb_Then;
+            matcher.thenScope = matcher.findThenScope();
+        }
+        return false;
+    }
+};
 
 #pragma warning(push)
 #pragma warning(disable : 4700) // for passing "offsets" to fprintCapture() with USE_STRINGS=false

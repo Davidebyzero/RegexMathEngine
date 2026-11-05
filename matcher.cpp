@@ -53,7 +53,9 @@ void RegexMatcher<USE_STRINGS>::nonMatch(NonMatchType type)
         else
         {
             bool okayToTryAlternatives = stack.empty() || stack->okayToTryAlternatives(*this);
-            if (*alternative && okayToTryAlternatives && !inrange(groupStackTop->group->type, RegexGroup_Conditional, RegexGroup_LookaroundConditional))
+            // A (*THEN) only takes effect in its scope; any alternatives in groups nested inside that scope are skipped
+            bool atThenScope = verb == RegexVerb_None || groupStackTop == thenScope;
+            if (*alternative && okayToTryAlternatives && atThenScope && !inrange(groupStackTop->group->type, RegexGroup_Conditional, RegexGroup_LookaroundConditional))
             {
                 alternative++;
                 if (*alternative)
@@ -68,9 +70,9 @@ void RegexMatcher<USE_STRINGS>::nonMatch(NonMatchType type)
                     return;
                 }
             }
-            // A (*THEN) that has run out of alternatives within a negative lookaround makes the lookaround's contents fail
-            // (so the lookaround succeeds), as the other verbs do above, rather than propagating outside it.
-            if (verb == RegexVerb_Then && okayToTryAlternatives && groupStackTop->group->isNegativeLookaround())
+            // A (*THEN) whose scope has run out of alternatives makes that group fail as a whole (or, if its scope is a lookaround, makes
+            // the lookaround's contents fail, so that a positive lookaround fails and a negative one succeeds), and normal backtracking resumes.
+            if (verb == RegexVerb_Then && okayToTryAlternatives && groupStackTop == thenScope)
                 verb = RegexVerb_None;
         }
 
@@ -87,6 +89,23 @@ void RegexMatcher<USE_STRINGS>::nonMatch(NonMatchType type)
         
         if (stopHere && verb == RegexVerb_None)
             break;
+    }
+}
+
+// The scope of a (*THEN) is the innermost group enclosing it that is an alternation (has more than one alternative) or a lookaround,
+// as (*THEN) is not allowed to escape a lookaround. A conditional group is not an alternation, as only one of its branches can be taken.
+template <bool USE_STRINGS>
+GroupStackNode *RegexMatcher<USE_STRINGS>::findThenScope()
+{
+    for (GroupStackNode *i = groupStackTop;; i--)
+    {
+        RegexGroup *group = i->group;
+        if (group->isLookaround())
+            return i;
+        if (group->alternatives[0] && group->alternatives[1] && !inrange(group->type, RegexGroup_Conditional, RegexGroup_LookaroundConditional))
+            return i;
+        if (i == groupStackBase)
+            return NULL;
     }
 }
 
