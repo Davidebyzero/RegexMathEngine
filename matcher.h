@@ -1200,13 +1200,11 @@ protected:
         matcher.groupStackTop->loopCount   = loopCount;
         matcher.groupStackTop->group       = group;
         matcher.groupStackTop->numCaptured = numCaptured;
+        matcher.groupStackTop[-1].numCaptured -= numCaptured;
         if (enable_persistent_backrefs)
             popCapture(matcher);
         else
-        {
-            matcher.groupStackTop[-1].numCaptured -= numCaptured;
             popCaptureGroup(matcher);
-        }
         if (group->type == RegexGroup_Atomic)
         {
             matcher.alternative = &nullAlternative;
