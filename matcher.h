@@ -687,6 +687,30 @@ class Backtrack_AtomicCapture : public BacktrackNode<USE_STRINGS>
         for (Uint i=0; i<matcher.captureIndexNumUsedAtomicTmp; i++)
             matcher.readCaptureAtomicTmp(i, indexes[i], values[i], USE_STRINGS ? offsets[i] : dummy);
         matcher.captureIndexNumUsedAtomicTmp = 0;
+
+        // The captures that were unset before (and thus have been pushed onto the capture stack) are not necessarily in the order
+        // in which they were pushed, e.g. when the oldest value of one came from a loop iteration before another one was set, so
+        // put them first, in the order they are on the capture stack from the top, so that they will be popped off in that order.
+        const Uint *captureStackPtr = matcher.captureStackTop;
+        for (Uint next=0; next<numCaptured; next++)
+        {
+            Uint i;
+            for (i=next; i<numCaptured; i++)
+                if (values[i] == NON_PARTICIPATING_CAPTURE_GROUP && indexes[i] == captureStackPtr[-1])
+                    break;
+            if (i == numCaptured)
+                break;
+            captureStackPtr--;
+            if (i != next)
+            {
+                Uint64 value = values[i]; values[i] = values[next]; values[next] = value;
+                Uint   index = indexes[i]; indexes[i] = indexes[next]; indexes[next] = index;
+                if (USE_STRINGS)
+                {
+                    const char *offset = offsets[i]; offsets[i] = offsets[next]; offsets[next] = offset;
+                }
+            }
+        }
     }
 
     // in enable_persistent_backrefs mode, returns how many of the captures were unset before, i.e. how many were pushed onto the capture stack
