@@ -1271,6 +1271,7 @@ int main(int argc, char *argv[])
                     str[bits*2+5] = ' ';
                     str[bits*3+6] = '\0';
                     bool useNoZeroesInAllButFirstNumber = true;
+                    bool useNoZeroesWithWrongSum = testForFalsePositives;
                     for (;;)
                     {
                         Uint a = IUNI  & (size-1);
@@ -1291,6 +1292,13 @@ int main(int argc, char *argv[])
                             b = size-1;
                             c = a + b;
                             useNoZeroesInAllButFirstNumber = false;
+                        }
+                        else if (useNoZeroesWithWrongSum)
+                        {
+                            // a wrong sum with no zeroes in the second and third numbers:
+                            // 1111111111111111 + 1111111111111111 = 1111111111111111
+                            a = b = c = size-1;
+                            useNoZeroesWithWrongSum = false;
                         }
 
                         bool wrong;
