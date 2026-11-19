@@ -931,21 +931,37 @@ int main(int argc, char *argv[])
                     {
                         Uint64 returnMatch;
                         if (regex.MatchNumber(a, mathMode, showMatch_backrefIndex, returnMatch))
+                        {
                             printf("%llu -> %llu\n", a, returnMatch);
+                            if (lineBuffered)
+                                fflush(stdout);
+                        }
                         else
+                        {
                             printf("%llu -> no match (FALSE NEGATIVE)\n", a);
+                            if (lineBuffered)
+                                fflush(stdout);
+                        }
                         if (a == 12200160415121876738uLL)
                         {
                             if (testForFalsePositives)
                                 for (Uint64 i=a+1; i!=0; i++)
                                     if (regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch))
+                                    {
                                         printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+                                        if (lineBuffered)
+                                            fflush(stdout);
+                                    }
                             break;
                         }
                         if (testForFalsePositives)
                             for (Uint64 i=a+1; i<b; i++)
                                 if (regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch))
+                                {
                                     printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+                                    if (lineBuffered)
+                                        fflush(stdout);
+                                }
                         Uint64 c = a + b;
                         a = b;
                         b = c;
@@ -963,20 +979,36 @@ int main(int argc, char *argv[])
                         {
                             for (Uint64 i=z; i<a; i++)
                                 if (regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch))
+                                {
                                     printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+                                    if (lineBuffered)
+                                        fflush(stdout);
+                                }
                             z = a+1;
                         }
                         if (regex.MatchNumber(a, mathMode, showMatch_backrefIndex, returnMatch))
+                        {
                             printf("%llu -> %llu\n", a, returnMatch);
+                            if (lineBuffered)
+                                fflush(stdout);
+                        }
                         else
+                        {
                             printf("%llu -> no match (FALSE NEGATIVE)\n", a);
+                            if (lineBuffered)
+                                fflush(stdout);
+                        }
                         Uint64 a2 = a + a;
                         if (a2 == 0)
                         {
                             if (testForFalsePositives)
                                 for (Uint64 i=a+1; i!=0; i++)
                                     if (regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch))
+                                    {
                                         printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+                                        if (lineBuffered)
+                                            fflush(stdout);
+                                    }
                             break;
                         }
                         a = a2;
@@ -993,13 +1025,25 @@ int main(int argc, char *argv[])
                         {
                             for (Uint64 i=z; i<n; i++)
                                 if (regex.MatchNumber(i, mathMode, showMatch_backrefIndex, returnMatch))
+                                {
                                     printf("%llu -> %llu (FALSE POSITIVE)\n", i, returnMatch);
+                                    if (lineBuffered)
+                                        fflush(stdout);
+                                }
                             z = n+1;
                         }
                         if (regex.MatchNumber(n, mathMode, showMatch_backrefIndex, returnMatch))
+                        {
                             printf("%u -> %llu\n", n, returnMatch);
+                            if (lineBuffered)
+                                fflush(stdout);
+                        }
                         else
+                        {
                             printf("%u -> no match (FALSE NEGATIVE)\n", n);
+                            if (lineBuffered)
+                                fflush(stdout);
+                        }
                         n += m;
                         m++;
                     }
@@ -1190,15 +1234,27 @@ int main(int argc, char *argv[])
                             if (regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength))
                             {
                                 if (!positive)
+                                {
                                     printf("%s - FALSE POSITIVE!\n", str);
+                                    if (lineBuffered)
+                                        fflush(stdout);
+                                }
                             }
                             else
                             {
                                 if (positive)
+                                {
                                     printf("%s - FALSE NEGATIVE!\n", str);
+                                    if (lineBuffered)
+                                        fflush(stdout);
+                                }
                             }
                             if (n % 0x10000 == 0)
+                            {
                                 printf("%s\n", str);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
                         }
                         if (++n == 0)
                             break;
@@ -1245,11 +1301,17 @@ int main(int argc, char *argv[])
                                         fputs(" - FALSE POSITIVE!\n", stdout);
                                     else
                                         fputc('\n', stdout);
+                                    if (lineBuffered)
+                                        fflush(stdout);
                                 }
                                 else
                                 {
                                     if (positive)
+                                    {
                                         printf("%u * %u = %u - FALSE NEGATIVE!\n", a, b, c);
+                                        if (lineBuffered)
+                                            fflush(stdout);
+                                    }
                                 }
                                 if (!testForFalsePositives)
                                     break;
@@ -1319,16 +1381,32 @@ int main(int argc, char *argv[])
                         if (!regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength))
                         {
                             if (!wrong)
+                            {
                                 printf("%04X+%04X=%04X: %s - FALSE NEGATIVE!\n", a, b, c, str);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
                             /*else
-                                printf("%04X+%04X=%04X: %s - correct\n", a, b, c, str);*/
+                            {
+                                printf("%04X+%04X=%04X: %s - correct\n", a, b, c, str);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }*/
                         }
                         else
                         {
                             if (wrong)
+                            {
                                 printf("%04X+%04X=%04X: %s - FALSE POSITIVE!\n", a, b, c, str);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
                             /*else
-                                printf("%04X+%04X=%04X: %s - incorrect\n", a, b, c, str);*/
+                            {
+                                printf("%04X+%04X=%04X: %s - incorrect\n", a, b, c, str);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }*/
                         }
                     }
                     break;
@@ -1372,20 +1450,40 @@ int main(int argc, char *argv[])
                         if (!regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength))
                         {
                             if (!wrong)
+                            {
                                 printf("%s - FALSE NEGATIVE!\n", str);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
                             /*else
-                                printf("%s - correct\n", str);*/
+                            {
+                                printf("%s - correct\n", str);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }*/
                         }
                         else
                         {
                             if (wrong)
+                            {
                                 printf("%s - FALSE POSITIVE!\n", str);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
                             /*else
-                                printf("%s - incorrect\n", str);*/
+                            {
+                                printf("%s - incorrect\n", str);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }*/
                         }
 
                         if (ii%0x10000==0)
+                        {
                             printf("%llu\n", ii);
+                            if (lineBuffered)
+                                fflush(stdout);
+                        }
                     }
                     break;
                 }
@@ -1406,7 +1504,11 @@ int main(int argc, char *argv[])
                             if (!testForFalsePositives && !shouldMatch)
                                 continue;
                             if (regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength) != shouldMatch)
+                            {
                                 printf("%s - FALSE %s!\n", str, shouldMatch ? "NEGATIVE" : "POSITIVE");
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
                         }
                         if (testForFalsePositives)
                             for (;; i++)
@@ -1415,7 +1517,11 @@ int main(int argc, char *argv[])
                                     memset(str, '0', maxZeroPadding);
                                     sprintf(str+j, "%u", i);
                                     if (regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength))
+                                    {
                                         printf("%s - FALSE POSITIVE!\n", str);
+                                        if (lineBuffered)
+                                            fflush(stdout);
+                                    }
                                 }
                     break;
                 }
@@ -1437,13 +1543,25 @@ int main(int argc, char *argv[])
                             const char *returnMatch;
                             size_t returnMatchLength;
                             if (!regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength))
+                            {
                                 printf("%llu, %llu - NON-MATCH!\n", j, k);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
                             else
                             if (inrangex64(j, returnMatch-str, returnMatch-str + returnMatchLength))
+                            {
                                 printf("%llu, %llu -> %llu,%llu - INCORRECT! (delimiter included in match)\n", j, k, j - (returnMatch-str), returnMatch-str + returnMatchLength - (j+1));
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
                             else
                             if (!inrange64(returnMatchLength, j, k))
+                            {
                                 printf("%llu, %llu -> %" PRIsize_t " - INCORRECT! (outside range)\n", j, k, returnMatchLength);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
                             else
                             {
                                 Uint64 smallestLargestPrimeFactor = k;
@@ -1455,7 +1573,11 @@ int main(int argc, char *argv[])
                                 }
                                 Uint64 returned_largestPrimeFactor = largestPrimeFactor(returnMatchLength);
                                 if (returned_largestPrimeFactor != smallestLargestPrimeFactor)
+                                {
                                     printf("%llu, %llu -> %" PRIsize_t " (largest prime factor %llu) - INCORRECT! (should have smallest largest prime factor %llu)\n", j, k, returnMatchLength, returned_largestPrimeFactor, smallestLargestPrimeFactor);
+                                    if (lineBuffered)
+                                        fflush(stdout);
+                                }
                             }
 
                             str[j] = numeral;
@@ -1504,9 +1626,17 @@ int main(int argc, char *argv[])
                             size_t returnMatchLength;
                             bool matched = regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength, possibleMatchesCount_ptr);
                             if (countPossibleMatches)
+                            {
                                 printf("%4llu", *possibleMatchesCount_ptr);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
                             else if (matched)
+                            {
                                 printf("%4" PRIsize_t, returnMatchLength);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
                         }
                     }
                     break;
@@ -1537,7 +1667,11 @@ int main(int argc, char *argv[])
                         }
                         else
                         if (countPossibleMatches)
+                        {
                             printf("%llu\n", *possibleMatchesCount_ptr);
+                            if (lineBuffered)
+                                fflush(stdout);
+                        }
                         else
                         if (matched)
                         {
