@@ -67,6 +67,7 @@ enum StringModeTest
     StringModeTest_MULTIPLICATION_INCLUDING_ZERO,
     StringModeTest_BINARY_SUM,
     StringModeTest_DECIMAL_SUM,
+    StringModeTest_MATRYOSHKA,
     StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED,
     StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED,
     StringModeTest_SMOOTH_NUMBERS,
@@ -90,6 +91,38 @@ enum NumericalModeTest
 #define wnew  ((w=18000*(w&65535)+(w>>16))&65535)
 #define IUNI  (znew+wnew)
 static Uint32 z=362436069, w=521288629;
+
+// Helper functions for --test=matryoshka
+
+// Returns true iff "b" can be formed by inserting one contiguous run of one or more characters into "a"
+static bool matryoshka_isValidStep(const char *a, Uint aLength, const char *b, Uint bLength)
+{
+    if (bLength <= aLength)
+        return false;
+    Uint prefix = 0;
+    while (prefix < aLength && a[prefix] == b[prefix])
+        prefix++;
+    Uint suffix = 0;
+    while (suffix < aLength && a[aLength-1-suffix] == b[bLength-1-suffix])
+        suffix++;
+    return prefix + suffix >= aLength;
+}
+
+static void matryoshka_randomLetters(char *dst, Uint length, Uint alphabetSize)
+{
+    for (Uint i=0; i<length; i++)
+        dst[i] = (char)('a' + IUNI % alphabetSize);
+}
+
+// Writes to "dst" the result of inserting a run of "insertLength" random letters at a random position in "src"; returns the new length
+static Uint matryoshka_insert(char *dst, const char *src, Uint srcLength, Uint insertLength, Uint alphabetSize)
+{
+    Uint pos = IUNI % (srcLength + 1);
+    memcpy(dst, src, pos);
+    matryoshka_randomLetters(dst + pos, insertLength, alphabetSize);
+    memcpy(dst + pos + insertLength, src + pos, srcLength - pos);
+    return srcLength + insertLength;
+}
 
 // todo: implement these as class members rather than global variables?
 Uint debugTrace = 0;
@@ -234,6 +267,13 @@ String mode tests:\n\
                            carry is discarded. Examples:\n\
      1293972669 + 6684886271 = 7978858940\n\
      2107255058 + 8170104067 = 0277359125\n\
+\n\
+  matryoshka               Match a list of two or more space-delimited words in\n\
+                           which every word after the first is formed by\n\
+                           inserting one contiguous run of one or more\n\
+                           characters into the word before it. Examples:\n\
+     a at art part party partly particularly\n\
+     in pin pint point appoint disappoint\n\
 \n\
   decimal-byte             Match decimal numbers in the range 0-255, with no\n\
                            leading zeroes allowed.\n\
@@ -530,6 +570,7 @@ int main(int argc, char *argv[])
                     else if (strcmp(&argv[i][2+strlength("test=")], "multiplication-0" )==0) stringModeTest = StringModeTest_MULTIPLICATION_INCLUDING_ZERO;
                     else if (strcmp(&argv[i][2+strlength("test=")], "binary-sum"       )==0) stringModeTest = StringModeTest_BINARY_SUM;
                     else if (strcmp(&argv[i][2+strlength("test=")], "decimal-sum"      )==0) stringModeTest = StringModeTest_DECIMAL_SUM;
+                    else if (strcmp(&argv[i][2+strlength("test=")], "matryoshka"       )==0) stringModeTest = StringModeTest_MATRYOSHKA;
                     else if (strcmp(&argv[i][2+strlength("test=")], "decimal-byte"     )==0) stringModeTest = StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_ALLOWED;
                     else if (strcmp(&argv[i][2+strlength("test=")], "decimal-byte-0"   )==0) stringModeTest = StringModeTest_DECIMAL_BYTE__LEADING_ZEROES_PROHIBITED;
                     else if (strcmp(&argv[i][2+strlength("test=")], "smoothest-numbers")==0) stringModeTest = StringModeTest_SMOOTH_NUMBERS;
@@ -1483,6 +1524,142 @@ int main(int argc, char *argv[])
                             printf("%llu\n", ii);
                             if (lineBuffered)
                                 fflush(stdout);
+                        }
+                    }
+                    break;
+                }
+                case StringModeTest_MATRYOSHKA:
+                {
+                    // Each test string is a chain of words in which each word is normally formed by inserting a run of
+                    // random letters into the previous word. With --test-false+, some steps are deliberately corrupted,
+                    // and the chain then continues from the corrupted word, so that usually only one step is wrong.
+                    // Small alphabets are used so that coincidental repetitions are common.
+                    const Uint maxWords = 6;
+                    const Uint maxWordLength = 48;
+                    char str[maxWords * (maxWordLength + 1)];
+                    char tmp[maxWordLength * 2];
+                    for (;;)
+                    {
+                        const Uint alphabetSize = 1 + IUNI % 4;
+                        Uint numWords = 2 + IUNI % (maxWords - 1);
+                        const char *word[maxWords];
+                        Uint wordLength[maxWords];
+
+                        char *s = str;
+                        word[0] = s;
+                        wordLength[0] = 1 + IUNI % 3;
+                        matryoshka_randomLetters(s, wordLength[0], alphabetSize);
+                        s += wordLength[0];
+
+                        for (Uint i=1; i<numWords; i++)
+                        {
+                            const char *prev = word[i-1];
+                            const Uint prevLength = wordLength[i-1];
+                            Uint length = matryoshka_insert(tmp, prev, prevLength, 1 + IUNI % 3, alphabetSize);
+                            if (testForFalsePositives)
+                            {
+                                switch (IUNI % 20)
+                                {
+                                case 0: // append extra letters, so that only a prefix of the word is a valid step
+                                    {
+                                        Uint extra = 1 + IUNI % 2;
+                                        matryoshka_randomLetters(tmp + length, extra, alphabetSize);
+                                        length += extra;
+                                        break;
+                                    }
+                                case 1: // prepend extra letters, so that only a suffix of the word is a valid step
+                                    {
+                                        Uint extra = 1 + IUNI % 2;
+                                        memmove(tmp + extra, tmp, length);
+                                        matryoshka_randomLetters(tmp, extra, alphabetSize);
+                                        length += extra;
+                                        break;
+                                    }
+                                case 2: // concatenate a valid step with a valid step from that, e.g. "at" -> "cat"+"cats"
+                                case 3: // the same, in the opposite order,                      e.g. "at" -> "cats"+"cat"
+                                    if (length <= 12)
+                                    {
+                                        char tmp2[maxWordLength * 2];
+                                        Uint length2 = matryoshka_insert(tmp2, tmp, length, 1 + IUNI % 3, alphabetSize);
+                                        if (IUNI % 2)
+                                            memcpy(tmp + length, tmp2, length2);
+                                        else
+                                        {
+                                            memmove(tmp + length2, tmp, length);
+                                            memcpy(tmp, tmp2, length2);
+                                        }
+                                        length += length2;
+                                    }
+                                    break;
+                                case 4: // repeat the previous word unchanged
+                                    memcpy(tmp, prev, prevLength);
+                                    length = prevLength;
+                                    break;
+                                case 5: // change one letter
+                                    tmp[IUNI % length] = (char)('a' + IUNI % alphabetSize);
+                                    break;
+                                case 6: // delete one letter
+                                    {
+                                        Uint pos = IUNI % length;
+                                        memmove(tmp + pos, tmp + pos + 1, length - pos - 1);
+                                        length--;
+                                        break;
+                                    }
+                                case 7: // use a completely random word
+                                    matryoshka_randomLetters(tmp, length, alphabetSize);
+                                    break;
+                                case 8: // do two separate insertions
+                                    length = matryoshka_insert(tmp, prev, prevLength, 1, alphabetSize);
+                                    {
+                                        char tmp2[maxWordLength * 2];
+                                        memcpy(tmp2, tmp, length);
+                                        length = matryoshka_insert(tmp, tmp2, length, 1, alphabetSize);
+                                    }
+                                    break;
+                                }
+                            }
+                            if (length == 0 || length > maxWordLength)
+                            {
+                                numWords = i;
+                                break;
+                            }
+                            *s++ = ' ';
+                            word[i] = s;
+                            wordLength[i] = length;
+                            memcpy(s, tmp, length);
+                            s += length;
+                        }
+                        *s = '\0';
+                        if (numWords < 2)
+                            continue;
+
+                        bool wrong = false;
+                        for (Uint i=1; i<numWords; i++)
+                            if (!matryoshka_isValidStep(word[i-1], wordLength[i-1], word[i], wordLength[i]))
+                            {
+                                wrong = true;
+                                break;
+                            }
+
+                        const char *returnMatch;
+                        size_t returnMatchLength;
+                        if (!regex.MatchString(str, showMatch_backrefIndex, returnMatch, returnMatchLength))
+                        {
+                            if (!wrong)
+                            {
+                                printf("%s - FALSE NEGATIVE!\n", str);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
+                        }
+                        else
+                        {
+                            if (wrong)
+                            {
+                                printf("%s - FALSE POSITIVE!\n", str);
+                                if (lineBuffered)
+                                    fflush(stdout);
+                            }
                         }
                     }
                     break;
